@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: media
+      POSTGRES_PASSWORD: media
+      POSTGRES_DB: media
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  media-api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Points at the `db` service above, not at .env.example's placeholder —
+      # a contributor's .env doesn't need editing to run this compose file.
+      DATABASE_URL: postgresql+psycopg://media:media@db:5432/media
+      # No IdP required for local dev — set to "false" once you have one.
+      AUTH_DISABLED: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Elasticsearch is optional — media-api boots and runs fine without it,
+  # transcript search just reports "unavailable". Uncomment to enable it,
+  # and set ELASTICSEARCH_URL=http://es:9200 in .env.
+  # es:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+  #   restart: unless-stopped
+  #   environment:
+  #     discovery.type: single-node
+  #     xpack.security.enabled: "false"
+  #   ports:
+  #     - "9200:9200"
+
+volumes:
+  db-data:
+
+# First run: `docker compose up -d db`, then `alembic upgrade head` against
+# postgresql+psycopg://media:media@localhost:5432/media to build the schema
+# (see CLAUDE.md "Database Migrations" — the app doesn't call
+# Base.metadata.create_all() at startup), then `docker compose up -d`.

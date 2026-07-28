@@ -1,0 +1,50 @@
+# === Secrets & local credentials — never commit (org secrets baseline) ===
+# See REDACTED-standards-repo/docs/standards/gitignore.md §2. These lines are audited (GITIG column).
+.env
+.env.*
+!.env.example
+.mcp.json
+*.pem
+*.key
+
+# === Claude Code state — oauth + MCP bearer tokens ===
+.claude.json
+claude.json
+.claude/settings.local.json
+
+# === OS / editor cruft ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# === Python (uv + hatch-vcs) ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# uv / virtualenv (uv.lock IS committed)
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage / test reports
+.coverage
+coverage.xml
+htmlcov/
+junit.xml
+
+# === media-api-specific ===
+poetry.lock
+inbox/
+logs/
+.hypothesis/
+/tests_e2e_alembic.db
+/frontend/.eslintcache

@@ -1,0 +1,15 @@
+media-api is licensed under the MIT License (see LICENSE).
+
+It depends at runtime on the following third-party component distributed
+under a copyleft license. media-api uses it as an unmodified library
+import (no vendored/modified source), which does not affect the license
+of media-api's own code.
+
+- psycopg (PostgreSQL database driver), including the psycopg-binary
+  distribution — LGPL-3.0-only
+  https://github.com/psycopg/psycopg
+
+All other third-party dependencies are permissively licensed
+(MIT/BSD/Apache-2.0/ISC/PSF or similar). See the dependency graph
+(`gh api repos/Glitchedpixel-io/media-api/dependency-graph/sbom`) or
+`uv.lock` for the full list.

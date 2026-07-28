@@ -1,0 +1,98 @@
+name: Publish
+
+# Builds and publishes the Docker image on every release, then notifies the
+# private deploy pipeline (Glitchedpixel-io/media-api-deploy) so it can update
+# production. This repo has no knowledge of how or where it's actually
+# deployed — that's an intentional split, documented internally.
+on:
+  workflow_run:
+    workflows: ["Version Bump"]
+    types: [completed]
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Get version tag
+        id: tag
+        run: |
+          git fetch --tags
+          TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Export OpenAPI schema
+        run: uv run python export_openapi.py
+
+      # media-runners' codegen pins against this asset (see media-runners#21). The
+      # tag already exists (pushed by Version Bump before this workflow runs), so
+      # this is the first thing in the repo to create a GitHub Release — attaching
+      # the spec to the same tag the image below is built from keeps "the spec for
+      # vX.Y.Z" and "the image for vX.Y.Z" trivially the same reference. Handles
+      # re-runs of this workflow (release already exists) by uploading instead.
+      - name: Publish OpenAPI schema as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" openapi.json --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" openapi.json --repo "$GITHUB_REPOSITORY" --generate-notes
+          fi
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: VERSION=${{ steps.tag.outputs.version }}
+          tags: |
+            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}
+            ghcr.io/glitchedpixel-io/media-api:latest
+          cache-from: type=registry,ref=ghcr.io/glitchedpixel-io/media-api:latest
+          cache-to: type=inline
+
+  dispatch:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {}   # no checkout, no GITHUB_TOKEN use — only the explicit DEPLOY_DISPATCH_TOKEN below
+    steps:
+      - name: Notify media-api-deploy
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/Glitchedpixel-io/media-api-deploy/dispatches \
+            -f event_type=media-api-released \
+            -F "client_payload[tag]=${{ needs.build.outputs.tag }}" \
+            -F "client_payload[version]=${{ needs.build.outputs.version }}"

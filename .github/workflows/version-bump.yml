@@ -1,0 +1,86 @@
+# This workflow computes the release version from the highest existing `vX.Y.Z`
+# git tag, bumped according to a `[major]`/`[minor]` marker in the merged PR's
+# title (default: patch) — see the "Versioning & Releases" section in CLAUDE.md.
+# Do not hand-edit without understanding that convention.
+#
+# TRIGGER SAFETY: `on: push` is safe ONLY because a required `test` status check
+# exists on this repo's branch protection, so every commit reaching main has
+# already passed CI. That protection is invisible from this file. Verify with:
+#   gh api /repos/<owner>/<repo>/rulesets | jq '.[].name'
+# If it is ever removed, switch to the `workflow_run` variant instead, or this
+# workflow will happily tag a red commit.
+name: Version Bump
+
+on:
+  push:
+    branches: [main]
+
+# Serialize: two merges seconds apart would otherwise both read the same "latest tag"
+# and compute the same next version. `cancel-in-progress: false` is not optional —
+# cancelling a version bump loses a release.
+concurrency:
+  group: version-bump-main
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read      # needed to look up the source PR's actual title
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0       # REQUIRED — a shallow clone has no tags, and every run
+                               # would then compute v0.0.1
+
+      - name: Compute next tag
+        id: next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Take the highest existing vX.Y.Z tag and bump it. The bump level comes from
+          # the source PR's title:
+          #   [major] -> X+1.0.0   [minor] -> X.Y+1.0   default -> X.Y.Z+1
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          latest=${latest:-v0.0.0}
+          echo "Latest tag: $latest"
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+
+          # A squash-merge commit subject only carries the PR title when the PR had more
+          # than one commit; for a single-commit PR, GitHub instead defaults the squash
+          # subject to that commit's own message, silently dropping a [minor]/[major]
+          # marker placed only in the PR title. Look up the actual PR title via the API —
+          # using the PR number GitHub always appends as "(#N)" — so the marker is never
+          # lost. Fall back to the commit subject if no PR number is found (e.g. a direct
+          # push to main).
+          msg=$(git log -1 --pretty=%s)
+          pr_number=$(echo "$msg" | grep -oP '(?<=\(#)[0-9]+(?=\)\s*$)' || true)
+          if [ -n "$pr_number" ]; then
+            pr_title=$(gh pr view "$pr_number" --json title -q .title 2>/dev/null || true)
+            if [ -n "$pr_title" ]; then
+              echo "Using PR #$pr_number title as bump source: $pr_title"
+              msg="$pr_title"
+            fi
+          fi
+          echo "Bump source: $msg"
+
+          if echo "$msg" | grep -qiE '\[major\]'; then
+            echo "Bump level: major"
+            next="$((major + 1)).0.0"
+          elif echo "$msg" | grep -qiE '\[minor\]'; then
+            echo "Bump level: minor"
+            next="${major}.$((minor + 1)).0"
+          else
+            echo "Bump level: patch"
+            next="${major}.${minor}.$((patch + 1))"
+          fi
+          echo "Next version: v$next"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.next.outputs.tag }}"
+          git push origin "${{ steps.next.outputs.tag }}"
