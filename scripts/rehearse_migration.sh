@@ -34,9 +34,13 @@
 #   CONTENTION_TABLE      Table to hold an ACCESS EXCLUSIVE lock on while the
 #                         migration runs, to rehearse queueing behavior.
 #                         Must be the table's name as it exists BEFORE the
-#                         migrations in this run (default: videos — the
-#                         pending migration renames it to assets partway
-#                         through the same upgrade).
+#                         migrations in this run (default: assets — renamed
+#                         from videos by an earlier migration, now the
+#                         current head; the pending migration here is a
+#                         full-table rewrite of media_transform_requests, so
+#                         that table is the one that actually wants
+#                         rehearsing under contention -- adjust if a future
+#                         migration changes what's pending).
 #   CONTENTION_HOLD_SECS  How long the background transaction holds the lock
 #                         (default: 8 — longer than LOCK_TIMEOUT_MS so you
 #                         can observe the migration time out, then rerun
@@ -45,9 +49,15 @@
 #   SKIP_CONTENTION_TEST  Set to "1" to skip the lock-contention rehearsal
 #                         and just measure clean-path migration time.
 #   DOWNGRADE_STEPS       How many `alembic downgrade -1` steps to rehearse
-#                         after upgrade (default: 3 — the three pending
-#                         rename migrations as of this writing). Set to 0
-#                         to skip the downgrade rehearsal.
+#                         after upgrade (default: 1 — the one pending
+#                         migration as of this writing, which converts
+#                         media_transform_requests.transform_type from an
+#                         enum to text and rewrites its values; downgrading
+#                         fails BY DESIGN if any row can't be mapped back
+#                         onto the old enum, e.g. a provider-qualified value
+#                         created after the migration ran — a red step 7 in
+#                         that case is expected, not a rehearsal bug). Set
+#                         to 0 to skip the downgrade rehearsal.
 #   DUMP_FILE             Where to write the pg_dump custom-format archive
 #                         (default: a path under the OS temp dir; kept after
 #                         the run so you can inspect or reuse it).
@@ -64,10 +74,10 @@ set -euo pipefail
 
 SCRATCH_DB_NAME="${SCRATCH_DB_NAME:-media_api_rehearsal}"
 LOCK_TIMEOUT_MS="${LOCK_TIMEOUT_MS:-5000}"
-CONTENTION_TABLE="${CONTENTION_TABLE:-videos}"
+CONTENTION_TABLE="${CONTENTION_TABLE:-assets}"
 CONTENTION_HOLD_SECS="${CONTENTION_HOLD_SECS:-8}"
 SKIP_CONTENTION_TEST="${SKIP_CONTENTION_TEST:-0}"
-DOWNGRADE_STEPS="${DOWNGRADE_STEPS:-3}"
+DOWNGRADE_STEPS="${DOWNGRADE_STEPS:-1}"
 DUMP_FILE="${DUMP_FILE:-$(mktemp -t media_api_rehearsal_XXXXXX.dump)}"
 
 if [[ "$PROD_SOURCE_URL" == "$SCRATCH_ADMIN_URL" ]]; then

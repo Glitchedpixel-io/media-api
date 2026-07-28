@@ -13,7 +13,6 @@ from app.schemas import (
     TransformRequestRead,
     TransformRequestReadExpanded,
     TransformRequestUpdateInternal,
-    TransformTypeEnum,
 )
 
 from ..utils.sorting import apply_ordering
@@ -113,7 +112,7 @@ class SQLAlchemyTransformRequestRepository(SQLAlchemyBaseRepository, TransformRe
         return [TransformRequestRead.model_validate(row) for row in rows]
 
     def claim_next(
-        self, transform_type: TransformTypeEnum, worker: str, external_job_id: str | None
+        self, transform_type: str, worker: str, external_job_id: str | None
     ) -> TransformRequestReadExpanded:
         # Atomically claim the next available task of the given type, eagerly loading asset
         try:

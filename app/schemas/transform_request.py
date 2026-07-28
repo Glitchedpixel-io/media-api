@@ -5,16 +5,24 @@ from pydantic import Field
 
 from . import make_partial_model
 from .asset import AssetRead
-from .enums import OutcomeEnum, TransformTypeEnum
+from .enums import OutcomeEnum
 from .mixins import IDMixin
+from .transform_routing import (
+    TRANSFORM_ROUTING_KEY_DESCRIPTION,
+    TRANSFORM_ROUTING_KEY_EXAMPLES,
+    TransformRoutingKey,
+)
 from .utc_basemodel import Timestamp, UTCBaseModel
 
 
 class TransformRequestAttrs(UTCBaseModel):
     model_config = {"from_attributes": True, "extra": "forbid"}
 
-    transform_type: TransformTypeEnum = Field(
-        ..., title="Transform Type", description="Type of transformation to perform"
+    transform_type: TransformRoutingKey = Field(
+        ...,
+        title="Transform Type",
+        description=TRANSFORM_ROUTING_KEY_DESCRIPTION,
+        examples=TRANSFORM_ROUTING_KEY_EXAMPLES,
     )
     parameters: dict[str, Any] | None = Field(
         None, title="Parameters", description="JSON parameters for the transformation"
@@ -103,8 +111,11 @@ class TransformRequestReadExpanded(TransformRequestRead):
 class TransformRequestClaim(UTCBaseModel):
     model_config = {"from_attributes": True, "extra": "forbid"}
 
-    transform_type: TransformTypeEnum = Field(
-        ..., title="Transform Type", description="Type of transformation to claim"
+    transform_type: TransformRoutingKey = Field(
+        ...,
+        title="Transform Type",
+        description="Provider-qualified routing key of the transform type to claim",
+        examples=TRANSFORM_ROUTING_KEY_EXAMPLES,
     )
     worker: str = Field(
         ..., title="Worker", description="Identifier of the worker claiming the task"

@@ -21,13 +21,12 @@ class TestRunnerConfig:
         cfg = get_runner_config()
 
         assert isinstance(cfg.backend, str)
-        assert isinstance(cfg.job_routing_map, dict)
         assert cfg.webhook_url is None or isinstance(cfg.webhook_url, str)
+        assert not hasattr(cfg, "job_routing_map")
 
     @pytest.mark.unit
     def test_runner_config_defaults(self) -> None:
         cfg = RunnerConfig()
 
         assert cfg.backend == "none"
-        assert cfg.job_routing_map == {}
         assert cfg.webhook_url is None

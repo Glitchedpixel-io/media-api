@@ -28,7 +28,6 @@ from app.schemas import (
     TransformRequestListParams,
     TransformRequestPatchPublic,
     TransformRequestUpdateInternal,
-    TransformTypeEnum,
 )
 from app.runners import JobDispatch, LogEntry, NullJobRunner
 from app.services import TransformRequestService
@@ -85,7 +84,7 @@ class TestGetTransformRequest:
         """get_transform_request returns request when found in repository."""
 
         expected_request = TransformRequestReadFactory(
-            id=123, asset_id=42, transform_type=TransformTypeEnum.transcode
+            id=123, asset_id=42, transform_type="prefect.transcode"
         )
         tr_repo.get.return_value = expected_request
 
@@ -94,7 +93,7 @@ class TestGetTransformRequest:
         assert result is expected_request
         assert result.id == 123
         assert result.asset_id == 42
-        assert result.transform_type == TransformTypeEnum.transcode
+        assert result.transform_type == "prefect.transcode"
         tr_repo.get.assert_called_once_with(123)
 
     @pytest.mark.unit
@@ -154,7 +153,7 @@ class TestGetTransformRequests:
         )
 
         params = TransformRequestListParams(
-            transform_type=TransformTypeEnum.transcode,
+            transform_type="prefect.transcode",
             actioned=True,
             worker_assigned=False,
             outcome=OutcomeEnum.failed,
@@ -324,11 +323,11 @@ class TestCreateAssetTransformRequest:
         """create_asset_transform_request creates request successfully."""
 
         created_request = TransformRequestReadFactory(
-            id=1, asset_id=7, transform_type=TransformTypeEnum.transcode
+            id=1, asset_id=7, transform_type="prefect.transcode"
         )
         tr_repo.create.return_value = created_request
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         result = svc.create_asset_transform_request(7, payload)
 
@@ -340,7 +339,7 @@ class TestCreateAssetTransformRequest:
         call_arg = tr_repo.create.call_args[0][0]
         assert isinstance(call_arg, TransformRequestCreateInternal)
         assert call_arg.asset_id == 7
-        assert call_arg.transform_type == TransformTypeEnum.transcode
+        assert call_arg.transform_type == "prefect.transcode"
 
     @pytest.mark.unit
     def test_create_asset_transform_request_unique_violation(self, tr_repo, m_repo, svc) -> None:
@@ -348,7 +347,7 @@ class TestCreateAssetTransformRequest:
 
         tr_repo.create.side_effect = UniqueViolation("u")
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_asset_transform_request(7, payload)
@@ -362,7 +361,7 @@ class TestCreateAssetTransformRequest:
 
         tr_repo.create.side_effect = DatabaseLocked("locked")
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_asset_transform_request(7, payload)
@@ -388,7 +387,7 @@ class TestCreateAssetTransformRequest:
 
         tr_repo.create.side_effect = exc_class("c")
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_asset_transform_request(7, payload)
@@ -410,7 +409,7 @@ class TestCreateLinkedRequest:
         )
         tr_repo.create.return_value = created_request
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         result = svc.create_linked_request(9, payload)
 
@@ -428,7 +427,7 @@ class TestCreateLinkedRequest:
 
         tr_repo.get.return_value = None
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_linked_request(999, payload)
@@ -492,7 +491,7 @@ class TestRetryTransformRequest:
             actioned=True,
             outcome=OutcomeEnum.failed,
             asset_id=11,
-            transform_type=TransformTypeEnum.transcode,
+            transform_type="prefect.transcode",
             parameters={"test": 122},
         )
         tr_repo.get.return_value = parent
@@ -510,7 +509,7 @@ class TestRetryTransformRequest:
         assert call_arg.processed_at is None
         assert call_arg.worker is None
         assert call_arg.parent_transform_request_id == 5
-        assert call_arg.transform_type == TransformTypeEnum.transcode
+        assert call_arg.transform_type == "prefect.transcode"
         assert call_arg.asset_id == 11
 
     @pytest.mark.unit
@@ -619,11 +618,11 @@ class TestClaimNextRequest:
         next_request = TransformRequestReadFactory(id=123)
         tr_repo.claim_next.return_value = next_request
 
-        result = svc.claim_next_request(TransformTypeEnum.test, "worker1", None)
+        result = svc.claim_next_request("prefect.test", "worker1", None)
 
         assert result is next_request
         tr_repo.claim_next.assert_called_once_with(
-            transform_type=TransformTypeEnum.test, worker="worker1", external_job_id=None
+            transform_type="prefect.test", worker="worker1", external_job_id=None
         )
 
     @pytest.mark.unit
@@ -633,11 +632,11 @@ class TestClaimNextRequest:
         next_request = TransformRequestReadFactory()
         tr_repo.claim_next.return_value = next_request
 
-        result = svc.claim_next_request(TransformTypeEnum.transcode, "worker2", "flow-run-123")
+        result = svc.claim_next_request("prefect.transcode", "worker2", "flow-run-123")
 
         assert result is next_request
         tr_repo.claim_next.assert_called_once_with(
-            transform_type=TransformTypeEnum.transcode,
+            transform_type="prefect.transcode",
             worker="worker2",
             external_job_id="flow-run-123",
         )
@@ -649,7 +648,7 @@ class TestClaimNextRequest:
         tr_repo.claim_next.side_effect = NotFoundError("none")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.claim_next_request(TransformTypeEnum.transcode, "w1", None)
+            svc.claim_next_request("prefect.transcode", "w1", None)
 
         assert exc_info.value.status_code == 204
         assert "No tasks available" in exc_info.value.detail
@@ -661,7 +660,7 @@ class TestClaimNextRequest:
         tr_repo.claim_next.side_effect = DatabaseLocked("locked")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.claim_next_request(TransformTypeEnum.transcode, "w2", None)
+            svc.claim_next_request("prefect.transcode", "w2", None)
 
         assert exc_info.value.status_code == 423
         assert "read-only mode" in exc_info.value.detail
@@ -673,7 +672,7 @@ class TestClaimNextRequest:
         tr_repo.claim_next.side_effect = RuntimeError("boom")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.claim_next_request(TransformTypeEnum.transcode, "w3", None)
+            svc.claim_next_request("prefect.transcode", "w3", None)
 
         assert exc_info.value.status_code == 500
         assert "Internal server error" in exc_info.value.detail
@@ -685,7 +684,7 @@ class TestClaimNextRequest:
         tr_repo.claim_next.side_effect = HTTPException(status_code=418, detail="teapot")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.claim_next_request(TransformTypeEnum.transcode, "w4", None)
+            svc.claim_next_request("prefect.transcode", "w4", None)
 
         assert exc_info.value.status_code == 418
         assert exc_info.value.detail == "teapot"
@@ -790,19 +789,38 @@ class TestDispatchOnCreate:
         runner = _RecordingRunner()
         svc = TransformRequestService(tr_repo, m_repo, runner)
         created = TransformRequestReadFactory(
-            id=1, asset_id=7, transform_type=TransformTypeEnum.transcode, parameters={"a": 1}
+            id=1, asset_id=7, transform_type="prefect.transcode", parameters={"a": 1}
         )
         tr_repo.create.return_value = created
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
         result = svc.create_asset_transform_request(7, payload)
 
         assert result is created
         assert len(runner.dispatched) == 1
         dispatch = runner.dispatched[0]
         assert dispatch.job_id == 1
-        assert dispatch.job_type == TransformTypeEnum.transcode.value
+        assert dispatch.job_type == "prefect.transcode"
         assert dispatch.parameters == {"a": 1}
+
+    @pytest.mark.unit
+    def test_create_dispatches_non_prefect_key_unchanged(self, tr_repo, m_repo) -> None:
+        """A non-Prefect routing key is forwarded to the runner verbatim, untouched."""
+
+        runner = _RecordingRunner()
+        svc = TransformRequestService(tr_repo, m_repo, runner)
+        created = TransformRequestReadFactory(
+            id=1, asset_id=7, transform_type="webhook.thumbnail.generate", parameters={"a": 1}
+        )
+        tr_repo.create.return_value = created
+
+        payload = TransformRequestCreatePublic(transform_type="webhook.thumbnail.generate")
+        result = svc.create_asset_transform_request(7, payload)
+
+        assert result is created
+        assert len(runner.dispatched) == 1
+        dispatch = runner.dispatched[0]
+        assert dispatch.job_type == "webhook.thumbnail.generate"
 
     @pytest.mark.unit
     def test_create_does_not_dispatch_non_read_model(self, tr_repo, m_repo) -> None:
@@ -812,7 +830,7 @@ class TestDispatchOnCreate:
         svc = TransformRequestService(tr_repo, m_repo, runner)
         tr_repo.create.return_value = MagicMock()  # not a TransformRequestRead
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
         svc.create_asset_transform_request(7, payload)
 
         assert runner.dispatched == []
@@ -823,10 +841,10 @@ class TestDispatchOnCreate:
 
         runner = _RecordingRunner(dispatch_error=RuntimeError("runner down"))
         svc = TransformRequestService(tr_repo, m_repo, runner)
-        created = TransformRequestReadFactory(id=1, transform_type=TransformTypeEnum.transcode)
+        created = TransformRequestReadFactory(id=1, transform_type="prefect.transcode")
         tr_repo.create.return_value = created
 
-        payload = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcode)
+        payload = TransformRequestCreatePublic(transform_type="prefect.transcode")
         result = svc.create_asset_transform_request(7, payload)
 
         assert result is created

@@ -15,7 +15,6 @@ from app.schemas import (
     OutcomeEnum,
     TransformRequestListParams,
     TransformRequestUpdateInternal,
-    TransformTypeEnum,
 )
 from tests.contracts.repositories.bundles_impl import (
     make_bundle,
@@ -78,14 +77,14 @@ def test_create_with_valid_parent_id(bundle):
         TransformRequestCreateFactory(
             parent_transform_request_id=transform_request.id,
             asset_id=asset.id,
-            transform_type=TransformTypeEnum.youtube,
+            transform_type="prefect.youtube",
         )
     )
     assert (
         linked_request
         and linked_request.parent_transform_request_id == transform_request.id
         and linked_request.asset_id == asset.id
-        and linked_request.transform_type == TransformTypeEnum.youtube
+        and linked_request.transform_type == "prefect.youtube"
     )
 
 
@@ -95,19 +94,61 @@ def test_only_one_unactioned_per_type_per_asset(bundle):
     asset = bundle.assets.create(AssetCreateFactory())
 
     # Create one unactioned transcode request
-    tr1 = TransformRequestCreateFactory(asset_id=asset.id, transform_type="transcode")
+    tr1 = TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode")
     assert bundle.transform_requests.create(tr1)
 
     # Creating another unactioned of same type for same asset should violate unique
     with pytest.raises(UniqueViolation):
         bundle.transform_requests.create(
-            TransformRequestCreateFactory(asset_id=asset.id, transform_type="transcode")
+            TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode")
         )
 
     # But creating a different type unactioned is allowed
     assert bundle.transform_requests.create(
-        TransformRequestCreateFactory(asset_id=asset.id, transform_type="extract_audio")
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.extract_audio")
     )
+
+    # A different provider for the same job name is a distinct routing key --
+    # no collision with the prefect.transcode row above.
+    assert bundle.transform_requests.create(
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="webhook.transcode")
+    )
+
+
+@pytest.mark.contract
+def test_transform_type_filter_is_exact_match(bundle):
+    """`prefect.transcode` must not match `prefect.transcode_hq` or `webhook.transcode`."""
+
+    asset = bundle.assets.create(AssetCreateFactory())
+    bundle.transform_requests.create(
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode")
+    )
+    bundle.transform_requests.create(
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode_hq")
+    )
+    bundle.transform_requests.create(
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="webhook.transcode")
+    )
+
+    response = bundle.transform_requests.list_paged(
+        TransformRequestListParams(transform_type="prefect.transcode")
+    )
+    assert [it.transform_type for it in response.items] == ["prefect.transcode"]
+
+
+@pytest.mark.contract
+def test_free_text_provider_local_type_round_trip(bundle):
+    """A provider-local type containing dots is stored and returned verbatim."""
+
+    asset = bundle.assets.create(AssetCreateFactory())
+    tr = bundle.transform_requests.create(
+        TransformRequestCreateFactory(
+            asset_id=asset.id, transform_type="webhook.thumbnail.generate"
+        )
+    )
+    fetched = bundle.transform_requests.get(tr.id)
+    assert fetched is not None
+    assert fetched.transform_type == "webhook.thumbnail.generate"
 
 
 @pytest.mark.contract
@@ -120,7 +161,7 @@ def test_many_actioned_allowed_per_type_per_asset(bundle):
         bundle.transform_requests.create(
             TransformRequestCreateFactory(
                 asset_id=asset.id,
-                transform_type="transcode",
+                transform_type="prefect.transcode",
                 actioned=True,
                 processed_at=datetime.now(UTC),
                 outcome="succeeded",
@@ -138,14 +179,14 @@ def test_many_unactioned_allowed_per_type_for_distinct_assets(bundle):
         bundle.transform_requests.create(
             TransformRequestCreateFactory(
                 asset_id=asset.id,
-                transform_type="transcode",
+                transform_type="prefect.transcode",
                 actioned=False,
                 processed_at=None,
                 outcome=None,
             )
         )
     response = bundle.transform_requests.list_paged(
-        TransformRequestListParams(transform_type="transcode", actioned=False)
+        TransformRequestListParams(transform_type="prefect.transcode", actioned=False)
     )
     assert len(response.items) == 5
 
@@ -222,7 +263,7 @@ def test_update_roundtrip_and_unset_fields(bundle):
     tr = bundle.transform_requests.create(
         TransformRequestCreateFactory(
             asset_id=asset.id,
-            transform_type="transcode",
+            transform_type="prefect.transcode",
             actioned=False,
             worker_notes="Initial",
         )
@@ -262,7 +303,7 @@ def test_update_invalid_actioned_states(bundle):
 
     asset = bundle.assets.create(AssetCreateFactory())
     tr = bundle.transform_requests.create(
-        TransformRequestCreateFactory(asset_id=asset.id, transform_type="transcode")
+        TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode")
     )
 
     with pytest.raises(CheckViolation):
@@ -287,7 +328,7 @@ def test_update_invalid_actioned_states(bundle):
     tr2 = bundle.transform_requests.create(
         TransformRequestCreateFactory(
             asset_id=asset.id,
-            transform_type="transcode",
+            transform_type="prefect.transcode",
             actioned=True,
             processed_at=datetime.now(UTC),
             outcome="succeeded",
@@ -328,12 +369,12 @@ def test_get_asset_transform_requests(bundle):
     asset = bundle.assets.create(AssetCreateFactory())
     other = bundle.assets.create(AssetCreateFactory())
     # create several
-    for t in ["transcode", "extract_audio", "youtube"]:
+    for t in ["prefect.transcode", "prefect.extract_audio", "prefect.youtube"]:
         bundle.transform_requests.create(
             TransformRequestCreateFactory(asset_id=asset.id, transform_type=t)
         )
     bundle.transform_requests.create(
-        TransformRequestCreateFactory(asset_id=other.id, transform_type="transcode")
+        TransformRequestCreateFactory(asset_id=other.id, transform_type="prefect.transcode")
     )
     got = bundle.transform_requests.get_asset_transform_requests(asset.id)
     assert all(gr.asset_id == asset.id for gr in got)
@@ -350,12 +391,12 @@ def test_list_paged_filters_and_ordering(bundle):
     items = []
     for i, t in enumerate(
         [
-            "transcode",
-            "transcode",
-            "extract_audio",
-            "youtube",
-            "transcode",
-            "extract_audio",
+            "prefect.transcode",
+            "prefect.transcode",
+            "prefect.extract_audio",
+            "prefect.youtube",
+            "prefect.transcode",
+            "prefect.extract_audio",
         ]
     ):
         actioned = i % 2 == 0
@@ -377,12 +418,10 @@ def test_list_paged_filters_and_ordering(bundle):
 
     # Filter by type
     response = bundle.transform_requests.list_paged(
-        TransformRequestListParams(transform_type=TransformTypeEnum.transcode)
+        TransformRequestListParams(transform_type="prefect.transcode")
     )
-    assert all(it.transform_type == TransformTypeEnum.transcode for it in response.items)
-    assert len(response.items) == len(
-        [x for x in items if x.transform_type == TransformTypeEnum.transcode]
-    )
+    assert all(it.transform_type == "prefect.transcode" for it in response.items)
+    assert len(response.items) == len([x for x in items if x.transform_type == "prefect.transcode"])
 
     # Filter by actioned
     response = bundle.transform_requests.list_paged(TransformRequestListParams(actioned=True))
@@ -505,9 +544,9 @@ def no_test_claim_next_and_not_found(bundle):
     ids = []
     for i, t in enumerate(
         [
-            "transcode",
-            "extract_audio",
-            "youtube",
+            "prefect.transcode",
+            "prefect.extract_audio",
+            "prefect.youtube",
         ]
     ):
         ids.append(
@@ -517,18 +556,18 @@ def no_test_claim_next_and_not_found(bundle):
         )
 
     # Assign one to a worker already
-    claimed = bundle.transform_requests.claim_next(TransformTypeEnum.transcode, "worker-1")
+    claimed = bundle.transform_requests.claim_next("prefect.transcode", "worker-1")
     assert claimed.worker == "worker-1"
     assert claimed.actioned is False
     # Next claim returns the next oldest unassigned of same type
-    claimed2 = bundle.transform_requests.claim_next(TransformTypeEnum.extract_audio, "worker-2")
+    claimed2 = bundle.transform_requests.claim_next("prefect.extract_audio", "worker-2")
     assert (
         claimed2.worker == "worker-2"
         and claimed2.actioned is False
         and claimed2.id in ids
-        and claimed2.transform_type == TransformTypeEnum.extract_audio
+        and claimed2.transform_type == "prefect.extract_audio"
     )
 
     # If none available of a different type, raises NotFoundError
     with pytest.raises(NotFoundError):
-        bundle.transform_requests.claim_next(TransformTypeEnum.test, "worker-x")
+        bundle.transform_requests.claim_next("prefect.test", "worker-x")

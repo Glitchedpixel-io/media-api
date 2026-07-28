@@ -83,8 +83,8 @@ groups:
   startup if `APP_ENV=production`).
 - **Filesystem roots** — `MEDIA_ROOT`, `ACCESSORY_ROOT`, `INBOX_ROOT`.
 - **Job execution** — `RUNNER_BACKEND` (`none` by default — no
-  orchestration framework required to boot), plus `RUNNER_WEBHOOK_URL` /
-  `RUNNER_JOB_ROUTING_MAP` for the optional backends described below.
+  orchestration framework required to boot), plus `RUNNER_WEBHOOK_URL` for
+  the optional backends described below.
 - **Elasticsearch** (optional) — `ELASTICSEARCH_URL` and friends, for
   transcript search.
 - **Logfire** (optional) — `LOGFIRE_TOKEN`, for observability.
@@ -97,6 +97,16 @@ The backend is selected with `RUNNER_BACKEND` (default `none`, i.e. a pure
 pull model). Prefect is one optional adapter
 (`pip install media-api[prefect]`, `RUNNER_BACKEND=prefect`); a generic
 `webhook` adapter is also provided.
+
+Routing is decided by the request, not server config: `transform_type` is a
+provider-qualified routing key, `<provider>.<provider-local-type>` (e.g.
+`prefect.transcode`). The API validates only the shape — no allow-list of
+providers or job names — so adding a new Prefect deployment needs no API
+release. The key is split on the first `.`; everything after is forwarded
+verbatim as that provider's own vocabulary. The Prefect adapter runs the
+deployment named by a `prefect.`-prefixed key's remainder and ignores keys
+for other providers; the webhook adapter forwards the whole key as
+`job_type` and lets the receiving system decide what to do with it.
 
 ## Database migrations
 

@@ -20,6 +20,7 @@ from .title_filters import *
 from .title_reference import *
 from .transcript_search import *
 from .transform_request import *
+from .transform_routing import *
 from .utc_basemodel import *
 
 __all__ = [
@@ -85,6 +86,9 @@ __all__ = [
     "StreamPatchPublic",
     "StreamRead",
     "StreamUpdateInternal",
+    "TRANSFORM_ROUTING_KEY_DESCRIPTION",
+    "TRANSFORM_ROUTING_KEY_EXAMPLES",
+    "TRANSFORM_ROUTING_KEY_PATTERN",
     "TagCounts",
     "TagCreateInternal",
     "TagCreatePublic",
@@ -129,6 +133,7 @@ __all__ = [
     "TransformRequestRead",
     "TransformRequestReadExpanded",
     "TransformRequestUpdateInternal",
+    "TransformRoutingKey",
     "TransformTypeEnum",
     "UTCBaseModel",
 ]

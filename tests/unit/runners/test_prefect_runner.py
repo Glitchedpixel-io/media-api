@@ -20,24 +20,55 @@ from app.runners.prefect_runner import (
 
 class TestPrefectDispatcher:
     @pytest.mark.unit
-    def test_dispatch_unknown_job_type_is_noop(self, mocker) -> None:
+    def test_dispatch_strips_prefect_prefix(self, mocker) -> None:
         run_deployment = mocker.patch("prefect.deployments.run_deployment")
 
-        dispatcher = PrefectDispatcher({"transcode": "flow/Deployment"})
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="unmapped"))
+        dispatcher = PrefectDispatcher()
+        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.transcode"))
+
+        assert result is None
+        run_deployment.assert_called_once_with(name="transcode", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_preserves_dots_in_remainder(self, mocker) -> None:
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+
+        dispatcher = PrefectDispatcher()
+        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.media/transcode"))
+
+        assert result is None
+        run_deployment.assert_called_once_with(name="media/transcode", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_preserves_multiple_dots_in_remainder(self, mocker) -> None:
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+
+        dispatcher = PrefectDispatcher()
+        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.deploy.v2"))
+
+        assert result is None
+        run_deployment.assert_called_once_with(name="deploy.v2", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_non_prefect_key_is_noop(self, mocker) -> None:
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+
+        dispatcher = PrefectDispatcher()
+        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="webhook.transcode"))
 
         assert result is None
         run_deployment.assert_not_called()
 
     @pytest.mark.unit
-    def test_dispatch_triggers_deployment(self, mocker) -> None:
+    def test_dispatch_prefix_match_is_exact_not_startswith_loose(self, mocker) -> None:
+        """`prefectish.transcode` must NOT match -- the prefix is "prefect.", not "prefect"."""
         run_deployment = mocker.patch("prefect.deployments.run_deployment")
 
-        dispatcher = PrefectDispatcher({"transcode": "flow/Deployment"})
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="transcode"))
+        dispatcher = PrefectDispatcher()
+        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefectish.transcode"))
 
         assert result is None
-        run_deployment.assert_called_once_with(name="flow/Deployment", timeout=0)
+        run_deployment.assert_not_called()
 
     @pytest.mark.unit
     def test_dispatch_swallows_errors(self, mocker) -> None:
@@ -46,9 +77,9 @@ class TestPrefectDispatcher:
             side_effect=RuntimeError("prefect down"),
         )
 
-        dispatcher = PrefectDispatcher({"transcode": "flow/Deployment"})
+        dispatcher = PrefectDispatcher()
 
-        assert dispatcher.dispatch(JobDispatch(job_id=1, job_type="transcode")) is None
+        assert dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.transcode")) is None
 
 
 class TestPrefectLogSource:
@@ -77,7 +108,7 @@ class TestPrefectLogSource:
 class TestPrefectJobRunner:
     @pytest.mark.unit
     def test_runner_wires_dispatcher_and_log_source(self) -> None:
-        runner = PrefectJobRunner({"transcode": "flow/Deployment"})
+        runner = PrefectJobRunner()
 
         assert isinstance(runner, CompositeJobRunner)
         assert isinstance(runner._dispatcher, PrefectDispatcher)

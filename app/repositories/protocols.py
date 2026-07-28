@@ -57,7 +57,7 @@ from app.schemas import (
     TransformRequestReadExpanded,
     TransformRequestUpdateInternal,
 )
-from app.schemas.enums import EntityTypeEnum, TransformTypeEnum
+from app.schemas.enums import EntityTypeEnum
 from app.schemas.job import JobRead
 
 
@@ -184,7 +184,7 @@ class TransformRequestRepository(Protocol):
     ) -> TransformRequestRead: ...
     def get_asset_transform_requests(self, asset_id: int) -> list[TransformRequestRead]: ...
     def claim_next(
-        self, transform_type: TransformTypeEnum, worker: str, external_job_id: str | None
+        self, transform_type: str, worker: str, external_job_id: str | None
     ) -> TransformRequestReadExpanded: ...
     def mark_heartbeat(self, request_id: int) -> None: ...
 

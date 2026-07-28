@@ -5,7 +5,8 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
-from .enums import OutcomeEnum, TransformTypeEnum
+from .enums import OutcomeEnum
+from .transform_routing import TransformRoutingKey
 
 
 class KeysetPagination(BaseModel):
@@ -35,7 +36,9 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class TransformRequestFilters(BaseModel):
-    transform_type: TransformTypeEnum | None = None
+    transform_type: TransformRoutingKey | None = Field(
+        None, description="Filter by exact-match provider-qualified routing key"
+    )
     actioned: bool | None = None
     worker_assigned: bool | None = Field(
         None, description="Filter where worker is set (True) or not set (False)"

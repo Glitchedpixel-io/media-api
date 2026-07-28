@@ -32,9 +32,7 @@ class TestBuildJobRunner:
 
     @pytest.mark.unit
     def test_prefect_backend_returns_prefect_runner(self) -> None:
-        runner = build_job_runner(
-            RunnerConfig(backend="prefect", job_routing_map={"transcode": "flow/Deployment"})
-        )
+        runner = build_job_runner(RunnerConfig(backend="prefect"))
 
         assert isinstance(runner, PrefectJobRunner)
 
