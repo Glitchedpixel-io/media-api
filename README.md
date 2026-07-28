@@ -1,7 +1,7 @@
 # media-api
 
 [![Tests](https://github.com/Glitchedpixel-io/media-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Glitchedpixel-io/media-api/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/Glitchedpixel-io/media-api/graph/badge.svg?token=U1UED7P3SX)](https://codecov.io/gh/Glitchedpixel-io/media-api)
+[![codecov](https://codecov.io/gh/Glitchedpixel-io/media-api/graph/badge.svg?token=lJf4cmHif7)](https://codecov.io/gh/Glitchedpixel-io/media-api)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
