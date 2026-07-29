@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from types import MappingProxyType
 from typing import Annotated
 
 from logfire import LevelName
@@ -23,7 +25,7 @@ from app.config.schema import (
     ElasticsearchConfig,
     LogfireConfig,
     MediaConfig,
-    RunnerConfig,
+    OrchestrationConfig,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -77,6 +79,26 @@ class _Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    @field_validator("enabled_orchestration_providers", mode="before")
+    @classmethod
+    def split_enabled_orchestration_providers(cls, v: str | list[str]) -> list[str]:
+        """Accept a comma-separated string (e.g. from an env var) or a list."""
+        if isinstance(v, str):
+            return [provider.strip() for provider in v.split(",") if provider.strip()]
+        return v
+
+    @field_validator("orchestration_provider_options", mode="before")
+    @classmethod
+    def parse_orchestration_provider_options(
+        cls, v: str | dict[str, dict[str, object]]
+    ) -> dict[str, dict[str, object]]:
+        """Accept a JSON object string (e.g. from an env var) or a dict; blank means none."""
+        if isinstance(v, str):
+            if not v.strip():
+                return {}
+            return json.loads(v)
+        return v
+
     @model_validator(mode="after")
     def forbid_auth_disabled_in_production(self) -> _Settings:
         if self.auth_disabled and self.env == "production":
@@ -109,12 +131,27 @@ class _Settings(BaseSettings):
     es_ca_cert: str | None = Field(None)
     transcripts_index: str = Field("transcript-segments")
 
-    # Job-execution backend selection. Default "none" is the pure pull model
-    # (no orchestration framework required to boot). Set to "prefect" or
-    # "webhook" to enable a best-effort dispatch on job creation. Routing is
-    # carried by each request's own transform_type, not by config.
-    runner_backend: str = Field("none")
-    runner_webhook_url: str | None = Field(None)
+    # Orchestration provider selection. Default is empty -- the pure pull
+    # model, no orchestration framework required to boot. Providers are
+    # discovered via the media_api.orchestration_providers entry-point group
+    # and only enabled ones are ever instantiated. Routing is carried by each
+    # request's own transform_type, not by config -- there is no routing map
+    # here, only provider-scoped construction options.
+    # NoDecode: keep pydantic-settings from JSON-decoding the env value so the
+    # validator below can parse a plain comma-separated string.
+    enabled_orchestration_providers: Annotated[list[str], NoDecode] = Field(
+        default=[],
+        description="Enabled orchestration provider keys, comma-separated (e.g. 'prefect,webhook')",
+    )
+    # NoDecode: an unset/blank env var isn't valid JSON -- decode it ourselves
+    # below so blank means "no options" instead of a startup crash.
+    orchestration_provider_options: Annotated[dict[str, dict[str, object]], NoDecode] = Field(
+        default_factory=dict,
+        description=(
+            "Provider-scoped construction options as a JSON object, e.g. "
+            '{"webhook": {"url": "https://example.com/hook"}}'
+        ),
+    )
 
     @classmethod
     def settings_customise_sources(
@@ -172,10 +209,15 @@ def _build_elasticsearch_config(s: _Settings) -> ElasticsearchConfig:
     )
 
 
-def _build_runner_config(s: _Settings) -> RunnerConfig:
-    return RunnerConfig(
-        backend=s.runner_backend,
-        webhook_url=s.runner_webhook_url,
+def _build_orchestration_config(s: _Settings) -> OrchestrationConfig:
+    return OrchestrationConfig(
+        enabled_providers=tuple(s.enabled_orchestration_providers),
+        provider_options=MappingProxyType(
+            {
+                name: MappingProxyType(options)
+                for name, options in s.orchestration_provider_options.items()
+            }
+        ),
     )
 
 
@@ -208,7 +250,7 @@ def _load() -> AppConfig:
         database=_build_database_config(s),
         media=_build_media_config(s),
         elasticsearch=_build_elasticsearch_config(s),
-        runner=_build_runner_config(s),
+        orchestration=_build_orchestration_config(s),
         auth=_build_auth_config(s),
         logfire=_build_logfire_config(s),
         cors_origins=tuple(s.cors_origins),
@@ -248,8 +290,8 @@ def get_es_config() -> ElasticsearchConfig:
     return get_config().elasticsearch
 
 
-def get_runner_config() -> RunnerConfig:
-    return get_config().runner
+def get_orchestration_config() -> OrchestrationConfig:
+    return get_config().orchestration
 
 
 def get_auth_config() -> AuthConfig:

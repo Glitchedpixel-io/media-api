@@ -5,8 +5,8 @@ import logfire
 
 from sqlalchemy.orm import Session
 
+from app.orchestration.registry import ProviderRegistry
 from app.repositories import SQLAlchemyMediaRepository, SQLAlchemyTransformRequestRepository
-from app.runners import JobRunner
 from app.schemas import (
     TransformRequestCreatePublic,
     TransformRequestReadExpanded,
@@ -15,12 +15,12 @@ from app.services import TransformRequestService
 
 
 class TransformActionsHandler:
-    def __init__(self, session: Session, job_runner: JobRunner) -> None:
+    def __init__(self, session: Session, provider_registry: ProviderRegistry) -> None:
         self.session = session
         self.service = TransformRequestService(
             SQLAlchemyTransformRequestRepository(session),
             SQLAlchemyMediaRepository(session),
-            job_runner,
+            provider_registry,
         )
 
     def process_actions(self, cause: TransformRequestReadExpanded, actions: dict) -> None:

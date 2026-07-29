@@ -14,6 +14,8 @@ from app.config import AppConfig, get_config, get_version, init_config
 from app.database import assert_database_timezone_utc, get_engine, init_db
 from app.elasticsearch_client import close_es, get_es_manager, initialize_es
 from app.middleware import RequestIdMiddleware
+from app.orchestration.loader import build_provider_registry
+from app.orchestration.registry import init_provider_registry
 from app.routers.assets import router as assets_router
 from app.routers.external_ids import router as external_ids_router
 from app.routers.file_stream import router as file_stream_router
@@ -55,6 +57,12 @@ def get_lifespan(config: AppConfig | None = None) -> Callable[[FastAPI], AsyncCo
             logfire.info("Elasticsearch client initialized")
         except Exception as ex:  # pragma: no cover - defensive logging only
             logfire.exception(f"Elasticsearch initialization failed: {ex}")
+
+        # Build and register the orchestration provider registry. Deliberately
+        # NOT wrapped in try/except: a misconfigured or unavailable enabled
+        # provider must abort startup with a clear error, not degrade silently.
+        init_provider_registry(build_provider_registry(cfg.orchestration))
+        logfire.info("Orchestration provider registry initialized")
 
         yield
 

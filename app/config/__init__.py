@@ -5,7 +5,7 @@ from app.config.schema import (
     ElasticsearchConfig,
     LogfireConfig,
     MediaConfig,
-    RunnerConfig,
+    OrchestrationConfig,
 )
 from app.config.settings import (
     get_auth_config,
@@ -14,7 +14,7 @@ from app.config.settings import (
     get_es_config,
     get_logfire_config,
     get_media_config,
-    get_runner_config,
+    get_orchestration_config,
     get_version,
     init_config,
 )
@@ -26,14 +26,14 @@ __all__ = [
     "ElasticsearchConfig",
     "LogfireConfig",
     "MediaConfig",
-    "RunnerConfig",
+    "OrchestrationConfig",
     "get_auth_config",
     "get_config",
     "get_db_config",
     "get_es_config",
     "get_logfire_config",
     "get_media_config",
-    "get_runner_config",
+    "get_orchestration_config",
     "get_version",
     "init_config",
 ]

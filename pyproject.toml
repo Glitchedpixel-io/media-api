@@ -30,12 +30,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Prefect is an optional job-execution backend. The default "none" runner and
-# the DB-backed pull queue work without it: `pip install media-api[prefect]`
-# only when runner_backend="prefect".
+# Prefect is an optional orchestration provider. The default (empty
+# enabled_orchestration_providers) pure pull model and the DB-backed pull
+# queue work without it: `uv add 'media-api[prefect]'` only when "prefect" is
+# actually listed in ENABLED_ORCHESTRATION_PROVIDERS.
 prefect = [
     "prefect>=3.6.2,<4.0.0",
 ]
+
+[project.entry-points."media_api.orchestration_providers"]
+prefect = "app.orchestration.prefect:PrefectProvider"
+webhook = "app.orchestration.webhook:WebhookProvider"
 
 [dependency-groups]
 dev = [

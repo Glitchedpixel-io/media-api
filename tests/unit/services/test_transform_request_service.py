@@ -29,35 +29,33 @@ from app.schemas import (
     TransformRequestPatchPublic,
     TransformRequestUpdateInternal,
 )
-from app.runners import JobDispatch, LogEntry, NullJobRunner
+from app.orchestration.registry import ProviderRegistry
+from app.runners.protocols import JobDispatch, LogEntry
 from app.services import TransformRequestService
 from tests.factories import AssetReadFactory, TransformRequestReadFactory
 
 
-class _RecordingRunner:
-    """A minimal JobRunner double that records dispatches and returns canned logs."""
+class _RecordingRegistry:
+    """A minimal ProviderRegistry double that records dispatches and returns canned logs."""
 
     def __init__(
         self,
         *,
         logs: list[LogEntry] | None = None,
         dispatch_error: Exception | None = None,
-        dispatch_return: str | None = None,
     ) -> None:
         self._logs = logs or []
         self._dispatch_error = dispatch_error
-        self._dispatch_return = dispatch_return
         self.dispatched: list[JobDispatch] = []
-        self.fetched: list[str] = []
+        self.fetched: list[tuple[str, str]] = []
 
-    def dispatch(self, job: JobDispatch) -> str | None:
+    def dispatch(self, job: JobDispatch) -> None:
         self.dispatched.append(job)
         if self._dispatch_error is not None:
             raise self._dispatch_error
-        return self._dispatch_return
 
-    def fetch_logs(self, external_ref: str) -> list[LogEntry]:
-        self.fetched.append(external_ref)
+    def fetch_logs(self, transform_type: str, external_job_id: str) -> list[LogEntry]:
+        self.fetched.append((transform_type, external_job_id))
         return list(self._logs)
 
 
@@ -73,7 +71,7 @@ def m_repo() -> MediaRepository:
 
 @pytest.fixture
 def svc(tr_repo: TransformRequestRepository, m_repo: MediaRepository) -> TransformRequestService:
-    return TransformRequestService(tr_repo, m_repo, NullJobRunner())
+    return TransformRequestService(tr_repo, m_repo, ProviderRegistry([]))
 
 
 class TestGetTransformRequest:
@@ -697,7 +695,7 @@ class TestGetTransformRequestLogs:
     def test_get_logs_success(self, tr_repo, m_repo) -> None:
         """get_transform_request_logs returns the runner's logs as plain dicts."""
 
-        runner = _RecordingRunner(
+        registry = _RecordingRegistry(
             logs=[
                 LogEntry(
                     timestamp="2024-01-01T00:00:00",
@@ -708,9 +706,9 @@ class TestGetTransformRequestLogs:
                 )
             ]
         )
-        svc = TransformRequestService(tr_repo, m_repo, runner)
+        svc = TransformRequestService(tr_repo, m_repo, registry)
         tr_repo.get.return_value = TransformRequestReadFactory(
-            id=5, actioned=True, external_job_id="job-123"
+            id=5, actioned=True, external_job_id="job-123", transform_type="prefect.transcode"
         )
 
         result = svc.get_transform_request_logs(5)
@@ -724,14 +722,14 @@ class TestGetTransformRequestLogs:
                 "external_ref": "job-123",
             }
         ]
-        assert runner.fetched == ["job-123"]
+        assert registry.fetched == [("prefect.transcode", "job-123")]
 
     @pytest.mark.unit
     def test_get_logs_empty(self, tr_repo, m_repo) -> None:
-        """get_transform_request_logs returns an empty list when runner has none."""
+        """get_transform_request_logs returns an empty list when the registry has none."""
 
-        runner = _RecordingRunner(logs=[])
-        svc = TransformRequestService(tr_repo, m_repo, runner)
+        registry = _RecordingRegistry(logs=[])
+        svc = TransformRequestService(tr_repo, m_repo, registry)
         tr_repo.get.return_value = TransformRequestReadFactory(
             id=5, actioned=True, external_job_id="job-123"
         )
@@ -786,7 +784,7 @@ class TestDispatchOnCreate:
     def test_create_dispatches_job_to_runner(self, tr_repo, m_repo) -> None:
         """create_asset_transform_request dispatches the created job to the runner."""
 
-        runner = _RecordingRunner()
+        runner = _RecordingRegistry()
         svc = TransformRequestService(tr_repo, m_repo, runner)
         created = TransformRequestReadFactory(
             id=1, asset_id=7, transform_type="prefect.transcode", parameters={"a": 1}
@@ -807,7 +805,7 @@ class TestDispatchOnCreate:
     def test_create_dispatches_non_prefect_key_unchanged(self, tr_repo, m_repo) -> None:
         """A non-Prefect routing key is forwarded to the runner verbatim, untouched."""
 
-        runner = _RecordingRunner()
+        runner = _RecordingRegistry()
         svc = TransformRequestService(tr_repo, m_repo, runner)
         created = TransformRequestReadFactory(
             id=1, asset_id=7, transform_type="webhook.thumbnail.generate", parameters={"a": 1}
@@ -826,7 +824,7 @@ class TestDispatchOnCreate:
     def test_create_does_not_dispatch_non_read_model(self, tr_repo, m_repo) -> None:
         """_dispatch is a no-op when the repository returns a non-read model."""
 
-        runner = _RecordingRunner()
+        runner = _RecordingRegistry()
         svc = TransformRequestService(tr_repo, m_repo, runner)
         tr_repo.create.return_value = MagicMock()  # not a TransformRequestRead
 
@@ -839,7 +837,7 @@ class TestDispatchOnCreate:
     def test_create_swallows_dispatch_errors(self, tr_repo, m_repo) -> None:
         """A failing dispatch must not break request creation."""
 
-        runner = _RecordingRunner(dispatch_error=RuntimeError("runner down"))
+        runner = _RecordingRegistry(dispatch_error=RuntimeError("runner down"))
         svc = TransformRequestService(tr_repo, m_repo, runner)
         created = TransformRequestReadFactory(id=1, transform_type="prefect.transcode")
         tr_repo.create.return_value = created
