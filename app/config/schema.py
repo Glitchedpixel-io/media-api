@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -29,19 +30,20 @@ class ElasticsearchConfig:
 
 
 @dataclass(frozen=True)
-class RunnerConfig:
-    """Selects and configures the job-execution backend.
+class OrchestrationConfig:
+    """Selects and configures the enabled orchestration providers.
 
-    ``backend="none"`` (the default) is the pure pull model -- no framework is
-    required. Routing is carried by each request's own ``transform_type``
-    (a provider-qualified key, e.g. ``prefect.transcode``), not by config --
-    there is no map to configure here. ``webhook_url`` is used by the webhook
-    backend. This replaces the old Prefect-specific config: the former
-    ``run_on_demand=false`` is simply ``backend="none"``.
+    An empty ``enabled_providers`` (the default) is the pure pull model -- no
+    orchestration framework is required to boot. Dispatch/log routing is
+    carried entirely by each request's own ``transform_type`` (a
+    provider-qualified key, e.g. ``prefect.transcode``), not by config --
+    there is no routing map to configure here. ``provider_options`` carries
+    provider-scoped construction kwargs (e.g. ``{"webhook": {"url": "..."}}"``)
+    so enabling a new integration never requires new core settings.
     """
 
-    backend: str = "none"
-    webhook_url: str | None = None
+    enabled_providers: tuple[str, ...] = ()
+    provider_options: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,7 @@ class AppConfig:
     database: DatabaseConfig
     media: MediaConfig
     elasticsearch: ElasticsearchConfig
-    runner: RunnerConfig
+    orchestration: OrchestrationConfig
     auth: AuthConfig
     logfire: LogfireConfig
     # Local-dev defaults only. Production origins are injected via CORS_ORIGINS;

@@ -4,6 +4,7 @@ from dataclasses import asdict
 import logfire
 from fastapi import HTTPException
 
+from app.orchestration.registry import ProviderRegistry
 from app.repositories.errors import (
     CheckViolation,
     ConstraintViolation,
@@ -18,7 +19,7 @@ from app.repositories.protocols import (
     MediaRepository,
     TransformRequestRepository,
 )
-from app.runners import JobDispatch, JobRunner
+from app.runners.protocols import JobDispatch
 from app.schemas import (
     PaginatedResponse,
     TransformRequestCreateInternal,
@@ -37,11 +38,11 @@ class TransformRequestService:
         self,
         transform_request_repository: TransformRequestRepository,
         media_repository: MediaRepository,
-        job_runner: JobRunner,
+        provider_registry: ProviderRegistry,
     ) -> None:
         self.repo = transform_request_repository
         self.media_repo = media_repository
-        self._runner = job_runner
+        self._providers = provider_registry
 
     def get_transform_request(self, request_id: int) -> TransformRequestRead:
         transform_request = self.repo.get(request_id)
@@ -63,7 +64,9 @@ class TransformRequestService:
                 status_code=409,
                 detail="Cannot retrieve logs for a transform request that has no external job id",
             )
-        entries = self._runner.fetch_logs(transform_request.external_job_id)
+        entries = self._providers.fetch_logs(
+            transform_request.transform_type, transform_request.external_job_id
+        )
         return [asdict(entry) for entry in entries]
 
     def retry_transform_request(self, request_id: int) -> TransformRequestRead:
@@ -177,7 +180,7 @@ class TransformRequestService:
             return
         with logfire.span("dispatch_job") as span:
             try:
-                self._runner.dispatch(
+                self._providers.dispatch(
                     JobDispatch(
                         job_id=request.id,
                         job_type=request.transform_type,

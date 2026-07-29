@@ -1,57 +1,48 @@
-# app/runners/prefect_runner.py
-"""Prefect adapter for the job-runner seams.
+# app/orchestration/prefect.py
+"""The built-in Prefect orchestration provider.
 
-Every ``prefect`` import lives inside this module and is performed lazily, so
-Prefect is an optional extra (``pip install media-api[prefect]``) rather than a
-mandatory dependency. Nothing here is imported unless ``runner_backend`` is set
-to ``"prefect"``.
+Requires the optional ``prefect`` extra (``media-api[prefect]``). The module
+itself -- and therefore its entry point -- is always importable without that
+extra installed; only *constructing* the provider (which only happens if
+``prefect`` is actually listed in ``enabled_orchestration_providers``) requires
+the package to be present. Every ``prefect`` API call beyond that check stays
+lazily imported, so nothing here is touched unless the provider is both
+enabled and in active use.
 """
 
 from __future__ import annotations
 
+import importlib.util
+
 import logfire
 
-from app.runners.facade import CompositeJobRunner
+from app.orchestration.providers import PROVIDER_API_VERSION, TransformRoute
 from app.runners.protocols import JobDispatch, LogEntry
 
-PREFECT_ROUTING_PREFIX = "prefect."
 
+class PrefectProvider:
+    key = "prefect"
+    api_version = PROVIDER_API_VERSION
 
-class PrefectDispatcher:
-    """Trigger a Prefect deployment run to cut worker pick-up latency."""
+    def __init__(self, log_limit: int = 100) -> None:
+        if importlib.util.find_spec("prefect") is None:
+            raise RuntimeError(
+                "Orchestration provider 'prefect' is enabled but the 'prefect' "
+                "package is not installed. Install it with: uv add 'media-api[prefect]'"
+            )
+        self._log_limit = log_limit
 
-    def dispatch(self, job: JobDispatch) -> str | None:
-        if not job.job_type.startswith(PREFECT_ROUTING_PREFIX):
-            return None
-        deployment_name = job.job_type[len(PREFECT_ROUTING_PREFIX) :]
+    def dispatch(self, route: TransformRoute, job: JobDispatch) -> None:
         with logfire.span("prefect_dispatch") as span:
             try:
                 from prefect.deployments import run_deployment  # noqa: PLC0415
 
-                run_deployment(name=deployment_name, timeout=0)
+                run_deployment(name=route.command, timeout=0)
             except Exception as e:
                 span.record_exception(e)
-        return None
 
-
-class PrefectLogSource:
-    """Read a flow run's logs directly from Prefect's own API."""
-
-    def __init__(self, limit: int = 100) -> None:
-        self._limit = limit
-
-    def fetch_logs(self, external_ref: str) -> list[LogEntry]:
-        return _fetch_flow_run_logs(external_ref, limit=self._limit)
-
-
-class PrefectJobRunner(CompositeJobRunner):
-    """A runner that both dispatches to and reads logs from Prefect."""
-
-    def __init__(self) -> None:
-        super().__init__(
-            dispatcher=PrefectDispatcher(),
-            log_source=PrefectLogSource(),
-        )
+    def fetch_logs(self, route: TransformRoute, external_job_id: str) -> list[LogEntry]:
+        return _fetch_flow_run_logs(external_job_id, limit=self._log_limit)
 
 
 def _fetch_flow_run_logs(flow_run_id: str, limit: int = 100) -> list[LogEntry]:

@@ -82,9 +82,10 @@ groups:
   provider, or `AUTH_DISABLED=true` for local development (refused at
   startup if `APP_ENV=production`).
 - **Filesystem roots** — `MEDIA_ROOT`, `ACCESSORY_ROOT`, `INBOX_ROOT`.
-- **Job execution** — `RUNNER_BACKEND` (`none` by default — no
-  orchestration framework required to boot), plus `RUNNER_WEBHOOK_URL` for
-  the optional backends described below.
+- **Job execution** — `ENABLED_ORCHESTRATION_PROVIDERS` (empty by default —
+  no orchestration framework required to boot), plus
+  `ORCHESTRATION_PROVIDER_OPTIONS` for provider-scoped config such as the
+  webhook adapter's URL. See below.
 - **Elasticsearch** (optional) — `ELASTICSEARCH_URL` and friends, for
   transcript search.
 - **Logfire** (optional) — `LOGFIRE_TOKEN`, for observability.
@@ -93,20 +94,27 @@ groups:
 
 Runners live in a separate project; this API only enqueues work (the
 DB-backed pull queue) and *optionally* signals a backend that work is ready.
-The backend is selected with `RUNNER_BACKEND` (default `none`, i.e. a pure
-pull model). Prefect is one optional adapter
-(`pip install media-api[prefect]`, `RUNNER_BACKEND=prefect`); a generic
-`webhook` adapter is also provided.
+Backends are pluggable orchestration providers, discovered from the
+`media_api.orchestration_providers` Python entry-point group and only
+instantiated if named in `ENABLED_ORCHESTRATION_PROVIDERS` (empty by default,
+i.e. a pure pull model; comma-separated, e.g. `prefect,webhook`). A
+provider that's enabled but unavailable (missing entry point, missing
+optional dependency, incompatible API version) fails startup with a clear
+error rather than degrading silently. Two adapters ship built in: Prefect
+(`pip install media-api[prefect]` — the extra is required only if `prefect`
+is actually enabled) and a generic `webhook` dispatcher (no extra install,
+configured via `ORCHESTRATION_PROVIDER_OPTIONS`, e.g.
+`{"webhook": {"url": "https://example.com/hook"}}`).
 
 Routing is decided by the request, not server config: `transform_type` is a
 provider-qualified routing key, `<provider>.<provider-local-type>` (e.g.
 `prefect.transcode`). The API validates only the shape — no allow-list of
 providers or job names — so adding a new Prefect deployment needs no API
 release. The key is split on the first `.`; everything after is forwarded
-verbatim as that provider's own vocabulary. The Prefect adapter runs the
-deployment named by a `prefect.`-prefixed key's remainder and ignores keys
-for other providers; the webhook adapter forwards the whole key as
-`job_type` and lets the receiving system decide what to do with it.
+verbatim as that provider's own vocabulary and used to resolve both dispatch
+and log retrieval to the matching adapter. A request whose provider isn't
+enabled remains persistable — dispatch is a logged no-op and log retrieval
+returns an empty result, rather than failing the request.
 
 ## Database migrations
 

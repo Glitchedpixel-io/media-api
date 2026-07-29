@@ -1,30 +1,16 @@
-# app/runners/__init__.py
-"""Pluggable job-execution backends.
+"""Payload types shared by the orchestration provider seams.
 
-The API depends only on the :class:`JobDispatcher` / :class:`JobLogSource`
-seams (and the :class:`JobRunner` facade that combines them). Concrete backends
--- Prefect, a webhook fan-out, or nothing at all -- live behind
-:func:`build_job_runner` and are selected by ``runner_backend`` config.
+The pluggable backends themselves -- Prefect, a webhook fan-out, or nothing
+at all -- live in :mod:`app.orchestration`, discovered via the
+``media_api.orchestration_providers`` entry-point group and selected by
+``enabled_orchestration_providers`` config. This package now holds only the
+:class:`JobDispatch` / :class:`LogEntry` payload types that providers pass
+around.
 """
 
-from app.runners.facade import CompositeJobRunner
-from app.runners.factory import build_job_runner
-from app.runners.null_runner import NullJobRunner
-from app.runners.protocols import (
-    JobDispatch,
-    JobDispatcher,
-    JobLogSource,
-    JobRunner,
-    LogEntry,
-)
+from app.runners.protocols import JobDispatch, LogEntry
 
 __all__ = [
-    "CompositeJobRunner",
     "JobDispatch",
-    "JobDispatcher",
-    "JobLogSource",
-    "JobRunner",
     "LogEntry",
-    "NullJobRunner",
-    "build_job_runner",
 ]

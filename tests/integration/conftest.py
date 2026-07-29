@@ -21,9 +21,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.app_factory import create_app
 from app.auth.jwt import Principal, get_current_user
-from app.config import AppConfig, get_media_config, get_runner_config
+from app.config import AppConfig, get_media_config
 from app.dependencies import get_db_session, get_inbox_repository
 from app.models import Base
+from app.orchestration.loader import build_provider_registry
+from app.orchestration.registry import get_provider_registry
 from app.repositories import (
     FileInboxRepository,
     SQLAlchemyRunSummaryRepository,
@@ -81,7 +83,9 @@ def app(
     app = create_app(test_settings)
 
     app.dependency_overrides[get_media_config] = lambda: test_settings.media
-    app.dependency_overrides[get_runner_config] = lambda: test_settings.runner
+    app.dependency_overrides[get_provider_registry] = lambda: build_provider_registry(
+        test_settings.orchestration
+    )
 
     # Bypass JWT auth for tests
     def _fake_user() -> Principal:

@@ -7,21 +7,21 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 
 from app.handlers.transform_actions import TransformActionsHandler
-from app.runners import NullJobRunner
+from app.orchestration.registry import ProviderRegistry
 from app.services import TransformRequestService
 from tests.factories import TransformRequestReadExpandedFactory, TransformRequestReadFactory
 
 
 @pytest.fixture
 def handler() -> TransformActionsHandler:
-    """A handler wired to a mock session and the default (no-op) runner."""
-    return TransformActionsHandler(MagicMock(), NullJobRunner())
+    """A handler wired to a mock session and an empty (no-op) provider registry."""
+    return TransformActionsHandler(MagicMock(), ProviderRegistry([]))
 
 
 class TestTransformActionsHandler:
     @pytest.mark.unit
     def test_init_builds_service_with_runner(self) -> None:
-        handler = TransformActionsHandler(MagicMock(), NullJobRunner())
+        handler = TransformActionsHandler(MagicMock(), ProviderRegistry([]))
 
         assert isinstance(handler.service, TransformRequestService)
 

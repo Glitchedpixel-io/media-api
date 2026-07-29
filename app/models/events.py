@@ -41,15 +41,14 @@ def _follow_on_orchestration(
         )
         # These imports must remain here: app.models is imported by app.db (via init_db),
         # and app.handlers/app.schemas transitively import app.models — a genuine cycle.
-        from app.config import get_runner_config  # noqa: PLC0415
         from app.database import get_session_factory  # noqa: PLC0415
         from app.handlers import TransformActionsHandler  # noqa: PLC0415
-        from app.runners import build_job_runner  # noqa: PLC0415
+        from app.orchestration.registry import get_provider_registry  # noqa: PLC0415
         from app.schemas import TransformRequestReadExpanded  # noqa: PLC0415
 
         session = get_session_factory()()
         try:
-            handler = TransformActionsHandler(session, build_job_runner(get_runner_config()))
+            handler = TransformActionsHandler(session, get_provider_registry())
 
             # Process actions
             handler.process_actions(

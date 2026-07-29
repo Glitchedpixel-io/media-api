@@ -1,4 +1,4 @@
-"""Unit tests for the Prefect job-runner adapter.
+"""Unit tests for the built-in Prefect orchestration provider.
 
 Every ``prefect`` symbol is imported lazily inside the adapter, so the tests
 patch those lazy import targets rather than importing Prefect eagerly.
@@ -8,67 +8,52 @@ from __future__ import annotations
 
 import pytest
 
-from app.runners import JobDispatch, LogEntry
-from app.runners.facade import CompositeJobRunner
-from app.runners.prefect_runner import (
-    PrefectDispatcher,
-    PrefectJobRunner,
-    PrefectLogSource,
-    _fetch_flow_run_logs,
-)
+from app.orchestration.prefect import PrefectProvider, _fetch_flow_run_logs
+from app.orchestration.providers import TransformRoute
+from app.runners.protocols import JobDispatch, LogEntry
 
 
-class TestPrefectDispatcher:
+class TestPrefectProviderConstruction:
     @pytest.mark.unit
-    def test_dispatch_strips_prefect_prefix(self, mocker) -> None:
+    def test_raises_clearly_when_prefect_not_installed(self, mocker) -> None:
+        mocker.patch("importlib.util.find_spec", return_value=None)
+
+        with pytest.raises(RuntimeError, match="media-api\\[prefect\\]"):
+            PrefectProvider()
+
+    @pytest.mark.unit
+    def test_constructs_when_prefect_is_installed(self) -> None:
+        # The real `prefect` package is a dev dependency in this repo (see
+        # pyproject.toml), so find_spec succeeds without mocking.
+        provider = PrefectProvider()
+
+        assert provider.key == "prefect"
+
+
+class TestPrefectProviderDispatch:
+    @pytest.mark.unit
+    def test_dispatch_runs_deployment_named_by_route_command(self, mocker) -> None:
         run_deployment = mocker.patch("prefect.deployments.run_deployment")
+        provider = PrefectProvider()
 
-        dispatcher = PrefectDispatcher()
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.transcode"))
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="transcode"),
+            JobDispatch(job_id=1, job_type="prefect.transcode"),
+        )
 
-        assert result is None
         run_deployment.assert_called_once_with(name="transcode", timeout=0)
 
     @pytest.mark.unit
-    def test_dispatch_preserves_dots_in_remainder(self, mocker) -> None:
+    def test_dispatch_preserves_dots_in_command(self, mocker) -> None:
         run_deployment = mocker.patch("prefect.deployments.run_deployment")
+        provider = PrefectProvider()
 
-        dispatcher = PrefectDispatcher()
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.media/transcode"))
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="deploy.v2"),
+            JobDispatch(job_id=1, job_type="prefect.deploy.v2"),
+        )
 
-        assert result is None
-        run_deployment.assert_called_once_with(name="media/transcode", timeout=0)
-
-    @pytest.mark.unit
-    def test_dispatch_preserves_multiple_dots_in_remainder(self, mocker) -> None:
-        run_deployment = mocker.patch("prefect.deployments.run_deployment")
-
-        dispatcher = PrefectDispatcher()
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.deploy.v2"))
-
-        assert result is None
         run_deployment.assert_called_once_with(name="deploy.v2", timeout=0)
-
-    @pytest.mark.unit
-    def test_dispatch_non_prefect_key_is_noop(self, mocker) -> None:
-        run_deployment = mocker.patch("prefect.deployments.run_deployment")
-
-        dispatcher = PrefectDispatcher()
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="webhook.transcode"))
-
-        assert result is None
-        run_deployment.assert_not_called()
-
-    @pytest.mark.unit
-    def test_dispatch_prefix_match_is_exact_not_startswith_loose(self, mocker) -> None:
-        """`prefectish.transcode` must NOT match -- the prefix is "prefect.", not "prefect"."""
-        run_deployment = mocker.patch("prefect.deployments.run_deployment")
-
-        dispatcher = PrefectDispatcher()
-        result = dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefectish.transcode"))
-
-        assert result is None
-        run_deployment.assert_not_called()
 
     @pytest.mark.unit
     def test_dispatch_swallows_errors(self, mocker) -> None:
@@ -76,15 +61,18 @@ class TestPrefectDispatcher:
             "prefect.deployments.run_deployment",
             side_effect=RuntimeError("prefect down"),
         )
+        provider = PrefectProvider()
 
-        dispatcher = PrefectDispatcher()
+        # Must not raise.
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="transcode"),
+            JobDispatch(job_id=1, job_type="prefect.transcode"),
+        )
 
-        assert dispatcher.dispatch(JobDispatch(job_id=1, job_type="prefect.transcode")) is None
 
-
-class TestPrefectLogSource:
+class TestPrefectProviderFetchLogs:
     @pytest.mark.unit
-    def test_fetch_logs_delegates_to_helper(self, mocker) -> None:
+    def test_fetch_logs_delegates_to_helper_with_configured_limit(self, mocker) -> None:
         entries = [
             LogEntry(
                 timestamp="2024-01-01",
@@ -95,24 +83,14 @@ class TestPrefectLogSource:
             )
         ]
         helper = mocker.patch(
-            "app.runners.prefect_runner._fetch_flow_run_logs", return_value=entries
+            "app.orchestration.prefect._fetch_flow_run_logs", return_value=entries
         )
+        provider = PrefectProvider(log_limit=25)
 
-        source = PrefectLogSource(limit=25)
-        result = source.fetch_logs("ref-1")
+        result = provider.fetch_logs(TransformRoute(provider="prefect", command="x"), "ref-1")
 
         assert result == entries
         helper.assert_called_once_with("ref-1", limit=25)
-
-
-class TestPrefectJobRunner:
-    @pytest.mark.unit
-    def test_runner_wires_dispatcher_and_log_source(self) -> None:
-        runner = PrefectJobRunner()
-
-        assert isinstance(runner, CompositeJobRunner)
-        assert isinstance(runner._dispatcher, PrefectDispatcher)
-        assert isinstance(runner._log_source, PrefectLogSource)
 
 
 class _FakeLevel:

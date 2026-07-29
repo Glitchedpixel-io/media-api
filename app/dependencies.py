@@ -10,13 +10,12 @@ from sqlalchemy.orm import Session
 from app.config import (
     ElasticsearchConfig,
     MediaConfig,
-    RunnerConfig,
     get_es_config,
     get_media_config,
-    get_runner_config,
 )
 from app.database import get_session_factory
 from app.elasticsearch_client import get_es_manager
+from app.orchestration.registry import ProviderRegistry, get_provider_registry
 from app.repositories import (
     FileInboxRepository,
     InboxRepository,
@@ -41,7 +40,6 @@ from app.repositories import (
     SQLAlchemyTransformRequestRepository,
     TitleRepository,
 )
-from app.runners import JobRunner, build_job_runner
 from app.services import (
     ExternalIdentifierService,
     FileStreamService,
@@ -153,20 +151,14 @@ def get_stream_service(db: Session = Depends(get_db_session)) -> StreamService:
     return StreamService(SQLAlchemyStreamRepository(db), SQLAlchemyMediaRepository(db))
 
 
-def get_job_runner(
-    config: RunnerConfig = Depends(get_runner_config),
-) -> JobRunner:
-    return build_job_runner(config)
-
-
 def get_transform_request_service(
     db: Session = Depends(get_db_session),
-    job_runner: JobRunner = Depends(get_job_runner),
+    provider_registry: ProviderRegistry = Depends(get_provider_registry),
 ) -> TransformRequestService:
     return TransformRequestService(
         SQLAlchemyTransformRequestRepository(db),
         SQLAlchemyMediaRepository(db),
-        job_runner,
+        provider_registry,
     )
 
 
