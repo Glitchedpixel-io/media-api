@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -33,14 +33,14 @@ class RunnerConfig:
     """Selects and configures the job-execution backend.
 
     ``backend="none"`` (the default) is the pure pull model -- no framework is
-    required. ``job_routing_map`` maps a transform type to a backend-specific
-    target (e.g. a Prefect deployment name); ``webhook_url`` is used by the
-    webhook backend. This replaces the old Prefect-specific config: the former
+    required. Routing is carried by each request's own ``transform_type``
+    (a provider-qualified key, e.g. ``prefect.transcode``), not by config --
+    there is no map to configure here. ``webhook_url`` is used by the webhook
+    backend. This replaces the old Prefect-specific config: the former
     ``run_on_demand=false`` is simply ``backend="none"``.
     """
 
     backend: str = "none"
-    job_routing_map: dict[str, str] = field(default_factory=dict)
     webhook_url: str | None = None
 
 

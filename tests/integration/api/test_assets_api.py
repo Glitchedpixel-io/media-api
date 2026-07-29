@@ -34,7 +34,6 @@ from app.schemas import (
     StreamCreateInternal,
     TagCreateInternal,
     TransformRequestCreateInternal,
-    TransformTypeEnum,
 )
 from tests.factories import (
     AssetReadFactory,
@@ -574,11 +573,9 @@ class TestAssetsAPI:
         asset_id = created_asset.id
 
         # Create transform requests
-        transform1 = TransformRequestReadFactory(
-            asset_id=asset_id, transform_type=TransformTypeEnum.test
-        )
+        transform1 = TransformRequestReadFactory(asset_id=asset_id, transform_type="prefect.test")
         transform2 = TransformRequestReadFactory(
-            asset_id=asset_id, transform_type=TransformTypeEnum.youtube
+            asset_id=asset_id, transform_type="prefect.youtube"
         )
         transform_request_repository.create(
             TransformRequestCreateInternal(
@@ -615,7 +612,7 @@ class TestAssetsAPI:
         asset_id = created_asset.id
 
         transform_data = {
-            "transform_type": "transcode",
+            "transform_type": "prefect.transcode",
             "parameters": {"format": "mp4", "bitrate": "1000k"},
         }
 
@@ -656,7 +653,7 @@ class TestAssetsAPI:
         # Create the first request
         transform = TransformRequestReadFactory(
             asset_id=asset_id,
-            transform_type=TransformTypeEnum.test,
+            transform_type="prefect.test",
             actioned=True,
             worker="test",
             worker_notes="test notes",
@@ -702,7 +699,7 @@ class TestAssetsAPI:
         # Create the first request
         transform = TransformRequestReadFactory(
             asset_id=asset_id,
-            transform_type=TransformTypeEnum.test,
+            transform_type="prefect.test",
             actioned=False,
         )
         tr = transform_request_repository.create(
@@ -724,7 +721,7 @@ class TestAssetsAPI:
         # Create a completed request of the same type
         transform2 = TransformRequestReadFactory(
             asset_id=asset_id,
-            transform_type=TransformTypeEnum.test,
+            transform_type="prefect.test",
             actioned=True,
             worker="test",
             worker_notes="test notes",
@@ -762,7 +759,7 @@ class TestAssetsAPI:
         # Create the first request
         transform = TransformRequestReadFactory(
             asset_id=asset_id,
-            transform_type=TransformTypeEnum.test,
+            transform_type="prefect.test",
             actioned=True,
             worker="test",
             worker_notes="test notes",
@@ -777,7 +774,7 @@ class TestAssetsAPI:
         )
         # parameters for the second requestq
         transform_data = {
-            "transform_type": "transcode",
+            "transform_type": "prefect.transcode",
             "parameters": {"format": "mp4", "bitrate": "1000k"},
         }
 

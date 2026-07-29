@@ -111,15 +111,10 @@ class _Settings(BaseSettings):
 
     # Job-execution backend selection. Default "none" is the pure pull model
     # (no orchestration framework required to boot). Set to "prefect" or
-    # "webhook" to enable a best-effort dispatch on job creation.
+    # "webhook" to enable a best-effort dispatch on job creation. Routing is
+    # carried by each request's own transform_type, not by config.
     runner_backend: str = Field("none")
     runner_webhook_url: str | None = Field(None)
-    # Maps a transform type to a backend-specific target (e.g. a Prefect
-    # deployment name). Accepts the legacy PREFECT_DEPLOYMENT_MAP env var.
-    runner_job_routing_map: dict[str, str] = Field(
-        {},
-        validation_alias=AliasChoices("RUNNER_JOB_ROUTING_MAP", "PREFECT_DEPLOYMENT_MAP"),
-    )
 
     @classmethod
     def settings_customise_sources(
@@ -180,7 +175,6 @@ def _build_elasticsearch_config(s: _Settings) -> ElasticsearchConfig:
 def _build_runner_config(s: _Settings) -> RunnerConfig:
     return RunnerConfig(
         backend=s.runner_backend,
-        job_routing_map=s.runner_job_routing_map,
         webhook_url=s.runner_webhook_url,
     )
 

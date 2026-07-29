@@ -10,7 +10,6 @@ from app.runners import JobRunner
 from app.schemas import (
     TransformRequestCreatePublic,
     TransformRequestReadExpanded,
-    TransformTypeEnum,
 )
 from app.services import TransformRequestService
 
@@ -44,14 +43,14 @@ class TransformActionsHandler:
                 for request in requests_to_create:
                     try:
                         creation = TransformRequestCreatePublic(
-                            transform_type=TransformTypeEnum(request.get("transform_type", "test")),
+                            transform_type=request.get("transform_type"),
                             parameters=request.get("parameters", {}),
                             on_success=request.get("on_success", None),
                             on_failure=request.get("on_failure", None),
                         )
                         linked_request = self.service.create_linked_request(cause.id, creation)
                         logfire.debug(
-                            f"Created linked request {linked_request.id} from {cause.id} of type {linked_request.transform_type.value}"
+                            f"Created linked request {linked_request.id} from {cause.id} of type {linked_request.transform_type}"
                         )
                     except Exception as e:
                         span.record_exception(e)

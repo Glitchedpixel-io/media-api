@@ -17,7 +17,6 @@ from app.schemas import (
     AssetRead,
     InboxImportRequest,
     TransformRequestCreateInternal,
-    TransformTypeEnum,
 )
 from app.schemas.inbox import InboxDeleteRequest, InboxItem
 
@@ -65,7 +64,7 @@ class InboxService:
             asset = self.assets.create(creation_request)  # todo: handle domain errors
             request = TransformRequestCreateInternal(
                 asset_id=asset.id,
-                transform_type=TransformTypeEnum.stream_reader,
+                transform_type="prefect.stream_reader",
                 parameters={},
                 actioned=False,
                 worker_notes=None,
@@ -78,7 +77,7 @@ class InboxService:
             self.transforms.create(request)  # todo: handle domain errors
             request_probe = TransformRequestCreateInternal(
                 asset_id=asset.id,
-                transform_type=TransformTypeEnum.ffprobe_metadata,
+                transform_type="prefect.ffprobe_metadata",
                 parameters={"metadata_types": ["format", "chapters"]},
                 actioned=False,
                 worker_notes=None,

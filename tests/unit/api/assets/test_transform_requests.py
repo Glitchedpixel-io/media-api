@@ -106,6 +106,18 @@ class TestCreateAssetTransformRequest:
 
     @pytest.mark.unit
     @pytest.mark.api
+    def test_create_asset_transform_request_empty_local_type_is_422(
+        self, client: TestClient
+    ) -> None:
+        """`prefect.` (empty provider-local type) fails the routing-key shape check."""
+        response = client.post(
+            "/api/assets/1/transform_requests", json={"transform_type": "prefect."}
+        )
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+    @pytest.mark.unit
+    @pytest.mark.api
     def test_create_asset_transform_request_asset_not_found(
         self, client: TestClient, transform_request_service_mock
     ) -> None:

@@ -14,22 +14,21 @@ import logfire
 from app.runners.facade import CompositeJobRunner
 from app.runners.protocols import JobDispatch, LogEntry
 
+PREFECT_ROUTING_PREFIX = "prefect."
+
 
 class PrefectDispatcher:
     """Trigger a Prefect deployment run to cut worker pick-up latency."""
 
-    def __init__(self, deployment_map: dict[str, str]) -> None:
-        self._deployment_map = deployment_map
-
     def dispatch(self, job: JobDispatch) -> str | None:
-        name = self._deployment_map.get(job.job_type)
-        if not name:
+        if not job.job_type.startswith(PREFECT_ROUTING_PREFIX):
             return None
+        deployment_name = job.job_type[len(PREFECT_ROUTING_PREFIX) :]
         with logfire.span("prefect_dispatch") as span:
             try:
                 from prefect.deployments import run_deployment  # noqa: PLC0415
 
-                run_deployment(name=str(name), timeout=0)
+                run_deployment(name=deployment_name, timeout=0)
             except Exception as e:
                 span.record_exception(e)
         return None
@@ -48,9 +47,9 @@ class PrefectLogSource:
 class PrefectJobRunner(CompositeJobRunner):
     """A runner that both dispatches to and reads logs from Prefect."""
 
-    def __init__(self, deployment_map: dict[str, str]) -> None:
+    def __init__(self) -> None:
         super().__init__(
-            dispatcher=PrefectDispatcher(deployment_map),
+            dispatcher=PrefectDispatcher(),
             log_source=PrefectLogSource(),
         )
 

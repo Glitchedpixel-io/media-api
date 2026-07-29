@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.schemas.enums import OutcomeEnum, TransformTypeEnum
+from app.schemas.enums import OutcomeEnum
 
 if TYPE_CHECKING:
     # Only imported for type checking; no runtime import cycles
@@ -35,9 +35,7 @@ class TransformRequestORM(Base):
     asset_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
     )
-    transform_type: Mapped[TransformTypeEnum] = mapped_column(
-        Enum(TransformTypeEnum, name="transform_type_enum"), nullable=False
-    )
+    transform_type: Mapped[str] = mapped_column(Text, nullable=False)
     parameters: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     actioned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

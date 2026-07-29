@@ -14,6 +14,8 @@ from app.schemas import (
     JobCreatePublic,
     TransformRequestCreatePublic,
     TransformRequestClaim,
+    TransformRequestFilters,
+    TransformRequestPatchPublic,
     TitleReferenceCreatePublic,
     IdSchemeCreatePublic,
     AssetIdCreatePublic,
@@ -22,7 +24,6 @@ from app.schemas import (
     InboxDeleteRequest,
     TitleTypeEnum,
     TitleReferenceTypeEnum,
-    TransformTypeEnum,
     OutcomeEnum,
     ContentKind,
     InboxItemTypeEnum,
@@ -211,20 +212,20 @@ class TestJobSchemas:
 @pytest.mark.unit
 class TestTransformRequestSchemas:
     def test_transform_request_create_minimal(self):
-        tr = TransformRequestCreatePublic(transform_type=TransformTypeEnum.transcribe)
-        assert tr.transform_type == TransformTypeEnum.transcribe
+        tr = TransformRequestCreatePublic(transform_type="prefect.transcribe")
+        assert tr.transform_type == "prefect.transcribe"
         assert tr.actioned is False
 
     def test_transform_request_create_with_parameters(self):
         tr = TransformRequestCreatePublic(
-            transform_type=TransformTypeEnum.extract_audio,
+            transform_type="prefect.extract_audio",
             parameters={"format": "mp3", "bitrate": 128},
         )
         assert tr.parameters == {"format": "mp3", "bitrate": 128}
 
     def test_transform_request_claim_valid(self):
         claim = TransformRequestClaim(
-            transform_type=TransformTypeEnum.transcribe,
+            transform_type="prefect.transcribe",
             worker="worker-001",
             external_job_id="job-123",
         )
@@ -234,6 +235,89 @@ class TestTransformRequestSchemas:
         assert OutcomeEnum.succeeded.value == "succeeded"
         assert OutcomeEnum.failed.value == "failed"
         assert OutcomeEnum.cancelled.value == "cancelled"
+
+
+@pytest.mark.unit
+class TestTransformRoutingKeyValidation:
+    """Shape-only validation of the provider-qualified transform_type routing key.
+
+    Accept: `<provider>.<anything-nonempty-and-non-whitespace>`, remainder may
+    itself contain dots. Reject: no dot, empty provider, empty local type,
+    empty/blank string, or any whitespace (including a trailing newline --
+    pydantic-core's default rust-regex engine treats `$` as strict
+    end-of-haystack, unlike Python's `re`).
+    """
+
+    VALID = [
+        "prefect.transcode",
+        "webhook.thumbnail.generate",
+        "prefect.media/transcode",
+    ]
+    INVALID = [
+        "prefect",
+        ".transcode",
+        "prefect.",
+        "",
+        "   ",
+        "prefect. transcode",
+        " prefect.transcode",
+        "prefect.transcode ",
+        "prefect .transcode",
+        "prefect.transcode\t",
+        "prefect.transcode\n",
+    ]
+
+    @pytest.mark.parametrize("value", VALID)
+    def test_create_public_accepts_valid_key(self, value):
+        tr = TransformRequestCreatePublic(transform_type=value)
+        assert tr.transform_type == value
+
+    @pytest.mark.parametrize("value", INVALID)
+    def test_create_public_rejects_invalid_key(self, value):
+        with pytest.raises(ValidationError) as exc_info:
+            TransformRequestCreatePublic(transform_type=value)
+        assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
+
+    @pytest.mark.parametrize("value", VALID)
+    def test_claim_accepts_valid_key(self, value):
+        claim = TransformRequestClaim(transform_type=value, worker="w")
+        assert claim.transform_type == value
+
+    @pytest.mark.parametrize("value", INVALID)
+    def test_claim_rejects_invalid_key(self, value):
+        with pytest.raises(ValidationError) as exc_info:
+            TransformRequestClaim(transform_type=value, worker="w")
+        assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
+
+    @pytest.mark.parametrize("value", VALID)
+    def test_patch_public_accepts_valid_key(self, value):
+        patch = TransformRequestPatchPublic(transform_type=value)
+        assert patch.transform_type == value
+
+    @pytest.mark.parametrize("value", INVALID)
+    def test_patch_public_rejects_invalid_key(self, value):
+        with pytest.raises(ValidationError) as exc_info:
+            TransformRequestPatchPublic(transform_type=value)
+        assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
+
+    def test_patch_public_omitted_transform_type_is_none(self):
+        patch = TransformRequestPatchPublic()
+        assert patch.transform_type is None
+
+    @pytest.mark.parametrize("value", VALID)
+    def test_filters_accepts_valid_key(self, value):
+        filters = TransformRequestFilters(transform_type=value)
+        assert filters.transform_type == value
+
+    @pytest.mark.parametrize("value", INVALID)
+    def test_filters_rejects_invalid_key(self, value):
+        with pytest.raises(ValidationError) as exc_info:
+            TransformRequestFilters(transform_type=value)
+        assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
+
+    def test_filters_omitted_transform_type_is_none(self):
+        filters = TransformRequestFilters()
+        assert filters.transform_type is None
 
 
 @pytest.mark.unit

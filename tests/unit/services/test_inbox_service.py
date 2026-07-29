@@ -20,7 +20,6 @@ from app.schemas import (
     InboxDeleteRequest,
     InboxImportRequest,
     TransformRequestCreateInternal,
-    TransformTypeEnum,
 )
 from app.services import InboxService
 from tests.factories import AssetReadFactory, TransformRequestReadFactory
@@ -204,13 +203,13 @@ class TestImportFile:
         # Verify first transform request (stream_reader)
         first_transform_call = t_repo.create.call_args_list[0][0][0]
         assert isinstance(first_transform_call, TransformRequestCreateInternal)
-        assert first_transform_call.transform_type == TransformTypeEnum.stream_reader
+        assert first_transform_call.transform_type == "prefect.stream_reader"
         assert first_transform_call.asset_id == created_asset.id
 
         # Verify second transform request (ffprobe_metadata)
         second_transform_call = t_repo.create.call_args_list[1][0][0]
         assert isinstance(second_transform_call, TransformRequestCreateInternal)
-        assert second_transform_call.transform_type == TransformTypeEnum.ffprobe_metadata
+        assert second_transform_call.transform_type == "prefect.ffprobe_metadata"
         assert second_transform_call.asset_id == created_asset.id
         assert second_transform_call.parameters == {"metadata_types": ["format", "chapters"]}
 
@@ -372,12 +371,12 @@ class TestImportFile:
 
         # First call should be stream_reader
         first_request = calls[0][0][0]
-        assert first_request.transform_type == TransformTypeEnum.stream_reader
+        assert first_request.transform_type == "prefect.stream_reader"
         assert first_request.asset_id == 42
         assert first_request.parameters == {}
 
         # Second call should be ffprobe_metadata
         second_request = calls[1][0][0]
-        assert second_request.transform_type == TransformTypeEnum.ffprobe_metadata
+        assert second_request.transform_type == "prefect.ffprobe_metadata"
         assert second_request.asset_id == 42
         assert second_request.parameters == {"metadata_types": ["format", "chapters"]}

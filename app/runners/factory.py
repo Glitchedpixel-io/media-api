@@ -20,7 +20,7 @@ def build_job_runner(config: RunnerConfig) -> JobRunner:
     if backend == "prefect":
         from app.runners.prefect_runner import PrefectJobRunner  # noqa: PLC0415
 
-        return PrefectJobRunner(config.job_routing_map)
+        return PrefectJobRunner()
 
     if backend == "webhook":
         from app.runners.facade import CompositeJobRunner  # noqa: PLC0415

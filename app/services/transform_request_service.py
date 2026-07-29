@@ -28,7 +28,6 @@ from app.schemas import (
     TransformRequestRead,
     TransformRequestReadExpanded,
     TransformRequestUpdateInternal,
-    TransformTypeEnum,
 )
 from app.services.errors import domain_error_detail, translate_repository_errors
 
@@ -181,7 +180,7 @@ class TransformRequestService:
                 self._runner.dispatch(
                     JobDispatch(
                         job_id=request.id,
-                        job_type=request.transform_type.value,
+                        job_type=request.transform_type,
                         parameters=request.parameters,
                     )
                 )
@@ -195,7 +194,7 @@ class TransformRequestService:
         return req
 
     def claim_next_request(
-        self, transform_type: TransformTypeEnum, worker: str, external_job_id: str | None
+        self, transform_type: str, worker: str, external_job_id: str | None
     ) -> TransformRequestReadExpanded:
         try:
             return self.repo.claim_next(

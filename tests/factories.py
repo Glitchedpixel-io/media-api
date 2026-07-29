@@ -34,7 +34,6 @@ from app.schemas import (
     TransformRequestCreateInternal,
     TransformRequestRead,
     TransformRequestReadExpanded,
-    TransformTypeEnum,
     IdSchemeCreateInternal,
     RunnerStateRead,
     MetadataRead,
@@ -109,7 +108,7 @@ class TransformRequestReadFactory(factory.Factory):
     id = factory.Faker("pyint")
     created_at = factory.Faker("date_time", tzinfo=UTC)
     asset_id = factory.Faker("pyint")
-    transform_type = TransformTypeEnum.test
+    transform_type = "prefect.test"
     parameters = None
     actioned = False
     processed_at = None
@@ -126,7 +125,7 @@ class TransformRequestReadExpandedFactory(factory.Factory):
     id = factory.Faker("pyint")
     created_at = factory.Faker("date_time", tzinfo=UTC)
     asset_id = factory.Faker("pyint")
-    transform_type = TransformTypeEnum.test
+    transform_type = "prefect.test"
     parameters = None
     actioned = False
     processed_at = None
@@ -258,7 +257,7 @@ class TransformRequestCreateFactory(factory.Factory):
     class Meta:
         model = TransformRequestCreateInternal
 
-    transform_type = "transcode"
+    transform_type = "prefect.transcode"
     parameters = None
     actioned = False
     processed_at = None

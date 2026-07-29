@@ -16,7 +16,6 @@ from app.models import TransformRequestORM
 from app.schemas import (
     OutcomeEnum,
     TransformRequestUpdateInternal,
-    TransformTypeEnum,
 )
 from tests.factories import AssetCreateFactory, TransformRequestCreateFactory
 
@@ -61,7 +60,7 @@ def test_on_success_actions_triggered(
     """Test that on_success actions are processed when outcome is succeeded."""
     # Create an asset and transform request with on_success config
     asset = media_repository.create(AssetCreateFactory())
-    on_success_config = {"action": "create_follow_on", "transform_type": "transcode"}
+    on_success_config = {"action": "create_follow_on", "transform_type": "prefect.transcode"}
     tr_create = TransformRequestCreateFactory(
         asset_id=asset.id,
         outcome=None,
@@ -177,7 +176,7 @@ def test_event_fires_via_orm_update(db_session: Session, media_repository):
     asset = media_repository.create(AssetCreateFactory())
     tr_orm = TransformRequestORM(
         asset_id=asset.id,
-        transform_type=TransformTypeEnum.test,
+        transform_type="prefect.test",
         actioned=False,
         outcome=None,
     )

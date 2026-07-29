@@ -55,7 +55,7 @@ class TestListTransformRequests:
             TransformRequestReadExpanded
         ](items=expected_requests, page=PageInfo(next=None, prev=None))
 
-        response = client.get("/api/transform_requests?actioned=true&transform_type=test")
+        response = client.get("/api/transform_requests?actioned=true&transform_type=prefect.test")
 
         assert response.status_code == HTTPStatus.OK
         transform_request_service_mock.get_transform_requests.assert_called_once()
@@ -187,7 +187,7 @@ class TestClaimRequest:
         response = client.post(
             "/api/transform_requests/claim",
             json={
-                "transform_type": "test",
+                "transform_type": "prefect.test",
                 "worker": "test-worker",
                 "external_job_id": "job-123",
             },
@@ -211,8 +211,94 @@ class TestCreateLinkedRequest:
 
         response = client.post(
             "/api/transform_requests/5/link",
-            json={"transform_type": "test", "parameters": {}},
+            json={"transform_type": "prefect.test", "parameters": {}},
         )
 
         assert response.status_code == HTTPStatus.CREATED
         transform_request_service_mock.create_linked_request.assert_called_once()
+
+
+def _unwrap_string_schema(prop: dict) -> dict:
+    """A property schema may carry `pattern` directly (required fields) or
+    under `anyOf` (optional/filter fields, e.g. `T | None`)."""
+    if "anyOf" in prop:
+        return next(s for s in prop["anyOf"] if s.get("type") == "string")
+    return prop
+
+
+class TestTransformTypeValidation:
+    """Shape-only validation of the provider-qualified routing key, end to end."""
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_claim_with_no_dot_is_422(
+        self, client: TestClient, transform_request_service_mock
+    ) -> None:
+        response = client.post(
+            "/api/transform_requests/claim",
+            json={"transform_type": "prefect", "worker": "w"},
+        )
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        transform_request_service_mock.claim_next_request.assert_not_called()
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_list_filter_with_no_dot_is_422_not_500(
+        self, client: TestClient, transform_request_service_mock
+    ) -> None:
+        """A bad query param must be validated (422) by the router's Depends(),
+        not raise inside the handler (500)."""
+        response = client.get("/api/transform_requests?transform_type=prefect")
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        transform_request_service_mock.get_transform_requests.assert_not_called()
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_list_filter_valid_key_reaches_service_unchanged(
+        self, client: TestClient, transform_request_service_mock
+    ) -> None:
+        transform_request_service_mock.get_transform_requests.return_value = PaginatedResponse[
+            TransformRequestReadExpanded
+        ](items=[], page=PageInfo(next=None, prev=None))
+
+        response = client.get("/api/transform_requests?transform_type=prefect.transcode")
+
+        assert response.status_code == HTTPStatus.OK
+        params: TransformRequestListParams = (
+            transform_request_service_mock.get_transform_requests.call_args[0][0]
+        )
+        assert params.transform_type == "prefect.transcode"
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_patch_with_empty_provider_is_422(
+        self, client: TestClient, transform_request_service_mock
+    ) -> None:
+        response = client.patch("/api/transform_requests/5", json={"transform_type": ".transcode"})
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        transform_request_service_mock.update_transform_request.assert_not_called()
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_openapi_documents_pattern_and_example(self, client: TestClient) -> None:
+        from app.schemas.transform_routing import (
+            TRANSFORM_ROUTING_KEY_EXAMPLES,
+            TRANSFORM_ROUTING_KEY_PATTERN,
+        )
+
+        openapi = client.get("/openapi.json").json()
+        schemas = openapi["components"]["schemas"]
+
+        create_prop = schemas["TransformRequestCreatePublic"]["properties"]["transform_type"]
+        create_schema = _unwrap_string_schema(create_prop)
+        assert create_schema["type"] == "string"
+        assert create_schema["pattern"] == TRANSFORM_ROUTING_KEY_PATTERN
+        assert create_prop.get("examples") == TRANSFORM_ROUTING_KEY_EXAMPLES
+
+        list_params = openapi["paths"]["/api/transform_requests"]["get"]["parameters"]
+        transform_type_param = next(p for p in list_params if p["name"] == "transform_type")
+        param_schema = _unwrap_string_schema(transform_type_param["schema"])
+        assert param_schema["pattern"] == TRANSFORM_ROUTING_KEY_PATTERN

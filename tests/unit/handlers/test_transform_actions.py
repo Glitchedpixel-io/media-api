@@ -43,8 +43,8 @@ class TestTransformActionsHandler:
         cause = TransformRequestReadExpandedFactory(id=1)
         actions = {
             "create": [
-                {"transform_type": "transcode", "parameters": {"x": 1}},
-                {"transform_type": "test"},
+                {"transform_type": "prefect.transcode", "parameters": {"x": 1}},
+                {"transform_type": "prefect.test"},
             ]
         }
 
@@ -61,6 +61,31 @@ class TestTransformActionsHandler:
         cause = TransformRequestReadExpandedFactory(id=1)
 
         # A failing linked-request creation must not propagate.
-        handler.process_actions(cause, {"create": [{"transform_type": "test"}]})
+        handler.process_actions(cause, {"create": [{"transform_type": "prefect.test"}]})
 
         service.create_linked_request.assert_called_once()
+
+    @pytest.mark.unit
+    def test_process_actions_invalid_transform_type_is_skipped(self, handler) -> None:
+        """A shape-invalid transform_type raises inside TransformRequestCreatePublic
+        construction; the handler's own try/except must record it on the span and
+        skip that one follow-on without creating a linked request or raising."""
+        service = create_autospec(TransformRequestService, instance=True, spec_set=True)
+        handler.service = service
+
+        cause = TransformRequestReadExpandedFactory(id=1)
+        handler.process_actions(cause, {"create": [{"transform_type": "no-dot-here"}]})
+
+        service.create_linked_request.assert_not_called()
+
+    @pytest.mark.unit
+    def test_process_actions_omitted_transform_type_is_skipped(self, handler) -> None:
+        """No implicit default (e.g. the old "test") -- an omitted transform_type
+        must not create a linked request, and must not raise."""
+        service = create_autospec(TransformRequestService, instance=True, spec_set=True)
+        handler.service = service
+
+        cause = TransformRequestReadExpandedFactory(id=1)
+        handler.process_actions(cause, {"create": [{"parameters": {"x": 1}}]})
+
+        service.create_linked_request.assert_not_called()

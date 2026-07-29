@@ -12,7 +12,6 @@ from app.repositories import (
     MediaRepository,
     TransformRequestRepository,
 )
-from app.schemas.enums import TransformTypeEnum
 
 
 @pytest.mark.integration
@@ -129,13 +128,13 @@ class TestInboxAPI:
         assert len(r) == 2
         req = r[0]
         assert req["asset_id"] == asset_id
-        assert req["transform_type"] == TransformTypeEnum.stream_reader.value
+        assert req["transform_type"] == "prefect.stream_reader"
         assert req["parameters"] == {}
         assert req["actioned"] == False
         assert req["processed_at"] is None
         req = r[1]
         assert req["asset_id"] == asset_id
-        assert req["transform_type"] == TransformTypeEnum.ffprobe_metadata.value
+        assert req["transform_type"] == "prefect.ffprobe_metadata"
         assert req["parameters"] != {}
         assert req["actioned"] == False
         assert req["processed_at"] is None
