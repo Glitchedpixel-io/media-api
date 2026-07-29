@@ -1,0 +1,81 @@
+name: Codecov (main)
+
+# main only ever receives squash-merge commits (see CLAUDE.md), which never run CI
+# themselves — ci.yml triggers on pull_request only, so the coverage upload happens
+# against the PR head SHA, an orphaned commit the instant the squash lands. Codecov
+# never sees a report tied to any commit actually on main, so the badge shows no data.
+#
+# Rather than re-running the full suite against a commit whose code content is
+# byte-identical to the PR head that already passed, this reuses that run's
+# coverage/test-result reports and re-attributes them to the new merge commit.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  reupload-coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+
+    steps:
+      - name: Find the PR that produced this merge commit
+        id: find_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          PR_NUMBER=$(printf '%s' "$COMMIT_MSG" | head -1 | grep -oE '\(#[0-9]+\)$' | tr -d '()#' || true)
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR number in merge commit subject; nothing to reuse." >&2
+            exit 0
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Find that PR's CI run
+        id: find_run
+        if: steps.find_pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+        run: |
+          HEAD_SHA=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefOid -q .headRefOid)
+          RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow=ci.yml --commit "$HEAD_SHA" --json databaseId,conclusion -q '[.[] | select(.conclusion == "success")][0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "No successful CI run found for $HEAD_SHA; nothing to reuse." >&2
+            exit 0
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Check out main at this commit
+        if: steps.find_run.outputs.run_id != ''
+        uses: actions/checkout@v5
+
+      - name: Download that run's coverage reports
+        if: steps.find_run.outputs.run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          run-id: ${{ steps.find_run.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Re-attribute coverage to this merge commit
+        if: steps.find_run.outputs.run_id != ''
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          override_commit: ${{ github.sha }}
+          override_branch: main
+
+      - name: Re-attribute test results to this merge commit
+        if: steps.find_run.outputs.run_id != ''
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: ./junit.xml
+          override_commit: ${{ github.sha }}
+          override_branch: main
