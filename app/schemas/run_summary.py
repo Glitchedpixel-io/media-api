@@ -3,8 +3,12 @@ from typing import Any
 
 from pydantic import Field
 
-from .enums import TransformTypeEnum
 from .mixins import IDMixin
+from .transform_routing import (
+    TRANSFORM_ROUTING_KEY_DESCRIPTION,
+    TRANSFORM_ROUTING_KEY_EXAMPLES,
+    TransformRoutingKey,
+)
 from .utc_basemodel import Timestamp, UTCBaseModel
 
 
@@ -15,8 +19,11 @@ class RunSummaryAttrs(UTCBaseModel):
     worker_type: str = Field(
         ..., title="Worker Type", description="Type/category of worker that ran this job"
     )
-    transform_type: TransformTypeEnum = Field(
-        ..., title="Transform Type", description="Type of transformation this run performed"
+    transform_type: TransformRoutingKey = Field(
+        ...,
+        title="Transform Type",
+        description=TRANSFORM_ROUTING_KEY_DESCRIPTION,
+        examples=TRANSFORM_ROUTING_KEY_EXAMPLES,
     )
     started_at: Timestamp = Field(..., title="Started At", description="When the run started")
     processed_count: int = Field(

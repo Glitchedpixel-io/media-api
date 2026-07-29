@@ -5,7 +5,6 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
-    Enum,
     Integer,
     Text,
     func,
@@ -13,7 +12,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from app.schemas.enums import TransformTypeEnum
 
 
 class RunSummaryORM(Base):
@@ -22,9 +20,7 @@ class RunSummaryORM(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     worker_name: Mapped[str] = mapped_column(Text, nullable=False)
     worker_type: Mapped[str] = mapped_column(Text, nullable=False)
-    transform_type: Mapped[TransformTypeEnum] = mapped_column(
-        Enum(TransformTypeEnum, name="transform_type_enum"), nullable=False
-    )
+    transform_type: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     processed_count: Mapped[int] = mapped_column(Integer, nullable=False)
     success_count: Mapped[int] = mapped_column(Integer, nullable=False)

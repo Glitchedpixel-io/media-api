@@ -219,7 +219,7 @@ class RunSummaryFactory(factory.Factory):
 
     worker_name = factory.Faker("name")
     worker_type = "system"
-    transform_type = "transcode"
+    transform_type = "prefect.transcode"
     started_at = factory.Faker("date_time", tzinfo=UTC)
     processed_count = 1
     success_count = 1
@@ -236,7 +236,7 @@ class RunSummaryReadFactory(factory.Factory):
     created_at = factory.Faker("date_time", tzinfo=UTC)
     worker_name = factory.Faker("name")
     worker_type = "system"
-    transform_type = "transcode"
+    transform_type = "prefect.transcode"
     started_at = factory.Faker("date_time", tzinfo=UTC)
     processed_count = 1
     success_count = 1
