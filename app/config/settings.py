@@ -96,7 +96,8 @@ class _Settings(BaseSettings):
         if isinstance(v, str):
             if not v.strip():
                 return {}
-            return json.loads(v)
+            parsed: dict[str, dict[str, object]] = json.loads(v)
+            return parsed
         return v
 
     @model_validator(mode="after")
