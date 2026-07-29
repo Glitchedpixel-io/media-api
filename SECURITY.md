@@ -15,21 +15,15 @@ This policy covers `media-api` only. The companion deployment repository
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Use GitHub's private vulnerability reporting: go to the **Security** tab of
-this repository and select **Report a vulnerability**. This opens a private
-advisory visible only to maintainers, so the issue can be discussed and
-fixed before any public disclosure.
-
-> This repository is still private while it's being prepared for open
-> sourcing, and GitHub's private vulnerability reporting isn't available on
-> private repos. Once the repo is public, the Security tab will have a
-> working "Report a vulnerability" button — this section will be accurate
-> from that point on.
-
-When reporting, please include:
-- A description of the vulnerability and its potential impact
-- Steps to reproduce, or a proof-of-concept if you have one
-- The affected version/commit
+ Use GitHub's private vulnerability reporting: go to the **Security** tab of
+ this repository and select **Report a vulnerability**. This opens a private
+ advisory visible only to maintainers, so the issue can be discussed and
+ fixed before any public disclosure.
+ 
+ When reporting, please include:
+ - A description of the vulnerability and its potential impact
+ - Steps to reproduce, or a proof-of-concept if you have one
+ - The affected version/commit
 
 ## What to Expect
 
