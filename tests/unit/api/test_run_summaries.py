@@ -51,7 +51,7 @@ class TestCreateRunSummary:
         invalid_payload = {
             "worker_name": "worker1",
             "worker_type": "system",
-            "transform_type": "test",
+            "transform_type": "prefect.test",
             "started_at": "2024-01-01T00:00:00Z",
             "nonexistent_field": "value",
         }
@@ -59,3 +59,41 @@ class TestCreateRunSummary:
         response = client.post("/api/run_summaries", json=invalid_payload)
 
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+class TestTransformTypeValidation:
+    """Shape-only validation of the provider-qualified routing key on create."""
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_create_with_no_dot_is_422(self, client: TestClient, run_summary_service_mock) -> None:
+        payload = {
+            "worker_name": "worker1",
+            "worker_type": "system",
+            "transform_type": "prefect",
+            "started_at": "2024-01-01T00:00:00Z",
+            "processed_count": 1,
+            "success_count": 1,
+            "failed_count": 0,
+            "running_time": 1,
+        }
+
+        response = client.post("/api/run_summaries", json=payload)
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        run_summary_service_mock.create_run_summary.assert_not_called()
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_create_with_valid_key_reaches_service_unchanged(
+        self, client: TestClient, run_summary_service_mock
+    ) -> None:
+        expected_summary = RunSummaryReadFactory()
+        run_summary_service_mock.create_run_summary.return_value = expected_summary
+        payload = get_run_summary_creation_json(expected_summary)
+
+        response = client.post("/api/run_summaries", json=payload)
+
+        assert response.status_code == HTTPStatus.CREATED
+        call_arg = run_summary_service_mock.create_run_summary.call_args[0][0]
+        assert call_arg.transform_type == expected_summary.transform_type

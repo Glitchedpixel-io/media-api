@@ -23,7 +23,6 @@ from app.schemas import (
     RunSummaryCreatePublic,
     ScannerRunSummaryCreateInternal,
     ScannerRunSummaryCreatePublic,
-    TransformTypeEnum,
 )
 from app.services import RunSummaryService, ScannerRunSummaryService
 from tests.factories import RunSummaryReadFactory
@@ -41,7 +40,7 @@ def _public_summary() -> RunSummaryCreatePublic:
     return RunSummaryCreatePublic(
         worker_name="worker1",
         worker_type="system",
-        transform_type=TransformTypeEnum.transcode,
+        transform_type="prefect.transcode",
         started_at=datetime(2024, 1, 1, tzinfo=UTC),
         processed_count=3,
         success_count=2,

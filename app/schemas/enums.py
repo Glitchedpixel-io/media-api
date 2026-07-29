@@ -2,20 +2,6 @@
 import enum
 
 
-class TransformTypeEnum(str, enum.Enum):
-    """Enum for transform types"""
-
-    extract_audio = "extract_audio"
-    test = "test"
-    transcribe = "transcribe"
-    transcode = "transcode"
-    youtube = "youtube"
-    whisper_ingest = "whisper_ingest"
-    clipper = "clipper"
-    stream_reader = "stream_reader"
-    ffprobe_metadata = "ffprobe_metadata"
-
-
 class OutcomeEnum(str, enum.Enum):
     """Enum for processing outcomes"""
 

@@ -16,6 +16,7 @@ from app.schemas import (
     TransformRequestClaim,
     TransformRequestFilters,
     TransformRequestPatchPublic,
+    RunSummaryCreatePublic,
     TitleReferenceCreatePublic,
     IdSchemeCreatePublic,
     AssetIdCreatePublic,
@@ -318,6 +319,29 @@ class TestTransformRoutingKeyValidation:
     def test_filters_omitted_transform_type_is_none(self):
         filters = TransformRequestFilters()
         assert filters.transform_type is None
+
+    def _run_summary_kwargs(self, value):
+        return {
+            "worker_name": "worker1",
+            "worker_type": "system",
+            "transform_type": value,
+            "started_at": datetime(2024, 1, 1, tzinfo=UTC),
+            "processed_count": 1,
+            "success_count": 1,
+            "failed_count": 0,
+            "running_time": 1,
+        }
+
+    @pytest.mark.parametrize("value", VALID)
+    def test_run_summary_create_accepts_valid_key(self, value):
+        rs = RunSummaryCreatePublic(**self._run_summary_kwargs(value))
+        assert rs.transform_type == value
+
+    @pytest.mark.parametrize("value", INVALID)
+    def test_run_summary_create_rejects_invalid_key(self, value):
+        with pytest.raises(ValidationError) as exc_info:
+            RunSummaryCreatePublic(**self._run_summary_kwargs(value))
+        assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
 
 
 @pytest.mark.unit
