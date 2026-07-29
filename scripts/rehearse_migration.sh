@@ -86,6 +86,11 @@ if [[ "$PROD_SOURCE_URL" == "$SCRATCH_ADMIN_URL" ]]; then
 fi
 
 SCRATCH_DATABASE_URL="${SCRATCH_ADMIN_URL%/postgres}/${SCRATCH_DB_NAME}"
+# psql/pg_dump/pg_restore need the plain "postgresql://" scheme above; Alembic's
+# env.py hands its URL straight to SQLAlchemy, which defaults to the psycopg2
+# dialect on a bare "postgresql://" -- but this project depends on psycopg (v3),
+# not psycopg2. Every `alembic` call below needs this "+psycopg" variant instead.
+ALEMBIC_SCRATCH_URL="${SCRATCH_DATABASE_URL/postgresql:/postgresql+psycopg:}"
 LOCK_MONITOR_LOG="$(mktemp -t media_api_rehearsal_locks_XXXXXX.log)"
 CONTENTION_PID=""
 MONITOR_PID=""
@@ -125,11 +130,11 @@ echo "== 3/7: Restoring dump into scratch =="
 time pg_restore --no-owner --no-acl -j 4 -d "$SCRATCH_DATABASE_URL" "$DUMP_FILE"
 
 echo "== 4/7: Current alembic revision on the restored snapshot =="
-ALEMBIC_DATABASE_URL="$SCRATCH_DATABASE_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
+ALEMBIC_DATABASE_URL="$ALEMBIC_SCRATCH_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
     uv run alembic current
 echo "(Confirm this is an ancestor of head with no drift before continuing.)"
 
-MIGRATION_URL="${SCRATCH_DATABASE_URL}?options=-c%20lock_timeout%3D${LOCK_TIMEOUT_MS}ms"
+MIGRATION_URL="${ALEMBIC_SCRATCH_URL}?options=-c%20lock_timeout%3D${LOCK_TIMEOUT_MS}ms"
 
 if [[ "$SKIP_CONTENTION_TEST" != "1" ]]; then
     echo "== 5/7: Holding an ACCESS EXCLUSIVE lock on '${CONTENTION_TABLE}' for ${CONTENTION_HOLD_SECS}s =="
@@ -183,17 +188,17 @@ if [[ "$UPGRADE_STATUS" -ne 0 ]]; then
 fi
 
 echo "== 7/7: alembic check + downgrade/upgrade round-trip =="
-ALEMBIC_DATABASE_URL="$SCRATCH_DATABASE_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
+ALEMBIC_DATABASE_URL="$ALEMBIC_SCRATCH_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
     uv run alembic check
 
 if [[ "$DOWNGRADE_STEPS" -gt 0 ]]; then
     for i in $(seq 1 "$DOWNGRADE_STEPS"); do
         echo "-- downgrade step $i/${DOWNGRADE_STEPS} --"
-        ALEMBIC_DATABASE_URL="$SCRATCH_DATABASE_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
+        ALEMBIC_DATABASE_URL="$ALEMBIC_SCRATCH_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
             uv run alembic downgrade -1
     done
     echo "-- re-upgrading back to head --"
-    ALEMBIC_DATABASE_URL="$SCRATCH_DATABASE_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
+    ALEMBIC_DATABASE_URL="$ALEMBIC_SCRATCH_URL" ${ALEMBIC_OWNER_ROLE:+ALEMBIC_OWNER_ROLE="$ALEMBIC_OWNER_ROLE"} \
         uv run alembic upgrade head
 fi
 
