@@ -103,3 +103,16 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
           files: ./junit.xml
+
+      # main only ever gets a squash-merge commit that never runs CI itself (this
+      # workflow triggers on pull_request only). codecov-main.yml reuses these reports
+      # after merge to attribute coverage to that commit instead of re-running the suite.
+      - name: Save coverage reports for reuse on main
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            junit.xml
+          retention-days: 7
