@@ -3,7 +3,6 @@ from datetime import UTC, datetime, timedelta
 from time import sleep
 
 import pytest
-from sqlalchemy.orm import sessionmaker
 
 from app.repositories.errors import (
     CheckViolation,
@@ -11,9 +10,6 @@ from app.repositories.errors import (
     NotFoundError,
     RecordCannotBeChanged,
     UniqueViolation,
-)
-from app.repositories.transform_request_repository import (
-    SQLAlchemyTransformRequestRepository,
 )
 from app.schemas import (
     OutcomeEnum,
@@ -141,19 +137,8 @@ def test_transform_type_filter_is_exact_match(bundle):
 
 
 @pytest.mark.contract
-def test_claim_next_exact_match_skips_non_matching_types(bundle, _test_engine):
-    """claim_next only claims exact routing-key matches, and raises when none remain.
-
-    claim_next wraps its body in an explicit `self.db.begin()`, which raises
-    `InvalidRequestError` if the session it's given already has an open
-    transaction -- a pre-existing bug, tracked separately in #10, that
-    reproduces on unmodified main and is unrelated to routing keys. Using a
-    second, freshly-opened session for the claim itself avoids tripping it
-    here while still exercising the real exact-match SQL predicate against
-    Postgres -- and matches how this method is actually invoked in
-    production, where TransformRequestService.claim_next_request runs
-    against its own fresh request-scoped session.
-    """
+def test_claim_next_exact_match_skips_non_matching_types(bundle):
+    """claim_next only claims exact routing-key matches, and raises when none remain."""
 
     asset = bundle.assets.create(AssetCreateFactory())
     bundle.transform_requests.create(
@@ -166,23 +151,14 @@ def test_claim_next_exact_match_skips_non_matching_types(bundle, _test_engine):
         TransformRequestCreateFactory(asset_id=asset.id, transform_type="prefect.transcode")
     )
 
-    claim_session_factory = sessionmaker(
-        bind=_test_engine, autoflush=False, autocommit=False, future=True
-    )
-    claim_session = claim_session_factory()
-    try:
-        claim_repo = SQLAlchemyTransformRequestRepository(claim_session)
+    claimed = bundle.transform_requests.claim_next("prefect.transcode", "worker-1", None)
+    assert claimed.id == target.id
+    assert claimed.worker == "worker-1"
 
-        claimed = claim_repo.claim_next("prefect.transcode", "worker-1", None)
-        assert claimed.id == target.id
-        assert claimed.worker == "worker-1"
-
-        # The one matching row is now claimed; the non-matching ones must
-        # not be picked up.
-        with pytest.raises(NotFoundError):
-            claim_repo.claim_next("prefect.transcode", "worker-2", None)
-    finally:
-        claim_session.close()
+    # The one matching row is now claimed; the non-matching ones must
+    # not be picked up.
+    with pytest.raises(NotFoundError):
+        bundle.transform_requests.claim_next("prefect.transcode", "worker-2", None)
 
 
 @pytest.mark.contract
@@ -585,7 +561,7 @@ def test_last_heartbeat_updates_every_time(bundle):
 
 
 @pytest.mark.contract
-def no_test_claim_next_and_not_found(bundle):
+def test_claim_next_and_not_found(bundle):
 
     asset = bundle.assets.create(AssetCreateFactory())
 
@@ -605,11 +581,11 @@ def no_test_claim_next_and_not_found(bundle):
         )
 
     # Assign one to a worker already
-    claimed = bundle.transform_requests.claim_next("prefect.transcode", "worker-1")
+    claimed = bundle.transform_requests.claim_next("prefect.transcode", "worker-1", None)
     assert claimed.worker == "worker-1"
     assert claimed.actioned is False
     # Next claim returns the next oldest unassigned of same type
-    claimed2 = bundle.transform_requests.claim_next("prefect.extract_audio", "worker-2")
+    claimed2 = bundle.transform_requests.claim_next("prefect.extract_audio", "worker-2", None)
     assert (
         claimed2.worker == "worker-2"
         and claimed2.actioned is False
@@ -619,4 +595,4 @@ def no_test_claim_next_and_not_found(bundle):
 
     # If none available of a different type, raises NotFoundError
     with pytest.raises(NotFoundError):
-        bundle.transform_requests.claim_next("prefect.test", "worker-x")
+        bundle.transform_requests.claim_next("prefect.test", "worker-x", None)
