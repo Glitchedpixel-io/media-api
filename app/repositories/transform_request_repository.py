@@ -114,31 +114,29 @@ class SQLAlchemyTransformRequestRepository(SQLAlchemyBaseRepository, TransformRe
     def claim_next(
         self, transform_type: str, worker: str, external_job_id: str | None
     ) -> TransformRequestReadExpanded:
-        # Atomically claim the next available task of the given type, eagerly loading asset
-        try:
-            with self.db.begin():
-                stmt = (
-                    select(TransformRequestORM)
-                    .options(selectinload(TransformRequestORM.asset))
-                    .where(
-                        TransformRequestORM.transform_type == transform_type,
-                        TransformRequestORM.actioned == False,  # noqa: E712
-                        TransformRequestORM.worker.is_(None),
-                    )
-                    .order_by(TransformRequestORM.created_at.asc())
-                    .with_for_update(skip_locked=True)
-                    .limit(1)
-                )
-                orm = self.db.scalars(stmt).first()
-                if orm is None:
-                    # Nothing to claim
-                    raise NotFoundError
-                # Assign the worker; do not mark actioned or processed here
-                orm.worker = worker
-                orm.external_job_id = external_job_id
-                self.db.flush()
-                # session will commit at context exit
-                return TransformRequestReadExpanded.model_validate(orm)
-        except Exception:
-            # Rollback is handled by context manager if needed
-            raise
+        # Atomically claim the next available task of the given type, eagerly loading asset.
+        # Relies on session autobegin (like every other method here) rather than an explicit
+        # self.db.begin(), which raises if the session already has an open transaction. The
+        # row lock from FOR UPDATE SKIP LOCKED is still held until _safe_commit() below.
+        stmt = (
+            select(TransformRequestORM)
+            .options(selectinload(TransformRequestORM.asset))
+            .where(
+                TransformRequestORM.transform_type == transform_type,
+                TransformRequestORM.actioned == False,  # noqa: E712
+                TransformRequestORM.worker.is_(None),
+            )
+            .order_by(TransformRequestORM.created_at.asc())
+            .with_for_update(skip_locked=True)
+            .limit(1)
+        )
+        orm = self.db.scalars(stmt).first()
+        if orm is None:
+            raise NotFoundError
+        # Assign the worker; do not mark actioned or processed here
+        orm.worker = worker
+        orm.external_job_id = external_job_id
+        self.db.flush()
+        result = TransformRequestReadExpanded.model_validate(orm)
+        self._safe_commit()
+        return result
