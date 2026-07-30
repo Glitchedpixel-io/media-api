@@ -64,7 +64,12 @@ class TagORM(Base):
     )
 
     # Indexes for performance
-    __table_args__ = (Index("ix_tags_parent_id", "parent_id"),)
+    __table_args__ = (
+        Index("ix_tags_parent_id", "parent_id"),
+        # Functional index backing case-insensitive lookups (see get_by_name);
+        # the plain btree index on `name` above doesn't serve a lower() predicate.
+        Index("ix_tags_name_lower", func.lower(name)),
+    )
 
     @validates("name")
     def convert_lowercase(self, key: str, value: str) -> str:

@@ -4,7 +4,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -113,6 +123,7 @@ class ExternalIdentifierORM(Base):
         # Index for resolution queries (scheme + external_id)
         # Already covered by unique constraint
         # Index for reverse lookups (entity_type + entity_id)
+        Index("ix_external_identifiers_entity", "entity_type", "entity_id"),
     )
 
     # Note: Referential integrity for entity_id is enforced at application layer
