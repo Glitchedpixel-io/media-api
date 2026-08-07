@@ -10,7 +10,7 @@
 # === Claude Code state — oauth + MCP bearer tokens ===
 .claude.json
 claude.json
-.claude/settings.local.json
+.claude/settings.local.json*
 # per-machine worktrees; a leftover one is also globbed by the repo's own linter and
 # test runner, which reports as phantom failures in the repo's own files (imp-warden #129)
 .claude/worktrees/
