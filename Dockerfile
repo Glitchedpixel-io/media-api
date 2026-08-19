@@ -12,9 +12,17 @@ RUN apt-get update -y && apt-get install -y \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Orchestration extras to install, as a comma-free extra name (e.g. "prefect").
+# Empty by default, and it must stay that way: the core image depends on no
+# orchestration framework, which is the entire point of the pluggable provider
+# registry. An orchestration-flavoured image is a *separate artifact* built from
+# this same Dockerfile with EXTRAS set, and the deploy chooses which one to run
+# per environment — the dependency never leaks into the default build. See #21.
+ARG EXTRAS=""
+
 # Install dependencies first so this layer is cached independently of source changes
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev ${EXTRAS:+--extra "$EXTRAS"} --no-install-project
 
 COPY . .
 # Version is injected, not read from git: .git is excluded via .dockerignore so
@@ -26,7 +34,7 @@ COPY . .
 # hatchling build of the project (e.g. an implicit `uv sync`) can still resolve it.
 ARG VERSION=0.0.0+local
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev ${EXTRAS:+--extra "$EXTRAS"}
 
 # --no-sync: the environment is already complete from the build above; do not
 # re-sync at startup (which would reinstall dev deps and rebuild the project).
