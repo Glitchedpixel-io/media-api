@@ -8,11 +8,33 @@ extra installed; only *constructing* the provider (which only happens if
 the package to be present. Every ``prefect`` API call beyond that check stays
 lazily imported, so nothing here is touched unless the provider is both
 enabled and in active use.
+
+## Deployment name resolution
+
+Prefect identifies a deployment as ``<flow name>/<deployment name>``, and
+``run_deployment`` splits on the ``/`` to resolve it. A routing key's
+provider-local half cannot carry that identifier directly: routing keys forbid
+whitespace (``app.schemas.transform_routing``) and real deployment names
+routinely contain spaces (``Probe Metadata``, ``Extract Audio``). So the
+provider takes an optional ``deployments`` map from provider-local command to
+full deployment identifier, supplied as a provider option:
+
+    ORCHESTRATION_PROVIDER_OPTIONS='{"prefect": {"deployments": {
+        "transcode": "transcode-flow/Transcoder",
+        "extract_audio": "extract-audio-flow/Extract Audio"
+    }}}'
+
+The map is provider-scoped on purpose: the core stays allow-list-free and never
+interprets a provider-local command, while the adapter that owns Prefect's
+vocabulary is the one that knows how to resolve it. An unmapped command is
+passed through verbatim, so the map is optional and adding a deployment whose
+identifier needs no translation requires no config change.
 """
 
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Mapping
 
 import logfire
 
@@ -24,21 +46,49 @@ class PrefectProvider:
     key = "prefect"
     api_version = PROVIDER_API_VERSION
 
-    def __init__(self, log_limit: int = 100) -> None:
+    def __init__(self, log_limit: int = 100, deployments: Mapping[str, str] | None = None) -> None:
         if importlib.util.find_spec("prefect") is None:
             raise RuntimeError(
                 "Orchestration provider 'prefect' is enabled but the 'prefect' "
                 "package is not installed. Install it with: uv add 'media-api[prefect]'"
             )
         self._log_limit = log_limit
+        self._deployments = dict(deployments or {})
 
     def dispatch(self, route: TransformRoute, job: JobDispatch) -> None:
         with logfire.span("prefect_dispatch") as span:
+            deployment = self._deployments.get(route.command, route.command)
+            span.set_attribute("prefect.deployment", deployment)
+
+            if "/" not in deployment:
+                # Prefect cannot resolve this: run_deployment splits the name on
+                # "/" and needs both halves. Say so plainly -- an unmapped
+                # command failing silently is exactly how this went unnoticed
+                # before (media-runners#39).
+                logfire.warn(
+                    "Transform type {job_type!r} resolves to {deployment!r}, which is "
+                    "not a '<flow>/<deployment>' identifier. Add it to the Prefect "
+                    "provider's 'deployments' option.",
+                    job_type=job.job_type,
+                    deployment=deployment,
+                )
+
             try:
                 from prefect.deployments import run_deployment  # noqa: PLC0415
 
-                run_deployment(name=route.command, timeout=0)
+                run_deployment(name=deployment, timeout=0)
             except Exception as e:
+                # Deliberately non-fatal: a dispatch failure must never fail the
+                # request that triggered it. Logged as an error as well as
+                # recorded on the span so it surfaces without reading traces.
+                logfire.error(
+                    "Prefect dispatch failed for job {job_id} ({job_type!r} -> "
+                    "{deployment!r}): {error}",
+                    job_id=job.job_id,
+                    job_type=job.job_type,
+                    deployment=deployment,
+                    error=e,
+                )
                 span.record_exception(e)
 
     def fetch_logs(self, route: TransformRoute, external_job_id: str) -> list[LogEntry]:

@@ -56,6 +56,72 @@ class TestPrefectProviderDispatch:
         run_deployment.assert_called_once_with(name="deploy.v2", timeout=0)
 
     @pytest.mark.unit
+    def test_dispatch_resolves_command_through_deployments_map(self, mocker) -> None:
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+        provider = PrefectProvider(deployments={"transcode": "transcode-flow/Transcoder"})
+
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="transcode"),
+            JobDispatch(job_id=1, job_type="prefect.transcode"),
+        )
+
+        run_deployment.assert_called_once_with(name="transcode-flow/Transcoder", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_maps_to_deployment_names_containing_spaces(self, mocker) -> None:
+        # The whole reason the map exists: routing keys forbid whitespace, so a
+        # deployment named "Extract Audio" is unreachable without translation.
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+        provider = PrefectProvider(
+            deployments={"extract_audio": "extract-audio-flow/Extract Audio"}
+        )
+
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="extract_audio"),
+            JobDispatch(job_id=1, job_type="prefect.extract_audio"),
+        )
+
+        run_deployment.assert_called_once_with(name="extract-audio-flow/Extract Audio", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_passes_unmapped_command_through_verbatim(self, mocker) -> None:
+        run_deployment = mocker.patch("prefect.deployments.run_deployment")
+        provider = PrefectProvider(deployments={"transcode": "transcode-flow/Transcoder"})
+
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="other-flow/Other"),
+            JobDispatch(job_id=1, job_type="prefect.other-flow/Other"),
+        )
+
+        run_deployment.assert_called_once_with(name="other-flow/Other", timeout=0)
+
+    @pytest.mark.unit
+    def test_dispatch_warns_when_resolved_name_cannot_resolve(self, mocker) -> None:
+        mocker.patch("prefect.deployments.run_deployment")
+        warn = mocker.patch("logfire.warn")
+        provider = PrefectProvider()
+
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="transcode"),
+            JobDispatch(job_id=1, job_type="prefect.transcode"),
+        )
+
+        warn.assert_called_once()
+
+    @pytest.mark.unit
+    def test_dispatch_does_not_warn_for_a_resolvable_name(self, mocker) -> None:
+        mocker.patch("prefect.deployments.run_deployment")
+        warn = mocker.patch("logfire.warn")
+        provider = PrefectProvider(deployments={"transcode": "transcode-flow/Transcoder"})
+
+        provider.dispatch(
+            TransformRoute(provider="prefect", command="transcode"),
+            JobDispatch(job_id=1, job_type="prefect.transcode"),
+        )
+
+        warn.assert_not_called()
+
+    @pytest.mark.unit
     def test_dispatch_swallows_errors(self, mocker) -> None:
         mocker.patch(
             "prefect.deployments.run_deployment",
