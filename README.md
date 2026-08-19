@@ -116,6 +116,24 @@ and log retrieval to the matching adapter. A request whose provider isn't
 enabled remains persistable — dispatch is a logged no-op and log retrieval
 returns an empty result, rather than failing the request.
 
+The Prefect adapter takes an optional `deployments` map, because Prefect
+identifies a deployment as `<flow name>/<deployment name>` and routing keys
+forbid whitespace — so a deployment called `Extract Audio` is unreachable
+without translation:
+
+```
+ORCHESTRATION_PROVIDER_OPTIONS='{"prefect": {"deployments": {
+  "transcode": "transcode-flow/Transcoder",
+  "extract_audio": "extract-audio-flow/Extract Audio"
+}}}'
+```
+
+The map is provider-scoped, not core config: the core still never interprets a
+provider-local command — the adapter that owns Prefect's vocabulary is the one
+that resolves it. An unmapped command is passed through verbatim, so the map is
+optional, and a command that can't resolve to a `<flow>/<deployment>` identifier
+is logged as a warning rather than failing quietly.
+
 ## Database migrations
 
 Alembic migrations are the single source of truth for the schema — a fresh
