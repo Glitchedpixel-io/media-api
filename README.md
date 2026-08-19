@@ -100,11 +100,31 @@ instantiated if named in `ENABLED_ORCHESTRATION_PROVIDERS` (empty by default,
 i.e. a pure pull model; comma-separated, e.g. `prefect,webhook`). A
 provider that's enabled but unavailable (missing entry point, missing
 optional dependency, incompatible API version) fails startup with a clear
-error rather than degrading silently. Two adapters ship built in: Prefect
-(`pip install media-api[prefect]` — the extra is required only if `prefect`
-is actually enabled) and a generic `webhook` dispatcher (no extra install,
-configured via `ORCHESTRATION_PROVIDER_OPTIONS`, e.g.
+error rather than degrading silently — so enabling a provider whose optional
+dependency isn't installed aborts startup rather than warning. Two adapters
+ship built in: Prefect (needs the `media-api[prefect]` extra) and a generic
+`webhook` dispatcher (no extra install, configured via
+`ORCHESTRATION_PROVIDER_OPTIONS`, e.g.
 `{"webhook": {"url": "https://example.com/hook"}}`).
+
+### Image flavours
+
+The core product depends on no orchestration framework — that's what the
+pluggable registry is for — so the default image installs no orchestration
+extra. Enabling a provider whose package isn't present aborts startup, so an
+extra that a deployment needs is shipped as a *separate artifact* rather than
+added to the default build:
+
+| tag | contents | use |
+| --- | --- | --- |
+| `:<version>`, `:latest` | no orchestration framework | pure pull model, or the `webhook` provider |
+| `:<version>-prefect`, `:latest-prefect` | adds `media-api[prefect]` | deployments enabling the `prefect` provider |
+
+Both are built from this Dockerfile; the flavour is selected with the `EXTRAS`
+build arg (`--build-arg EXTRAS=prefect`). A deployment picks the tag matching
+the providers it enables. Publish-time checks assert that the core image
+contains no orchestration framework and that the flavoured image can construct
+the providers it ships.
 
 Routing is decided by the request, not server config: `transform_type` is a
 provider-qualified routing key, `<provider>.<provider-local-type>` (e.g.

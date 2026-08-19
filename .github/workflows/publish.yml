@@ -71,7 +71,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      # The core image depends on no orchestration framework. That is the point
+      # of the pluggable provider registry, and it is why EXTRAS defaults empty.
+      - name: Build and push (core)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -82,6 +84,56 @@ jobs:
             ghcr.io/glitchedpixel-io/media-api:latest
           cache-from: type=registry,ref=ghcr.io/glitchedpixel-io/media-api:latest
           cache-to: type=inline
+
+      # A separate artifact, not a different default. Environments that enable
+      # the prefect provider deploy this tag; everything else stays lean.
+      - name: Build and push (prefect flavour)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ steps.tag.outputs.version }}
+            EXTRAS=prefect
+          tags: |
+            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}-prefect
+            ghcr.io/glitchedpixel-io/media-api:latest-prefect
+          cache-from: type=registry,ref=ghcr.io/glitchedpixel-io/media-api:latest-prefect
+          cache-to: type=inline
+
+      # Guards for the failure in #21: enabling a provider is a *runtime* switch
+      # but installing it is a *build-time* one, and registry init is deliberately
+      # not wrapped in try/except, so a mismatch is a startup crash loop rather
+      # than a config error. Nothing in CI previously ran the built image, so the
+      # test suite -- which runs in a dev venv where prefect IS installed -- could
+      # never see it. `dispatch` needs `build`, so a failure here blocks the deploy.
+      - name: Core image carries no orchestration framework
+        run: |
+          docker run --rm \
+            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }} \
+            uv run --no-sync python -c '
+          import importlib.util, sys
+          if importlib.util.find_spec("prefect") is not None:
+              sys.exit("core image contains prefect; it must not depend on an orchestration framework")
+          print("core image is orchestration-framework free")
+          '
+
+      - name: Prefect flavour can construct the providers it ships
+        run: |
+          docker run --rm \
+            -e APP_ENV=staging \
+            -e ENABLED_ORCHESTRATION_PROVIDERS=prefect,webhook \
+            -e ORCHESTRATION_PROVIDER_OPTIONS='{"webhook":{"url":"https://example.invalid/hook"}}' \
+            -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
+            -e LOGFIRE_IGNORE_NO_CONFIG=1 \
+            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}-prefect \
+            uv run --no-sync python -c '
+          from app.config.settings import _Settings, _build_orchestration_config
+          from app.orchestration.loader import build_provider_registry
+          cfg = _build_orchestration_config(_Settings())
+          build_provider_registry(cfg)
+          print("constructed:", cfg.enabled_providers)
+          '
 
   dispatch:
     needs: build
