@@ -53,4 +53,19 @@ class TransformActionsHandler:
                             f"Created linked request {linked_request.id} from {cause.id} of type {linked_request.transform_type}"
                         )
                     except Exception as e:
+                        # Deliberately non-fatal: one unusable follow-on must not
+                        # fail the transform that triggered it, nor stop the other
+                        # follow-ons in this batch. Logged as an error as well as
+                        # recorded on the span so it surfaces without reading
+                        # traces — a follow-on that never materialises is otherwise
+                        # indistinguishable from one that was never configured,
+                        # which is exactly how every YouTube-import chain stayed
+                        # broken unnoticed after the routing-key change (#9).
+                        logfire.error(
+                            "Follow-on transform {transform_type!r} from request "
+                            "{cause_id} could not be created: {error}",
+                            cause_id=cause.id,
+                            transform_type=request.get("transform_type"),
+                            error=e,
+                        )
                         span.record_exception(e)
