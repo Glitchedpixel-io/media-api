@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/Glitchedpixel-io/media-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Glitchedpixel-io/media-api/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Glitchedpixel-io/media-api/graph/badge.svg?token=lJf4cmHif7)](https://codecov.io/gh/Glitchedpixel-io/media-api)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -52,7 +52,7 @@ Open `http://localhost:8000/docs` for interactive API docs.
 
 ## Local development
 
-Requires Python 3.11–3.13 and [`uv`](https://docs.astral.sh/uv/).
+Requires Python 3.13 and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync

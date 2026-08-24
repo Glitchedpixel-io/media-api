@@ -1,7 +1,7 @@
 Testing guide for media-api
 
 Prerequisites
-- Python 3.11+
+- Python 3.13.x
 - Poetry >= 2.1.x with in-project virtualenvs
 
 Install dev dependencies
