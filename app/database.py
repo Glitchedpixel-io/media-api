@@ -77,7 +77,11 @@ def init_db(config: DatabaseConfig) -> Engine:
     _engine = _create_engine_from_config(config)
     _session_factory = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
     try:
-        import app.models  # noqa: F401
+        # Side-effect import that registers the ORM models against Base.metadata.
+        # It cannot move to module scope: app/models/__init__.py does
+        # `from app.database import Base`, so hoisting raises ImportError on a
+        # partially initialized module.
+        import app.models  # noqa: F401, PLC0415
     except Exception:
         pass
     return _engine

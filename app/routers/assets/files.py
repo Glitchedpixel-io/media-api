@@ -41,8 +41,8 @@ def list_accessories(
     # Security: build and ensure path stays under root
     try:
         acc_dir = resolve_under_root(relative, accessory_root)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid accessory path")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid accessory path") from e
 
     items: list = []
     if acc_dir.exists() and acc_dir.is_dir():

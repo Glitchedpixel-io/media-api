@@ -29,7 +29,10 @@ class SortConfig:
 
 
 def normalize_sort(sort_spec: str, config: SortConfig) -> list[tuple[str, Direction]]:
-    from app.repositories.errors import EnumViolation
+    # Imported here, not at module scope: app.repositories.errors is reached through
+    # app/repositories/__init__.py, which imports the repositories, which import this
+    # module. Hoisting it raises ImportError on a partially initialized module.
+    from app.repositories.errors import EnumViolation  # noqa: PLC0415
 
     out: list[tuple[str, Direction]] = []
     seen: set[str] = set()
@@ -63,10 +66,13 @@ def _col_for_field(config: SortConfig, field: str) -> ColumnElement:
     # Regular model column
     try:
         return getattr(config.model, field)  # type: ignore
-    except AttributeError:
-        from app.repositories.errors import EnumViolation
+    except AttributeError as e:
+        # Imported here, not at module scope: app.repositories.errors is reached through
+        # app/repositories/__init__.py, which imports the repositories, which import this
+        # module. Hoisting it raises ImportError on a partially initialized module.
+        from app.repositories.errors import EnumViolation  # noqa: PLC0415
 
-        raise EnumViolation(f"Model {config.model.__name__} has no column {field!r}")
+        raise EnumViolation(f"Model {config.model.__name__} has no column {field!r}") from e
 
 
 def _maybe_coalesce(
@@ -87,9 +93,9 @@ def _maybe_coalesce(
 
 def build_order_by(config: SortConfig, sort_spec: str) -> list[ColumnElement]:
     clauses: list[ColumnElement] = []
-    for field, direction in normalize_sort(sort_spec, config):
-        col = _col_for_field(config, field)
-        col = _maybe_coalesce(config, field, col, direction)
+    for field_name, direction in normalize_sort(sort_spec, config):
+        col = _col_for_field(config, field_name)
+        col = _maybe_coalesce(config, field_name, col, direction)
         clauses.append(asc(col) if direction == "asc" else desc(col))
     return clauses
 

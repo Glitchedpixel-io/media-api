@@ -1,6 +1,6 @@
 # app/repositories/title_repository.py
 from sqlakeyset import select_page
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import TitleORM
@@ -49,11 +49,6 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
 
         if params.name:
             stmt = stmt.where(TitleORM.name.ilike(f"%{params.name}%"))
-
-        # Total count
-        sub_query = stmt.order_by(None).subquery()
-        count_stmt = select(func.count()).select_from(sub_query)
-        total = self.db.scalar(count_stmt) or 0
 
         # Apply sorting
         stmt = apply_ordering(stmt, TITLE_SORT, params.sort)

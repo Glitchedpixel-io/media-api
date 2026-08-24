@@ -204,7 +204,7 @@ class TransformRequestService:
                 transform_type=transform_type, worker=worker, external_job_id=external_job_id
             )
         except NotFoundError:
-            raise HTTPException(status_code=204, detail="No tasks available")
+            raise HTTPException(status_code=204, detail="No tasks available") from None
         except DatabaseLocked as e:
             raise HTTPException(
                 status_code=423, detail="Database is currently in read-only mode"

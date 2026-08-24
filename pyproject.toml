@@ -173,14 +173,31 @@ exclude = [
 
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "PL", "RUF"]
-ignore = ["F821"]
+# Deliberately narrow — see the decision recorded on issue #30. The correctness
+# core (E, F) plus two individually-chosen rules, gated in CI. Widening is a
+# separate decision, not something to do incidentally.
+select = [
+  "E",       # pycodestyle errors
+  "F",       # pyflakes — undefined names, unused imports/variables, shadowing
+  "B904",    # raise-without-from inside except: losing the cause hurts debugging
+  "PLC0415", # import-outside-top-level: enforces the import convention in CLAUDE.md
+]
+# black is the formatter and both are set to line-length 100. The remaining E501
+# hits are long string literals and comments black will not split, so enforcing
+# it would mean hand-wrapping strings to satisfy a rule the formatter does not
+# implement.
+ignore = ["E501"]
 
 [tool.ruff.format]
 # Turn off Ruff formatting if you want Black to be the formatter:
 skip-magic-trailing-comma = false  # (Doesn't disable; instead, just don't run `ruff format`)
 # Simply run Black instead of `ruff format`.
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
+# Deliberate re-export aggregator. The star imports are the pattern working as
+# intended, and account for 133 findings on their own.
+"app/schemas/__init__.py" = ["F403", "F405"]
+# FastAPI's Depends()-in-defaults idiom. Inert under the current selection since
+# B008 is not selected; kept so the exemption survives any widening of "B".
 "app/routers/*.py" = ["B008"]
 "app/dependencies.py" = ["B008"]
