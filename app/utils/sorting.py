@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlalchemy import ColumnElement, Select, asc, desc, func, inspect
 
+from app.repositories.errors import EnumViolation
+
 # Useful sentinels (pick what matches your semantics)
 DT_MAX = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
 DT_MIN = datetime(1, 1, 1, 0, 0, 0, tzinfo=UTC)
@@ -29,11 +31,6 @@ class SortConfig:
 
 
 def normalize_sort(sort_spec: str, config: SortConfig) -> list[tuple[str, Direction]]:
-    # Imported here, not at module scope: app.repositories.errors is reached through
-    # app/repositories/__init__.py, which imports the repositories, which import this
-    # module. Hoisting it raises ImportError on a partially initialized module.
-    from app.repositories.errors import EnumViolation  # noqa: PLC0415
-
     out: list[tuple[str, Direction]] = []
     seen: set[str] = set()
     for raw in (p.strip() for p in sort_spec.split(",") if p.strip()):
@@ -67,11 +64,6 @@ def _col_for_field(config: SortConfig, field: str) -> ColumnElement:
     try:
         return getattr(config.model, field)  # type: ignore
     except AttributeError as e:
-        # Imported here, not at module scope: app.repositories.errors is reached through
-        # app/repositories/__init__.py, which imports the repositories, which import this
-        # module. Hoisting it raises ImportError on a partially initialized module.
-        from app.repositories.errors import EnumViolation  # noqa: PLC0415
-
         raise EnumViolation(f"Model {config.model.__name__} has no column {field!r}") from e
 
 

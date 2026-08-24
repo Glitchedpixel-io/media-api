@@ -7,6 +7,7 @@ from sqlalchemy.engine import Engine, ExceptionContext
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DatabaseConfig
+from app.repositories.errors import DatabaseLocked
 
 
 class Base(DeclarativeBase):
@@ -32,9 +33,6 @@ def _attach_error_handler(engine: Engine) -> None:
         error = context.original_exception
         error_msg = str(error).lower()
         if any(pattern in error_msg for pattern in READ_ONLY_ERROR_PATTERNS):
-            # Import here: app.repositories.__init__ imports all repos → schemas → models → app.db
-            from app.repositories.errors import DatabaseLocked  # noqa: PLC0415
-
             raise DatabaseLocked(error_msg) from error
 
 
