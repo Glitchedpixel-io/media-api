@@ -17,6 +17,9 @@ from app.schemas import (
     RunSummaryCreateInternal,
     RunSummaryCreatePublic,
     RunSummaryRead,
+    ScannerRunSummaryCreateInternal,
+    ScannerRunSummaryCreatePublic,
+    ScannerRunSummaryRead,
     StreamCreateInternal,
     StreamRead,
     TagCreateInternal,
@@ -167,6 +170,12 @@ def get_run_summary_creation_json(r: RunSummaryRead) -> dict:
     )
 
 
+def get_scanner_run_summary_creation_json(r: ScannerRunSummaryRead) -> dict:
+    return ScannerRunSummaryCreatePublic(**r.model_dump(exclude={"id", "created_at"})).model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+
+
 def get_title_creation_json(t: TitleRead) -> dict:
     return TitleCreatePublic(**t.model_dump(exclude={"id"})).model_dump(
         mode="json", by_alias=True, exclude_none=True
@@ -242,6 +251,76 @@ class RunSummaryReadFactory(factory.Factory):
     success_count = 1
     failed_count = 0
     running_time = 1234
+    extras = None
+
+
+class ScannerRunSummaryFactory(factory.Factory):
+    """A scan over a filesystem: every counter applies and is populated."""
+
+    class Meta:
+        model = ScannerRunSummaryCreateInternal
+
+    worker_name = factory.Faker("name")
+    worker_type = "scanner"
+    scan_path = "/data/media"
+    relative_to_path = "/data"
+    started_at = factory.Faker("date_time", tzinfo=UTC)
+    running_time = 99
+    dry_run = False
+    total_count = 10
+    processed_count = 8
+    folder_count = 2
+    excluded_count = 1
+    previously_seen_count = 0
+    error_count = 0
+    api_error_count = 0
+    no_metadata_count = 1
+    unsupported_file_count = 0
+    extras = None
+
+
+class NonFilesystemScannerRunSummaryFactory(factory.Factory):
+    """A scan over something that is not a filesystem.
+
+    Sends only what any scanner can answer, leaves the filesystem-specific
+    counters at None, and puts its own counters in `extras` (media-api#37).
+    """
+
+    class Meta:
+        model = ScannerRunSummaryCreateInternal
+
+    worker_name = factory.Faker("name")
+    worker_type = "scanner"
+    started_at = factory.Faker("date_time", tzinfo=UTC)
+    running_time = 12
+    dry_run = False
+    processed_count = 7
+    previously_seen_count = 3
+    extras = {"items_seen": 40, "created": 7, "skipped_existing": 33}
+
+
+class ScannerRunSummaryReadFactory(factory.Factory):
+    class Meta:
+        model = ScannerRunSummaryRead
+
+    id = factory.Faker("pyint")
+    created_at = factory.Faker("date_time", tzinfo=UTC)
+    worker_name = factory.Faker("name")
+    worker_type = "scanner"
+    scan_path = "/data/media"
+    relative_to_path = "/data"
+    started_at = factory.Faker("date_time", tzinfo=UTC)
+    running_time = 99
+    dry_run = False
+    total_count = 10
+    processed_count = 8
+    folder_count = 2
+    excluded_count = 1
+    previously_seen_count = 0
+    error_count = 0
+    api_error_count = 0
+    no_metadata_count = 1
+    unsupported_file_count = 0
     extras = None
 
 

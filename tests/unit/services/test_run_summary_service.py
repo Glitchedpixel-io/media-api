@@ -134,6 +134,20 @@ class TestCreateRunSummary:
         assert exc_info.value.status_code == 422
 
 
+def _non_filesystem_scanner_summary() -> ScannerRunSummaryCreatePublic:
+    """A scan over something that is not a filesystem (media-api#37)."""
+    return ScannerRunSummaryCreatePublic(
+        worker_name="yt-scanner",
+        worker_type="scanner",
+        started_at=datetime(2024, 1, 1, tzinfo=UTC),
+        running_time=12,
+        dry_run=False,
+        processed_count=7,
+        previously_seen_count=3,
+        extras={"items_seen": 40},
+    )
+
+
 class TestCreateScannerRunSummary:
     @pytest.mark.unit
     def test_create_scanner_run_summary_success(self, scanner_repo, scanner_svc) -> None:
@@ -146,6 +160,20 @@ class TestCreateScannerRunSummary:
         call_arg = scanner_repo.create.call_args[0][0]
         assert isinstance(call_arg, ScannerRunSummaryCreateInternal)
         assert call_arg.scan_path == "/data/media"
+
+    @pytest.mark.unit
+    def test_create_non_filesystem_scanner_run_summary(self, scanner_repo, scanner_svc) -> None:
+        """Absent filesystem counters stay absent on the way to the repository."""
+        scanner_repo.create.return_value = object()
+
+        scanner_svc.create_scanner_run_summary(_non_filesystem_scanner_summary())
+
+        call_arg = scanner_repo.create.call_args[0][0]
+        assert isinstance(call_arg, ScannerRunSummaryCreateInternal)
+        assert call_arg.scan_path is None
+        assert call_arg.folder_count is None
+        assert call_arg.extras == {"items_seen": 40}
+        assert call_arg.processed_count == 7
 
     @pytest.mark.unit
     def test_create_scanner_run_summary_unique_violation(self, scanner_repo, scanner_svc) -> None:
