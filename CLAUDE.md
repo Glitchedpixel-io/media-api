@@ -264,8 +264,28 @@ The file is organised into clearly commented sections:
 # runtime / <name>            (one section per runtime component)
 ```
 
-All imports belong at the top of the file. Do not place imports mid-file, even for
-optional integrations — this avoids masking circular import issues.
+All imports belong at the top of the file. Placing an import mid-file can hide a
+circular dependency that would otherwise surface at load time, so the default is
+top-of-file and `PLC0415` enforces it in CI.
+
+**Two exceptions are permitted.** Both require a `# noqa: PLC0415` and a comment
+stating which case applies and why:
+
+1. **Breaking a genuine import cycle**, where hoisting the import raises
+   `ImportError` on a partially initialized module. Name the cycle in the comment.
+   `app/database.py` is the reference case: `app/models/__init__.py` does
+   `from app.database import Base`, so `Base` has to exist before the models load.
+   This is inherent to the SQLAlchemy declarative pattern.
+2. **An optional dependency that must not be required at import time.** The
+   orchestration providers in `app/orchestration/` are the reference case: `prefect`
+   is an optional extra, and the core image deliberately does not depend on any
+   orchestration framework. A top-level import would make the extra mandatory and
+   defeat the pluggable provider registry.
+
+Anything else belongs at the top. Before reaching for exception 1, check whether the
+cycle is real or merely a package `__init__` importing more than it needs — see the
+lazy re-export in `app/repositories/__init__.py`, which removed three such
+workarounds at once (issue #32).
 
 ---
 
