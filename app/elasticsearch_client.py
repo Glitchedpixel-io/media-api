@@ -7,7 +7,6 @@ connection pooling, and graceful shutdown.
 from __future__ import annotations
 
 import logfire
-from typing import TYPE_CHECKING
 
 from elasticsearch import Elasticsearch
 

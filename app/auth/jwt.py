@@ -111,7 +111,7 @@ def verify_jwt(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
             },
         )
         return header, payload
-    except Exception:
+    except Exception as aud_err:
         # If audience verification failed, retry with custom azp fallback logic
         try:
             payload = jwt.decode(
@@ -150,7 +150,7 @@ def verify_jwt(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
         raise HTTPException(
             status_code=401,
             detail="Invalid token, audience/azp does not include required audience",
-        )
+        ) from aud_err
 
 
 def _extract_roles(payload: dict[str, Any]) -> list[str]:

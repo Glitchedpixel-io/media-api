@@ -116,8 +116,8 @@ class TitleContentService:
             raise HTTPException(
                 status_code=423, detail="Database is currently in read-only mode"
             ) from e
-        except:
-            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Internal server error") from e
         if not updated:
             raise HTTPException(status_code=404, detail="Title Content not found")
         else:
@@ -133,9 +133,7 @@ class TitleContentService:
             raise HTTPException(
                 status_code=423, detail="Database is currently in read-only mode"
             ) from e
-        except Exception:
-            # Log the unexpected error for debugging
-            # logger.error(f"Unexpected error deleting streams for asset {asset_id}: {e}")
+        except Exception as e:
             raise HTTPException(
                 status_code=500, detail="Internal server error during content unlinking"
-            )
+            ) from e

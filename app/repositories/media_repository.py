@@ -100,11 +100,6 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
                     .distinct()
                 )
 
-        # Total count
-        sub_query = stmt.order_by(None).subquery()
-        count_stmt = select(func.count()).select_from(sub_query)
-        total = self.db.scalar(count_stmt) or 0
-
         # Apply sorting
         stmt = apply_ordering(stmt, ASSET_SORT, params.sort)
 

@@ -1,7 +1,6 @@
 # app/repositories/__init__.py
 """Repository layer for data access."""
 
-from .base_repository import SQLAlchemyBaseRepository
 from .inbox_repository import FileInboxRepository
 from .job_repository import SQLAlchemyJobRepository
 from .media_repository import SQLAlchemyMediaRepository

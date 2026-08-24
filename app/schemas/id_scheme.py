@@ -1,11 +1,9 @@
 # app/schemas/id_scheme.py
 from __future__ import annotations
 
-from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from ._dynamic import make_partial_model
 from .enums import EntityTypeEnum
 from .mixins import IDMixin
 from .utc_basemodel import UTCBaseModel, Timestamp

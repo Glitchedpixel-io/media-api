@@ -1,6 +1,6 @@
 # app/utils/paths.py
 import os
-from pathlib import Path, PurePosixPath, PureWindowsPath, WindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 
 def to_linux_path(path: str | None) -> str | None:
@@ -87,8 +87,8 @@ def resolve_under_root(relative_path: str, root: Path) -> Path:
     absolute = (root / clean).resolve()
     try:
         absolute.relative_to(root)
-    except ValueError:
-        raise ValueError("Path escapes root")
+    except ValueError as e:
+        raise ValueError("Path escapes root") from e
     return absolute
 
 

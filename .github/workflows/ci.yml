@@ -59,6 +59,9 @@ jobs:
       - name: Check formatting (black)
         run: uv run black --check .
 
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
       - name: Type check (mypy)
         run: uv run mypy
 

@@ -50,7 +50,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         # Add to request state for easy access in route handlers
         request.state.request_id = request_id
 
-        with logfire.span(f"request {request_id}") as span:
+        with logfire.span(f"request {request_id}"):
 
             # Process request - logfire will capture the exeception details automatically
             # ...but won't consume it, which is what we need
