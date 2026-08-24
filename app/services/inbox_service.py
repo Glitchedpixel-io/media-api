@@ -78,7 +78,11 @@ class InboxService:
             request_probe = TransformRequestCreateInternal(
                 asset_id=asset.id,
                 transform_type="prefect.ffprobe_metadata",
-                parameters={"metadata_types": ["format", "chapters"]},
+                # The consumer picks a payload schema by "schema_id" and rejects the whole
+                # payload without one; the recognised field is "categories", not
+                # "metadata_types". Getting either wrong meant the categories below were
+                # discarded and the consumer's own defaults used for every request (#35).
+                parameters={"schema_id": "probe@1", "categories": ["format", "chapters"]},
                 actioned=False,
                 worker_notes=None,
                 worker=None,

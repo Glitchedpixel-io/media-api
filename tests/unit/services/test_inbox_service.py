@@ -211,7 +211,10 @@ class TestImportFile:
         assert isinstance(second_transform_call, TransformRequestCreateInternal)
         assert second_transform_call.transform_type == "prefect.ffprobe_metadata"
         assert second_transform_call.asset_id == created_asset.id
-        assert second_transform_call.parameters == {"metadata_types": ["format", "chapters"]}
+        assert second_transform_call.parameters == {
+            "schema_id": "probe@1",
+            "categories": ["format", "chapters"],
+        }
 
     @pytest.mark.unit
     def test_import_file_with_different_paths(self) -> None:
@@ -379,4 +382,7 @@ class TestImportFile:
         second_request = calls[1][0][0]
         assert second_request.transform_type == "prefect.ffprobe_metadata"
         assert second_request.asset_id == 42
-        assert second_request.parameters == {"metadata_types": ["format", "chapters"]}
+        assert second_request.parameters == {
+            "schema_id": "probe@1",
+            "categories": ["format", "chapters"],
+        }
