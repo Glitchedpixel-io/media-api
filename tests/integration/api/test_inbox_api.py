@@ -135,6 +135,9 @@ class TestInboxAPI:
         req = r[1]
         assert req["asset_id"] == asset_id
         assert req["transform_type"] == "prefect.ffprobe_metadata"
-        assert req["parameters"] != {}
+        assert req["parameters"] == {
+            "schema_id": "probe@1",
+            "categories": ["format", "chapters"],
+        }
         assert req["actioned"] == False
         assert req["processed_at"] is None
