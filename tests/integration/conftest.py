@@ -5,7 +5,7 @@ Sets up test infrastructure for full-stack integration tests that cover:
 - API requests through FastAPI routers
 - Service layer business logic
 - Repository data access layer
-- In-memory SQLite database interactions
+- Database interactions against the Postgres instance at TEST_DATABASE_URL
 
 Uses dependency injection overrides to provide test database sessions
 while maintaining the same code paths as production.
@@ -15,17 +15,14 @@ from collections.abc import Generator
 
 import pytest
 
-from tests.conftest import seed_title_types
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.app_factory import create_app
 from app.auth.jwt import Principal, get_current_user
 from app.config import AppConfig, get_media_config
 from app.dependencies import get_db_session, get_inbox_repository
-from app.models import Base
 from app.orchestration.loader import build_provider_registry
 from app.orchestration.registry import get_provider_registry
 from app.repositories import (
@@ -50,34 +47,6 @@ from app.repositories.protocols import (
     TitleRepository,
     TransformRequestRepository,
 )
-
-
-@pytest.fixture
-def db_session(
-    _session_factory: sessionmaker, _test_engine: Engine
-) -> Generator[Session, None, None]:
-    """
-    Provide a fully isolated database session per test.
-
-    To ensure test isolation even when the application code commits,
-    we reset the schema by dropping and recreating all tables before
-    each test. This guarantees a clean database state between tests
-    for SQLite (in-memory or temp file) and for other databases used
-    via TEST_DATABASE_URL.
-    """
-    # Reset schema to ensure a clean state per test
-    Base.metadata.drop_all(bind=_test_engine)
-    Base.metadata.create_all(bind=_test_engine)
-
-    session = _session_factory()
-    # Same seeding as the root conftest's db_session, which this fixture
-    # shadows for integration tests. Without it every request that creates a
-    # title fails on the title_types foreign key.
-    seed_title_types(session)
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 @pytest.fixture
@@ -107,8 +76,12 @@ def app(
 
     app.dependency_overrides[get_current_user] = _fake_user
 
-    # Override database session dependency to create new session per request
-    # This ensures thread safety for concurrent requests
+    # Hand every request the *same* session the test body uses, so data the test
+    # sets up directly is visible to the request without a commit, and vice versa.
+    # That sharing is load-bearing, but note it is not a session-per-request: a
+    # SQLAlchemy Session is not thread-safe, and TestClient runs this repo's sync
+    # endpoints in a threadpool, so a test issuing genuinely concurrent requests
+    # shares one Session across threads (see test_concurrent_asset_access).
     def override_db_session() -> Generator[Session, None, None]:
         yield db_session
 
