@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from tests.factories import (
     AssetReadFactory,
-    TitleCreateFactory,
+    TitleReadFactory,
     get_asset_creation_json,
     get_title_creation_json,
 )
@@ -43,8 +43,8 @@ class TestExternalIdResolutionAPI:
         return res.json()
 
     def _create_title(self, client: TestClient) -> dict:
-        title_data = TitleCreateFactory()
-        res = client.post("/api/titles", json=get_title_creation_json(title_data))  # type: ignore[arg-type]
+        title_data = TitleReadFactory()
+        res = client.post("/api/titles", json=get_title_creation_json(title_data))
         assert res.status_code == HTTPStatus.CREATED, res.text
         return res.json()
 
@@ -160,8 +160,8 @@ class TestTitleExternalIdsAPI:
         return res.json()
 
     def _create_title(self, client: TestClient) -> dict:
-        title_data = TitleCreateFactory()
-        res = client.post("/api/titles", json=get_title_creation_json(title_data))  # type: ignore[arg-type]
+        title_data = TitleReadFactory()
+        res = client.post("/api/titles", json=get_title_creation_json(title_data))
         assert res.status_code == HTTPStatus.CREATED, res.text
         return res.json()
 
@@ -402,8 +402,8 @@ class TestCrossEntityExternalIdEnforcement:
         return res.json()
 
     def _create_title(self, client: TestClient) -> dict:
-        title_data = TitleCreateFactory()
-        res = client.post("/api/titles", json=get_title_creation_json(title_data))  # type: ignore[arg-type]
+        title_data = TitleReadFactory()
+        res = client.post("/api/titles", json=get_title_creation_json(title_data))
         assert res.status_code == HTTPStatus.CREATED, res.text
         return res.json()
 
