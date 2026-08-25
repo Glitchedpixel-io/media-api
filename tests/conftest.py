@@ -117,6 +117,14 @@ def db_session(
     Base.metadata.drop_all(bind=_test_engine)
     Base.metadata.create_all(bind=_test_engine)
 
+    # Empty the connection pool afterwards. Dropping and recreating the schema
+    # gives the Postgres ENUM types new OIDs, but a pooled connection keeps the
+    # OIDs it has already looked up, so reusing one against the new schema fails
+    # with "cache lookup failed for type <oid>". Only reachable once more than
+    # one connection is in play per test -- which is the case now that requests
+    # through TestClient get their own session.
+    _test_engine.dispose()
+
     session = _session_factory()
     seed_title_types(session)
     try:
