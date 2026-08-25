@@ -17,17 +17,23 @@ from tests.factories import (
     ScannerRunSummaryFactory,
 )
 
+#: Only a filesystem walk can answer these.
 _FILESYSTEM_FIELDS = (
     "scan_path",
     "relative_to_path",
     "total_count",
     "folder_count",
-    "excluded_count",
-    "error_count",
     "api_error_count",
     "no_metadata_count",
     "unsupported_file_count",
 )
+
+#: Meaningful for any scan whatever its source, but still optional because a
+#: scanner may not track them (media-api#39).
+_SOURCE_AGNOSTIC_FIELDS = ("error_count", "excluded_count")
+
+#: Everything a scanner is allowed to leave unanswered.
+_OPTIONAL_FIELDS = _FILESYSTEM_FIELDS + _SOURCE_AGNOSTIC_FIELDS
 
 
 @pytest.fixture
@@ -64,7 +70,7 @@ def test_non_filesystem_scan_persists_with_nulls(bundle):
 
     fetched = bundle.scanner_run_summary.get(out.id)
     assert fetched is not None
-    for field in _FILESYSTEM_FIELDS:
+    for field in _OPTIONAL_FIELDS:
         assert getattr(fetched, field) is None, f"{field} should be NULL, not a zero"
 
     # ...while the counters every scanner can answer are still recorded.
@@ -98,6 +104,28 @@ def test_zero_is_distinguishable_from_not_applicable(bundle):
 
     assert bundle.scanner_run_summary.get(measured.id).folder_count == 0
     assert bundle.scanner_run_summary.get(inapplicable.id).folder_count is None
+
+
+@pytest.mark.contract
+def test_source_agnostic_counters_persist_without_a_filesystem(bundle):
+    """`error_count` and `excluded_count` are not filesystem-only.
+
+    A scan over any source can fail on an item or filter one out before
+    processing it, so both must store alongside NULL filesystem counters rather
+    than being pushed into `extras`, where nothing can aggregate them across
+    scans (media-api#39).
+    """
+    out = bundle.scanner_run_summary.create(
+        NonFilesystemScannerRunSummaryFactory(error_count=2, excluded_count=9)
+    )
+
+    fetched = bundle.scanner_run_summary.get(out.id)
+    assert fetched is not None
+    assert fetched.error_count == 2
+    assert fetched.excluded_count == 9
+    # ...with the genuinely filesystem-only counters still absent.
+    for field in _FILESYSTEM_FIELDS:
+        assert getattr(fetched, field) is None
 
 
 @pytest.mark.contract

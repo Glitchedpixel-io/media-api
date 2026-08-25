@@ -37,9 +37,12 @@ class ScannerRunSummaryORM(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     worker_name: Mapped[str] = mapped_column(Text, nullable=False)
     worker_type: Mapped[str] = mapped_column(Text, nullable=False)
-    # Nullable because only a filesystem walk can answer them. NULL reads as
-    # "not applicable to this kind of scan", which 0 cannot express and no
-    # consumer could tell apart from a real zero (media-api#37).
+    # Nullable so a scanner can leave a counter unanswered. NULL reads as "no
+    # value for this", which 0 cannot express and no consumer could tell apart
+    # from a real zero (media-api#37). For most of these that means "only a
+    # filesystem walk can answer it"; for `error_count` and `excluded_count` it
+    # means "this scanner does not track it", since both are meaningful for any
+    # scan whatever its source (media-api#39).
     scan_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     relative_to_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
