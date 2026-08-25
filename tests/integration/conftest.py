@@ -17,7 +17,7 @@ import pytest
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.app_factory import create_app
 from app.auth.jwt import Principal, get_current_user
@@ -52,9 +52,15 @@ from app.repositories.protocols import (
 @pytest.fixture
 def app(
     db_session: Session,
+    _session_factory: sessionmaker,
     inbox_repository: InboxRepository,
     test_settings: AppConfig,
 ) -> Generator[FastAPI, None, None]:
+    """Build the app with test overrides in place.
+
+    ``db_session`` is depended on even though requests no longer use it: that
+    fixture is what resets the schema and seeds the title types for this test.
+    """
     app = create_app(test_settings)
 
     app.dependency_overrides[get_media_config] = lambda: test_settings.media
@@ -76,14 +82,21 @@ def app(
 
     app.dependency_overrides[get_current_user] = _fake_user
 
-    # Hand every request the *same* session the test body uses, so data the test
-    # sets up directly is visible to the request without a commit, and vice versa.
-    # That sharing is load-bearing, but note it is not a session-per-request: a
-    # SQLAlchemy Session is not thread-safe, and TestClient runs this repo's sync
-    # endpoints in a threadpool, so a test issuing genuinely concurrent requests
-    # shares one Session across threads (see test_concurrent_asset_access).
+    # One session per request, mirroring get_db_session in app/dependencies.py.
+    # A SQLAlchemy Session is not thread-safe and TestClient runs this repo's sync
+    # endpoints in a threadpool, so sharing the test body's session across requests
+    # would put one Session in several threads at once.
+    #
+    # This means a request sees the test body's data only once it is committed.
+    # The repositories commit (see SQLAlchemyBaseRepository._safe_commit), as does
+    # seed_title_types, so setup done through those is visible; raw db_session.add()
+    # without a commit is not.
     def override_db_session() -> Generator[Session, None, None]:
-        yield db_session
+        db = _session_factory()
+        try:
+            yield db
+        finally:
+            db.close()
 
     def override_inbox_repository() -> InboxRepository:
         return inbox_repository
