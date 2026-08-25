@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         MetadataRepository,
         RunSummaryRepository,
         RunnerStateRepository,
+        ScannerRunSummaryRepository,
         StreamRepository,
         TagRepository,
         TitleContentRepository,
@@ -44,6 +45,11 @@ class StreamRepoBundle(BaseBundle):
 @dataclass
 class RunSummaryRepoBundle(BaseBundle):
     run_summary: RunSummaryRepository
+
+
+@dataclass
+class ScannerRunSummaryRepoBundle(BaseBundle):
+    scanner_run_summary: ScannerRunSummaryRepository
 
 
 @dataclass

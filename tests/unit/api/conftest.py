@@ -16,6 +16,7 @@ from app.dependencies import (
     get_job_service,
     get_media_service,
     get_run_summary_service,
+    get_scanner_run_summary_service,
     get_runner_state_service,
     get_stream_service,
     get_tag_service,
@@ -198,6 +199,18 @@ def run_summary_service_mock(api_app):
 
     mock = create_autospec(RunSummaryService, instance=True, spec_set=True)
     api_app.dependency_overrides[get_run_summary_service] = lambda: mock
+    return mock
+
+
+@pytest.fixture()
+def scanner_run_summary_service_mock(api_app):
+    """Provide ScannerRunSummaryService mock."""
+    from unittest.mock import create_autospec
+
+    from app.services import ScannerRunSummaryService
+
+    mock = create_autospec(ScannerRunSummaryService, instance=True, spec_set=True)
+    api_app.dependency_overrides[get_scanner_run_summary_service] = lambda: mock
     return mock
 
 

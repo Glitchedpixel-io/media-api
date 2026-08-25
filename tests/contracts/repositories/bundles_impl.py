@@ -13,6 +13,7 @@ from app.repositories import (
     SQLAlchemyMetadataRepository,
     SQLAlchemyRunSummaryRepository,
     SQLAlchemyRunnerStateRepository,
+    SQLAlchemyScannerRunSummaryRepository,
     SQLAlchemyStreamRepository,
     SQLAlchemyTagRepository,
     SQLAlchemyTitleContentRepository,
@@ -30,6 +31,7 @@ from ._bundles import (
     MetadataRepoBundle,
     RunSummaryRepoBundle,
     RunnerStateRepoBundle,
+    ScannerRunSummaryRepoBundle,
     StreamRepoBundle,
     TagRepoBundle,
     TitleContentRepoBundle,
@@ -81,6 +83,13 @@ def stream_bundler(session, engine) -> StreamRepoBundle:
 def run_summary_bundler(session, engine) -> RunSummaryRepoBundle:
     return RunSummaryRepoBundle(
         run_summary=SQLAlchemyRunSummaryRepository(session),
+        close=lambda: (session.close()),
+    )
+
+
+def scanner_run_summary_bundler(session, engine) -> ScannerRunSummaryRepoBundle:
+    return ScannerRunSummaryRepoBundle(
+        scanner_run_summary=SQLAlchemyScannerRunSummaryRepository(session),
         close=lambda: (session.close()),
     )
 
