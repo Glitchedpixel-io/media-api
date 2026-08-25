@@ -67,13 +67,24 @@ _NOT_APPLICABLE = " Omitted when the scan is not over a filesystem."
 class ScannerRunSummaryAttrs(UTCBaseModel):
     """Counters for one scan pass.
 
-    Only the fields describing the scan itself -- who ran it, when, for how
-    long, and how much it took in -- are required, because every scanner can
-    answer those whatever it scans. The filesystem-specific counters are
-    optional: a scanner over a paginated catalogue or a remote playlist has no
-    honest value for `folder_count` or `unsupported_file_count`, and forcing it
-    to send `0` writes a row that reads as a measurement rather than an absence
-    (media-api#37).
+    Three groups of field, and which group one belongs in is decided by whether
+    every scanner can answer it -- not by whether a filesystem scanner happens
+    to be the one that popularised it.
+
+    Required: the fields describing the scan itself -- who ran it, when, for
+    how long, and how much it took in. Every scanner can answer those whatever
+    it scans.
+
+    Optional and source-agnostic: `error_count` and `excluded_count`. Any scan
+    can fail on an item or filter one out before processing it, so these are
+    optional only because a scanner may not track them -- not because they stop
+    meaning anything away from a filesystem (media-api#39).
+
+    Optional and filesystem-specific: the rest, marked with `_NOT_APPLICABLE`.
+    A scanner whose source is a remote API rather than a directory tree has
+    no honest value for `folder_count` or `unsupported_file_count`, and forcing
+    it to send `0` writes a row that reads as a measurement rather than an
+    absence (media-api#37).
 
     `extras` is the escape hatch for whatever a scanner does count that this
     shape has no field for, mirroring `RunSummaryAttrs.extras`.
@@ -121,9 +132,7 @@ class ScannerRunSummaryAttrs(UTCBaseModel):
     excluded_count: int | None = Field(
         None,
         title="Excluded Count",
-        description=(
-            "Number of files excluded by configured exclusion policies." + _NOT_APPLICABLE
-        ),
+        description="Number of items excluded by configured exclusion policies",
     )
     previously_seen_count: int = Field(
         ...,
@@ -133,9 +142,7 @@ class ScannerRunSummaryAttrs(UTCBaseModel):
     error_count: int | None = Field(
         None,
         title="Error Count",
-        description=(
-            "Number of files that could not be processed due to an error." + _NOT_APPLICABLE
-        ),
+        description="Number of items that could not be processed due to an error",
     )
 
     api_error_count: int | None = Field(

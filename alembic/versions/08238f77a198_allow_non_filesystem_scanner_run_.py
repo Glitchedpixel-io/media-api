@@ -4,8 +4,8 @@
 its columns describe a directory walk (`scan_path`, `relative_to_path`,
 `total_count`, `folder_count`, `excluded_count`, `error_count`,
 `api_error_count`, `no_metadata_count`, `unsupported_file_count`), and all of
-them were `NOT NULL`. A scanner over any other kind of source -- a paginated
-catalogue, a remote playlist -- has no value for them, and because
+them were `NOT NULL`. A scanner whose source is a remote API rather than a
+directory tree has no value for them, and because
 `ScannerRunSummaryCreatePublic` also sets `extra: "forbid"`, it could neither
 omit them nor record what it *does* count somewhere else. Its only way to post
 at all was to send zeros, writing a row that reads as a scan which inspected
