@@ -37,6 +37,7 @@ from app.repositories import (
     SQLAlchemyTitleContentRepository,
     SQLAlchemyTitleReferenceRepository,
     SQLAlchemyTitleRepository,
+    SQLAlchemyTitleTypeRepository,
     SQLAlchemyTransformRequestRepository,
     TitleRepository,
 )
@@ -56,6 +57,7 @@ from app.services import (
     TitleContentService,
     TitleReferenceService,
     TitleService,
+    TitleTypeService,
     TranscriptSearchService,
     TransformRequestService,
 )
@@ -182,10 +184,19 @@ def get_runner_state_service(
     return RunnerStateService(runner_state_repo)
 
 
-def get_title_service(
-    title_repo: TitleRepository = Depends(get_title_repository),
-) -> TitleService:
-    return TitleService(title_repo)
+def get_title_service(db: Session = Depends(get_db_session)) -> TitleService:
+    # TitleService needs two repositories, so the session is injected once and
+    # both are built from it. Chaining Depends(get_*_repository) calls would make
+    # FastAPI open a separate session per repository and break transactional
+    # consistency.
+    return TitleService(
+        SQLAlchemyTitleRepository(db),
+        SQLAlchemyTitleTypeRepository(db),
+    )
+
+
+def get_title_type_service(db: Session = Depends(get_db_session)) -> TitleTypeService:
+    return TitleTypeService(SQLAlchemyTitleTypeRepository(db))
 
 
 def get_title_reference_service(db: Session = Depends(get_db_session)) -> TitleReferenceService:

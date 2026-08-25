@@ -997,7 +997,8 @@ class TestAssetsAPIBusinessLogic:
     ) -> None:
         """Test retrieving titles associated with an asset."""
         from app.models.title_contents import ContentKind
-        from app.schemas import TitleContentInsert, TitleCreateInternal
+        from app.schemas import TitleContentInsert
+        from tests.factories import get_title_internal
 
         # Arrange - create an asset
         asset = AssetReadFactory()
@@ -1013,12 +1014,8 @@ class TestAssetsAPIBusinessLogic:
 
         title1 = TitleReadFactory()
         title2 = TitleReadFactory()
-        created_title1 = title_repository.create(
-            TitleCreateInternal(**title1.model_dump(exclude={"id"}))
-        )
-        created_title2 = title_repository.create(
-            TitleCreateInternal(**title2.model_dump(exclude={"id"}))
-        )
+        created_title1 = title_repository.create(get_title_internal(title1))
+        created_title2 = title_repository.create(get_title_internal(title2))
 
         # Link asset to titles
         title_content_repository.create_positioned(

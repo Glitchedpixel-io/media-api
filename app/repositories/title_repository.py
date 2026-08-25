@@ -1,7 +1,7 @@
 # app/repositories/title_repository.py
 from sqlakeyset import select_page
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from app.models import TitleORM
 from app.models.sort_configs import TITLE_SORT
@@ -44,8 +44,11 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
         return self.db.get(TitleORM, title_id) is not None
 
     def list_paged(self, params: TitleListParams) -> PaginatedResponse[TitleReadExtended]:
-        # Base selectable
-        stmt = select(TitleORM)
+        # Base selectable. The join to title_types is what lets TITLE_SORT's
+        # `title_type` override (which orders by TitleTypeORM.code) resolve.
+        # contains_eager reuses that join to populate TitleORM.type instead of
+        # letting the relationship's lazy="joined" emit a second one.
+        stmt = select(TitleORM).join(TitleORM.type).options(contains_eager(TitleORM.type))
 
         if params.name:
             stmt = stmt.where(TitleORM.name.ilike(f"%{params.name}%"))

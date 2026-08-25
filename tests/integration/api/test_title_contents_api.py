@@ -24,6 +24,7 @@ from app.schemas import (
 from tests.factories import (
     AssetReadFactory,
     TitleReadFactory,
+    get_title_internal,
 )
 
 
@@ -42,9 +43,7 @@ class TestTitleContentsAPI:
         """Test that retrieving the contents of a title returns an empty list"""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
         asset = AssetReadFactory()
         created_asset = media_repository.create(
@@ -53,9 +52,7 @@ class TestTitleContentsAPI:
         asset_id = created_asset.id
         for _ in range(3):
             other_title = TitleReadFactory()
-            created_other_title = title_repository.create(
-                TitleCreateInternal(**other_title.model_dump(exclude={"id"}))
-            )
+            created_other_title = title_repository.create(get_title_internal(other_title))
             title_content_repository.create_positioned(
                 parent_title_id=created_other_title.id,
                 title_content=TitleContentInsert(kind=ContentKind.asset, asset_id=asset_id),
@@ -79,9 +76,7 @@ class TestTitleContentsAPI:
         """Test that retrieving the contents of a title returns the correct items"""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
         ids, asset_ids = [], []
         for _ in range(3):
@@ -128,9 +123,7 @@ class TestTitleContentsAPI:
         """Test that adding items to a title's contents works as expected"""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
         assets = [
             media_repository.create(
@@ -167,9 +160,7 @@ class TestTitleContentsAPI:
         """Test that items may be added to the start of a list of contents"""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
         assets = [
             media_repository.create(
@@ -206,9 +197,7 @@ class TestTitleContentsAPI:
         """Test that items can be added a reordered in a title's contents"""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
         assets = [
             media_repository.create(

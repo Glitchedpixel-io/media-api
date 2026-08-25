@@ -24,7 +24,6 @@ from app.schemas import (
     TitleContentInsert,
     TitleContentPatchPublic,
     TitleContentUpdateInternal,
-    TitleTypeEnum,
 )
 from app.services import TitleContentService
 from tests.factories import TitleContentReadFactory
@@ -626,7 +625,7 @@ class TestGetTitlesWithAsset:
                 child_title_id=None,
                 asset_id=42,
                 label="Second",
-                parent_title=TitleRead(id=20, name="Title 2", title_type=TitleTypeEnum.season),
+                parent_title=TitleRead(id=20, name="Title 2", title_type="season"),
             ),
         ]
         c_repo.get_titles_with_asset.return_value = title_content_items

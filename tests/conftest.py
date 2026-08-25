@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from dataclasses import replace
 
 from app.config import AppConfig, ElasticsearchConfig, MediaConfig, get_config
-from app.models import Base
+from app.models import Base, DEFAULT_TITLE_TYPES, TitleTypeORM
 
 
 def pytest_sessionstart(session):
@@ -118,7 +118,33 @@ def db_session(
     Base.metadata.create_all(bind=_test_engine)
 
     session = _session_factory()
+    seed_title_types(session)
     try:
         yield session
     finally:
         session.close()
+
+
+def seed_title_types(session: Session) -> None:
+    """Seed the reference title types that titles hold a foreign key onto.
+
+    The schema here is built from the models by ``create_all``, not by running
+    the migrations, so the seed the migration performs never happens in tests --
+    and ``db_session`` drops and recreates every table before each test, so it
+    has to happen again each time. Without this, any test that creates a Title
+    fails on the foreign key.
+
+    Committed rather than flushed because requests made through ``TestClient``
+    get their own session via ``get_db_session`` and would not otherwise see it.
+
+    Args:
+        session: The session to seed through.
+    """
+    session.add_all(TitleTypeORM(code=code, label=label) for code, label in DEFAULT_TITLE_TYPES)
+    session.commit()
+
+
+@pytest.fixture
+def title_type_ids(db_session: Session) -> dict[str, int]:
+    """Map seeded title type codes to their IDs, for tests that need the FK."""
+    return {tt.code: tt.id for tt in db_session.query(TitleTypeORM).all()}

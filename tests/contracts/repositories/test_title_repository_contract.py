@@ -8,7 +8,7 @@ from app.repositories.errors import (
     NotFoundError,
     NotNullViolation,
 )
-from app.schemas import TitleListParams, TitleTypeEnum, TitleUpdateInternal
+from app.schemas import TitleListParams, TitleUpdateInternal
 from tests.contracts.repositories.bundles_impl import make_bundle, title_bundler
 from tests.factories import (
     TagCreateFactory,
@@ -167,9 +167,7 @@ def test_list_paged_filter_include(bundle):
 def test_list_paged_sorting_disallowed_field(bundle):
 
     for i in range(20):
-        bundle.titles.create(
-            TitleCreateFactory(name=f"Title {i}", title_type="movie" if i % 2 == 0 else "tv")
-        )
+        bundle.titles.create(TitleCreateFactory(name=f"Title {i}"))
     with pytest.raises(EnumViolation):
         bundle.titles.list_paged(
             TitleListParams(
@@ -180,31 +178,32 @@ def test_list_paged_sorting_disallowed_field(bundle):
 
 
 @pytest.mark.contract
-def test_list_paged_sorting(bundle):
+def test_list_paged_sorting_by_title_type_is_alphabetical_by_code(bundle, title_type_ids):
+    """Sorting on title_type orders by the type's code, not by its id.
 
-    for i in range(20):
+    title_type is no longer a column on titles -- it lives on the joined
+    title_types table, and TITLE_SORT reaches it through a field override. The
+    three types here are chosen so that alphabetical order (audiobook, movie,
+    tv) and seeded order (movie=1, tv=2, audiobook=4) disagree: sorting by the
+    foreign key instead of the code would pass a two-type test but fails this
+    one.
+    """
+    codes = ["movie", "tv", "audiobook"]
+    for i in range(21):
+        code = codes[i % len(codes)]
         bundle.titles.create(
-            TitleCreateFactory(name=f"Title {i}", title_type="movie" if i % 2 == 0 else "tv")
+            TitleCreateFactory(name=f"Title {i}", title_type_id=title_type_ids[code])
         )
-    title_list = bundle.titles.list_paged(
-        TitleListParams(
-            limit=11,
-            sort="title_type:desc",
-        )
-    )
-    assert len(title_list.items) == 11  # and title_list.meta.total == 20
-    assert title_list.items[0].title_type == TitleTypeEnum.tv
-    assert title_list.items[10].title_type == TitleTypeEnum.movie
 
-    title_list = bundle.titles.list_paged(
-        TitleListParams(
-            limit=11,
-            sort="title_type:asc",
-        )
-    )
-    assert len(title_list.items) == 11  # and title_list.meta.total == 20
-    assert title_list.items[0].title_type == TitleTypeEnum.movie
-    assert title_list.items[10].title_type == TitleTypeEnum.tv
+    title_list = bundle.titles.list_paged(TitleListParams(limit=21, sort="title_type:asc"))
+    assert [t.title_type for t in title_list.items] == ["audiobook"] * 7 + ["movie"] * 7 + [
+        "tv"
+    ] * 7
+
+    title_list = bundle.titles.list_paged(TitleListParams(limit=21, sort="title_type:desc"))
+    assert [t.title_type for t in title_list.items] == ["tv"] * 7 + ["movie"] * 7 + [
+        "audiobook"
+    ] * 7
 
 
 @pytest.mark.contract
@@ -251,7 +250,7 @@ def test_invalid_updates(bundle):
     t = bundle.titles.create(TitleCreateFactory(name="Title 1"))
     assert t and t.name == "Title 1"
     with pytest.raises(NotNullViolation):
-        bundle.titles.update(t.id, TitleUpdateInternal.model_validate({"title_type": None}))
+        bundle.titles.update(t.id, TitleUpdateInternal.model_validate({"title_type_id": None}))
     with pytest.raises(NotNullViolation):
         bundle.titles.update(t.id, TitleUpdateInternal.model_validate({"name": None}))
     with pytest.raises(NotFoundError):

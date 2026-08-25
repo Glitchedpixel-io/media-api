@@ -20,6 +20,7 @@ from tests.factories import (
     AssetReadFactory,
     TagReadFactory,
     TitleReadFactory,
+    get_title_internal,
     get_tag_creation_json,
 )
 
@@ -422,9 +423,7 @@ class TestTagsAPI:
         """Test adding a tag to a title."""
         # Arrange
         t = tag_repository.create(TagCreateInternal(name="test"))
-        o = title_repository.create(
-            TitleCreateInternal(**TitleReadFactory().model_dump(exclude={"id"}))  # type: ignore
-        )
+        o = title_repository.create(get_title_internal(TitleReadFactory()))  # type: ignore
         title_id = o.id
 
         # Act - tag the title
@@ -490,9 +489,7 @@ class TestTagsAPI:
         """Test adding a tag to a title by name"""
         # Arrange
         t = tag_repository.create(TagCreateInternal(name="test-tag"))
-        o = title_repository.create(
-            TitleCreateInternal(**TitleReadFactory().model_dump(exclude={"id"}))  # type: ignore
-        )
+        o = title_repository.create(get_title_internal(TitleReadFactory()))  # type: ignore
         title_id = o.id
 
         # Act - tag the title

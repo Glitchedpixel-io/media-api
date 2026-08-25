@@ -14,6 +14,7 @@ from .tag import AssetTagORM, TagORM, TitleTagORM
 from .title import TitleORM
 from .title_contents import TitleContentORM
 from .title_reference import TitleReferenceORM
+from .title_type import DEFAULT_TITLE_TYPES, TitleTypeORM
 from .transform_request import TransformRequestORM
 from .id_scheme import IdSchemeORM, AssetIdORM, ExternalIdentifierORM
 
@@ -32,6 +33,8 @@ __all__ = [
     "TitleORM",
     "TitleReferenceORM",
     "TitleTagORM",
+    "TitleTypeORM",
+    "DEFAULT_TITLE_TYPES",
     "TransformRequestORM",
     "AssetIdORM",
     "ExternalIdentifierORM",
