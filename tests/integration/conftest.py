@@ -14,6 +14,8 @@ while maintaining the same code paths as production.
 from collections.abc import Generator
 
 import pytest
+
+from tests.conftest import seed_title_types
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
@@ -68,6 +70,10 @@ def db_session(
     Base.metadata.create_all(bind=_test_engine)
 
     session = _session_factory()
+    # Same seeding as the root conftest's db_session, which this fixture
+    # shadows for integration tests. Without it every request that creates a
+    # title fails on the title_types foreign key.
+    seed_title_types(session)
     try:
         yield session
     finally:

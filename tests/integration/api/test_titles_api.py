@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models import DEFAULT_TITLE_TYPES
 from app.repositories import TitleReferenceRepository
 from app.repositories.protocols import (
     MediaRepository,
@@ -27,12 +28,12 @@ from app.schemas import (
     TitleContentInsert,
     TitleCreateInternal,
     TitleReferenceCreateInternal,
-    TitleTypeEnum,
 )
 from tests.factories import (
     AssetReadFactory,
     TitleReadFactory,
     TitleReferenceReadFactory,
+    get_title_internal,
     get_title_creation_json,
 )
 
@@ -58,7 +59,7 @@ class TestTitlesAPI:
         # Verify response structure and data
         assert response_data["name"] == title.name
         assert response_data["release_year"] == title.release_year
-        assert response_data["title_type"] == title.title_type.value
+        assert response_data["title_type"] == title.title_type
         assert response_data["synopsis"] == title.synopsis
         assert "id" in response_data
 
@@ -69,7 +70,7 @@ class TestTitlesAPI:
         db_title = db_session.query(TitleORM).filter_by(name=title.name).first()
         assert db_title is not None
         assert db_title.release_year == title.release_year
-        assert db_title.title_type == title.title_type.value
+        assert db_title.title_type == title.title_type
         assert db_title.synopsis == title.synopsis
 
     def test_get_titles_with_data(
@@ -79,12 +80,8 @@ class TestTitlesAPI:
         # Arrange - create test data using factory
         title1 = TitleReadFactory()
         title2 = TitleReadFactory()
-        title_repository.create(
-            TitleCreateInternal(**title1.model_dump(exclude={"id"}))  # type: ignore
-        )
-        title_repository.create(
-            TitleCreateInternal(**title2.model_dump(exclude={"id"}))  # type: ignore
-        )
+        title_repository.create(get_title_internal(title1))  # type: ignore
+        title_repository.create(get_title_internal(title2))  # type: ignore
 
         # Act
         response = client.get("/api/titles")
@@ -114,12 +111,8 @@ class TestTitlesAPI:
     ) -> None:
         """Test retrieving titles, tags and references after creating some through repository."""
         # Arrange - create test data using factory
-        t1 = title_repository.create(
-            TitleCreateInternal(name="A", **TitleReadFactory().model_dump(exclude={"id", "name"}))  # type: ignore
-        )
-        t2 = title_repository.create(
-            TitleCreateInternal(name="Z", **TitleReadFactory().model_dump(exclude={"id", "name"}))  # type: ignore
-        )
+        t1 = title_repository.create(get_title_internal(TitleReadFactory(name="A")))
+        t2 = title_repository.create(get_title_internal(TitleReadFactory(name="Z")))
 
         r1 = title_reference_repository.create(
             TitleReferenceCreateInternal(
@@ -224,9 +217,7 @@ class TestTitlesAPI:
         """Test adding an asset to a title."""
         # Arrange
         title = TitleReadFactory()
-        created_title = title_repository.create(
-            TitleCreateInternal(**title.model_dump(exclude={"id"}))
-        )
+        created_title = title_repository.create(get_title_internal(title))
         title_id = created_title.id
 
         asset = AssetReadFactory()
@@ -264,7 +255,7 @@ class TestTitlesAPI:
             and content_record.order_key == r["order_key"]
         )
 
-    @pytest.mark.parametrize("title_type", [tt.value for tt in TitleTypeEnum])
+    @pytest.mark.parametrize("title_type", [code for code, _ in DEFAULT_TITLE_TYPES])
     def test_title_types_validation(self, client: TestClient, title_type: str):
         """Test that different title types are properly validated."""
         # Arrange

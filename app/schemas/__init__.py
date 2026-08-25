@@ -18,6 +18,7 @@ from .title import *
 from .title_contents import *
 from .title_filters import *
 from .title_reference import *
+from .title_type import *
 from .transcript_search import *
 from .transform_request import *
 from .transform_routing import *
@@ -119,7 +120,12 @@ __all__ = [
     "TitleReferenceRead",
     "TitleReferenceTypeEnum",
     "TitleReferenceUpdateInternal",
-    "TitleTypeEnum",
+    "TitleTypeAttrs",
+    "TitleTypeCreateInternal",
+    "TitleTypeCreatePublic",
+    "TitleTypePatchPublic",
+    "TitleTypeRead",
+    "TitleTypeUpdateInternal",
     "TitleUpdateInternal",
     "TranscriptSearchHit",
     "TranscriptSearchQuery",

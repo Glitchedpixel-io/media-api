@@ -17,7 +17,7 @@ from app.repositories.errors import (
     NotNullViolation,
     UniqueViolation,
 )
-from app.repositories.protocols import TitleRepository
+from app.repositories.protocols import TitleRepository, TitleTypeRepository
 from app.schemas import (
     PageInfo,
     PaginatedResponse,
@@ -25,11 +25,30 @@ from app.schemas import (
     TitleCreatePublic,
     TitleListParams,
     TitlePatchPublic,
-    TitleTypeEnum,
+    TitleTypeRead,
     TitleUpdateInternal,
 )
 from app.services import TitleService
 from tests.factories import TitleReadFactory
+
+
+def _type_repo(known: dict[str, int] | None = None):
+    """A title type repository that resolves codes to ids.
+
+    Defaults to resolving every code, so tests that are not about type
+    resolution do not have to care. Pass an explicit mapping to test the
+    unknown-code path.
+    """
+    repo = create_autospec(TitleTypeRepository, instance=True, spec_set=True)
+
+    def get_by_code(code: str) -> TitleTypeRead | None:
+        if known is not None and code not in known:
+            return None
+        type_id = known[code] if known else 1
+        return TitleTypeRead(id=type_id, code=code, label=code)
+
+    repo.get_by_code.side_effect = get_by_code
+    return repo
 
 
 class TestGetTitle:
@@ -39,16 +58,16 @@ class TestGetTitle:
     def test_get_title_success(self) -> None:
         """get_title returns title when found in repository."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        expected_title = TitleReadFactory(id=42, name="Alien", title_type=TitleTypeEnum.movie)
+        expected_title = TitleReadFactory(id=42, name="Alien", title_type="movie")
         repo.get.return_value = expected_title
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         result = svc.get_title(42)
 
         assert result is expected_title
         assert result.id == 42
         assert result.name == "Alien"
-        assert result.title_type == TitleTypeEnum.movie
+        assert result.title_type == "movie"
         repo.get.assert_called_once_with(42)
 
     @pytest.mark.unit
@@ -56,7 +75,7 @@ class TestGetTitle:
         """get_title raises 404 when repository returns None."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.get.return_value = None
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         with pytest.raises(HTTPException) as exc_info:
             svc.get_title(123)
@@ -69,7 +88,7 @@ class TestGetTitle:
     def test_get_title_with_various_ids(self) -> None:
         """get_title correctly handles different title IDs."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         test_ids = [1, 500, 999999]
         for title_id in test_ids:
@@ -86,9 +105,9 @@ class TestGetTitle:
     def test_get_title_with_different_title_types(self) -> None:
         """get_title returns titles with different types correctly."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        for title_type in [TitleTypeEnum.movie, TitleTypeEnum.season, TitleTypeEnum.collection]:
+        for title_type in ["movie", "season", "collection"]:
             repo.reset_mock()
             expected = TitleReadFactory(id=1, title_type=title_type)
             repo.get.return_value = expected
@@ -108,7 +127,7 @@ class TestGetTitles:
         titles = [TitleReadFactory() for _ in range(3)]
         expected_response = PaginatedResponse(items=titles, page=PageInfo(next=None, prev=None))
         repo.list_paged.return_value = expected_response
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
         params = TitleListParams()
 
         result = svc.get_titles(params)
@@ -125,7 +144,7 @@ class TestGetTitles:
         repo.list_paged.return_value = PaginatedResponse(
             items=[], page=PageInfo(next="next_cursor", prev="prev_cursor")
         )
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
         params = TitleListParams(limit=50, after="cursor123", sort="name:asc")
 
         result = svc.get_titles(params)
@@ -141,7 +160,7 @@ class TestGetTitles:
         repo.list_paged.return_value = PaginatedResponse(
             items=[], page=PageInfo(next=None, prev=None)
         )
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
         params = TitleListParams(
             limit=100,
             sort="title_type:desc",
@@ -159,7 +178,7 @@ class TestGetTitles:
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         empty_response = PaginatedResponse(items=[], page=PageInfo(next=None, prev=None))
         repo.list_paged.return_value = empty_response
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
         params = TitleListParams()
 
         result = svc.get_titles(params)
@@ -174,7 +193,7 @@ class TestGetTitles:
         repo.list_paged.return_value = PaginatedResponse(
             items=[], page=PageInfo(next=None, prev=None)
         )
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         for limit in [10, 50, 100]:
             repo.reset_mock()
@@ -193,48 +212,48 @@ class TestCreateTitle:
     def test_create_title_success(self) -> None:
         """create_title creates new title and returns it."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        created_title = TitleReadFactory(id=1, name="The Matrix", title_type=TitleTypeEnum.movie)
+        created_title = TitleReadFactory(id=1, name="The Matrix", title_type="movie")
         repo.create.return_value = created_title
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        payload = TitleCreatePublic(name="The Matrix", title_type=TitleTypeEnum.movie)
+        payload = TitleCreatePublic(name="The Matrix", title_type="movie")
 
         result = svc.create_title(payload)
 
         assert result is created_title
         assert result.id == 1
         assert result.name == "The Matrix"
-        assert result.title_type == TitleTypeEnum.movie
+        assert result.title_type == "movie"
 
         # Verify internal DTO conversion
         repo.create.assert_called_once()
         call_arg = repo.create.call_args[0][0]
         assert isinstance(call_arg, TitleCreateInternal)
         assert call_arg.name == "The Matrix"
-        assert call_arg.title_type == TitleTypeEnum.movie
+        assert call_arg.title_type_id == 1
 
     @pytest.mark.unit
     def test_create_title_with_season_type(self) -> None:
         """create_title works with season type titles."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        created_title = TitleReadFactory(name="Season 1", title_type=TitleTypeEnum.season)
+        created_title = TitleReadFactory(name="Season 1", title_type="season")
         repo.create.return_value = created_title
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        payload = TitleCreatePublic(name="Season 1", title_type=TitleTypeEnum.season)
+        payload = TitleCreatePublic(name="Season 1", title_type="season")
 
         result = svc.create_title(payload)
 
-        assert result.title_type == TitleTypeEnum.season
+        assert result.title_type == "season"
 
     @pytest.mark.unit
     def test_create_title_unique_violation(self) -> None:
         """create_title raises 409 on unique constraint violation."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.create.side_effect = UniqueViolation("Unique constraint")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        payload = TitleCreatePublic(name="Example", title_type=TitleTypeEnum.movie)
+        payload = TitleCreatePublic(name="Example", title_type="movie")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_title(payload)
@@ -247,9 +266,9 @@ class TestCreateTitle:
         """create_title raises 423 when database is read-only."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.create.side_effect = DatabaseLocked("Database locked")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        payload = TitleCreatePublic(name="Example", title_type=TitleTypeEnum.movie)
+        payload = TitleCreatePublic(name="Example", title_type="movie")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_title(payload)
@@ -272,9 +291,9 @@ class TestCreateTitle:
         """create_title raises 422 for various constraint violations."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.create.side_effect = exc_class("Constraint error")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        payload = TitleCreatePublic(name="Example", title_type=TitleTypeEnum.movie)
+        payload = TitleCreatePublic(name="Example", title_type="movie")
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_title(payload)
@@ -291,7 +310,7 @@ class TestUpdateTitle:
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         updated_title = TitleReadFactory(id=9, name="Renamed Title")
         repo.update.return_value = updated_title
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="Renamed Title")
 
@@ -313,7 +332,7 @@ class TestUpdateTitle:
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         updated_title = TitleReadFactory(id=9, name="X")
         repo.update.return_value = updated_title
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="X")
 
@@ -330,7 +349,7 @@ class TestUpdateTitle:
         """update_title allows partial field updates."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         # Only update name, leave other fields unchanged
         patch = TitlePatchPublic(name="Updated Name")
@@ -345,22 +364,22 @@ class TestUpdateTitle:
     def test_update_title_change_title_type(self) -> None:
         """update_title allows changing title type."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        updated = TitleReadFactory(id=5, title_type=TitleTypeEnum.season)
+        updated = TitleReadFactory(id=5, title_type="season")
         repo.update.return_value = updated
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
-        patch = TitlePatchPublic(title_type=TitleTypeEnum.season)
+        patch = TitlePatchPublic(title_type="season")
 
         result = svc.update_title(5, patch, exclude_none=True)
 
-        assert result.title_type == TitleTypeEnum.season
+        assert result.title_type == "season"
 
     @pytest.mark.unit
     def test_update_title_not_found(self) -> None:
         """update_title raises 404 when title doesn't exist."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.update.side_effect = NotFoundError("Title not found")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="X")
 
@@ -375,7 +394,7 @@ class TestUpdateTitle:
         """update_title raises 409 on unique constraint violation."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.update.side_effect = UniqueViolation("Unique constraint")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="X")
 
@@ -390,7 +409,7 @@ class TestUpdateTitle:
         """update_title raises 423 when database is read-only."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.update.side_effect = DatabaseLocked("Database locked")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="Y")
 
@@ -415,7 +434,7 @@ class TestUpdateTitle:
         """update_title raises 422 for various constraint violations."""
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         repo.update.side_effect = exc_class("Constraint error")
-        svc = TitleService(repo)
+        svc = TitleService(repo, _type_repo())
 
         patch = TitlePatchPublic(name="Y")
 

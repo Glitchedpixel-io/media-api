@@ -40,6 +40,7 @@ if TYPE_CHECKING:
         TitleContentRepository,
         TitleReferenceRepository,
         TitleRepository,
+        TitleTypeRepository,
         TransformRequestRepository,
     )
     from .run_summary_repository import (
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
     from .title_content_repository import SQLAlchemyTitleContentRepository
     from .title_reference_repository import SQLAlchemyTitleReferenceRepository
     from .title_repository import SQLAlchemyTitleRepository
+    from .title_type_repository import SQLAlchemyTitleTypeRepository
     from .transform_request_repository import SQLAlchemyTransformRequestRepository
 
 # Exported name -> the submodule that defines it.
@@ -76,6 +78,7 @@ _EXPORTS: dict[str, str] = {
     "TitleContentRepository": ".protocols",
     "TitleReferenceRepository": ".protocols",
     "TitleRepository": ".protocols",
+    "TitleTypeRepository": ".protocols",
     "TransformRequestRepository": ".protocols",
     "SQLAlchemyRunSummaryRepository": ".run_summary_repository",
     "SQLAlchemyScannerRunSummaryRepository": ".run_summary_repository",
@@ -85,6 +88,7 @@ _EXPORTS: dict[str, str] = {
     "SQLAlchemyTitleContentRepository": ".title_content_repository",
     "SQLAlchemyTitleReferenceRepository": ".title_reference_repository",
     "SQLAlchemyTitleRepository": ".title_repository",
+    "SQLAlchemyTitleTypeRepository": ".title_type_repository",
     "SQLAlchemyTransformRequestRepository": ".transform_request_repository",
 }
 
@@ -131,6 +135,7 @@ __all__ = [
     "SQLAlchemyTitleContentRepository",
     "SQLAlchemyTitleReferenceRepository",
     "SQLAlchemyTitleRepository",
+    "SQLAlchemyTitleTypeRepository",
     "SQLAlchemyTransformRequestRepository",
     "ScannerRunSummaryRepository",
     "StreamRepository",
@@ -138,5 +143,6 @@ __all__ = [
     "TitleContentRepository",
     "TitleReferenceRepository",
     "TitleRepository",
+    "TitleTypeRepository",
     "TransformRequestRepository",
 ]

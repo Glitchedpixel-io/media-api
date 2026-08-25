@@ -7,6 +7,7 @@ from app.schemas import (
     AssetSeenBatch,
     TagCreatePublic,
     TagNameSet,
+    TitleCreateInternal,
     TitleCreatePublic,
     TitleContentInsert,
     StreamCreatePublic,
@@ -23,7 +24,6 @@ from app.schemas import (
     InboxItem,
     InboxImportRequest,
     InboxDeleteRequest,
-    TitleTypeEnum,
     TitleReferenceTypeEnum,
     OutcomeEnum,
     ContentKind,
@@ -123,23 +123,39 @@ class TestTitleSchemas:
     def test_title_create_valid(self):
         title = TitleCreatePublic(
             name="The Matrix",
-            title_type=TitleTypeEnum.movie,
+            title_type="movie",
             release_year=1999,
             synopsis="A hacker discovers reality",
         )
         assert title.name == "The Matrix"
-        assert title.title_type == TitleTypeEnum.movie
+        assert title.title_type == "movie"
 
     def test_title_create_minimal(self):
-        title = TitleCreatePublic(name="Test", title_type=TitleTypeEnum.other)
+        title = TitleCreatePublic(name="Test", title_type="other")
         assert title.name == "Test"
         assert title.release_year is None
         assert title.synopsis is None
 
-    def test_title_type_enum_values(self):
-        assert TitleTypeEnum.movie.value == "movie"
-        assert TitleTypeEnum.tv.value == "tv"
-        assert TitleTypeEnum.audiobook.value == "audiobook"
+    def test_title_type_is_an_open_string_not_a_closed_enum(self):
+        """Any code validates here; whether it exists is TitleService's job.
+
+        title_type used to be a Pydantic enum, so an unknown value was rejected
+        at the request boundary. Types are rows now, so validation moved to
+        TitleService._resolve_title_type_id -- which still returns 422. This
+        pins the boundary between the two so the schema is not "fixed" later by
+        reintroducing a closed set.
+        """
+        title = TitleCreatePublic(name="Test", title_type="a-type-that-does-not-exist")
+        assert title.title_type == "a-type-that-does-not-exist"
+
+    def test_title_internal_forbids_the_public_type_field(self):
+        """The public code must be translated to a FK, never passed through.
+
+        Without extra="forbid" Pydantic would silently drop title_type here and
+        the title's type would go unchanged with no error anywhere.
+        """
+        with pytest.raises(ValidationError):
+            TitleCreateInternal(name="Test", title_type="movie")
 
 
 @pytest.mark.unit

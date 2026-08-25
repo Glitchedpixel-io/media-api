@@ -29,6 +29,7 @@ from app.routers.scanner_run_summaries import router as scanner_run_summaries_ro
 from app.routers.search_transcripts import router as search_router
 from app.routers.streams import router as streams_router
 from app.routers.tags import router as tags_router
+from app.routers.title_types import router as title_types_router
 from app.routers.titles import router as titles_router
 from app.routers.transform_requests import router as transform_requests_router
 
@@ -92,6 +93,12 @@ def _include_routers(api: FastAPI) -> None:
         titles_router,
         prefix="/api/titles",
         tags=["titles"],
+        dependencies=[Depends(get_current_user)],
+    )
+    api.include_router(
+        title_types_router,
+        prefix="/api/title_types",
+        tags=["title_types", "titles"],
         dependencies=[Depends(get_current_user)],
     )
     api.include_router(

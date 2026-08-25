@@ -15,7 +15,6 @@ from app.schemas import (
     AssetReadExtended,
     PageInfo,
     PaginatedResponse,
-    TitleTypeEnum,
 )
 from tests.factories import AssetReadFactory, get_asset_creation_json
 
@@ -347,7 +346,7 @@ class TestGetAssetTitles:
                 child_title_id=None,
                 asset_id=42,
                 label="First",
-                parent_title=TitleRead(id=10, name="Title 1", title_type=TitleTypeEnum.movie),
+                parent_title=TitleRead(id=10, name="Title 1", title_type="movie"),
             ),
             TitleContentReadParent(
                 id=2,
@@ -357,7 +356,7 @@ class TestGetAssetTitles:
                 child_title_id=None,
                 asset_id=42,
                 label="Second",
-                parent_title=TitleRead(id=20, name="Title 2", title_type=TitleTypeEnum.season),
+                parent_title=TitleRead(id=20, name="Title 2", title_type="season"),
             ),
         ]
         title_content_service_mock.get_titles_with_asset.return_value = expected_titles

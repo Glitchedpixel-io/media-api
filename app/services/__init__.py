@@ -14,6 +14,7 @@ from .tag_service import TagService
 from .title_content_service import TitleContentService
 from .title_reference_service import TitleReferenceService
 from .title_service import TitleService
+from .title_type_service import TitleTypeService
 from .transform_request_service import TransformRequestService
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "TitleContentService",
     "TitleReferenceService",
     "TitleService",
+    "TitleTypeService",
     "TranscriptSearchService",
     "TransformRequestService",
 ]

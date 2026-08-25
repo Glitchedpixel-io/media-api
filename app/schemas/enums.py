@@ -10,19 +10,6 @@ class OutcomeEnum(str, enum.Enum):
     failed = "failed"
 
 
-class TitleTypeEnum(str, enum.Enum):
-    """Enum for title types"""
-
-    movie = "movie"
-    tv = "tv"
-    music = "music"
-    audiobook = "audiobook"
-    event = "event"
-    collection = "collection"
-    season = "season"
-    other = "other"
-
-
 class TitleReferenceTypeEnum(str, enum.Enum):
     """Enum for title references"""
 

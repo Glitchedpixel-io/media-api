@@ -33,7 +33,6 @@ from app.schemas import (
     TitleReferenceCreatePublic,
     TitleReferenceRead,
     TitleReferenceTypeEnum,
-    TitleTypeEnum,
     TransformRequestCreateInternal,
     TransformRequestRead,
     TransformRequestReadExpanded,
@@ -179,6 +178,30 @@ def get_scanner_run_summary_creation_json(r: ScannerRunSummaryRead) -> dict:
 def get_title_creation_json(t: TitleRead) -> dict:
     return TitleCreatePublic(**t.model_dump(exclude={"id"})).model_dump(
         mode="json", by_alias=True, exclude_none=True
+    )
+
+
+def get_title_internal(t: TitleRead, title_type_id: int = 1) -> TitleCreateInternal:
+    """Convert a TitleRead fixture into the model the repository actually takes.
+
+    TitleRead carries `title_type` (the public code) while TitleCreateInternal
+    carries `title_type_id`, and the latter forbids extra fields -- so the two
+    cannot be bridged by splatting one into the other.
+
+    conftest seeds DEFAULT_TITLE_TYPES in order into a table that is recreated
+    for every test, so id 1 is always "movie", which is what TitleReadFactory
+    produces by default. Pass an id from the `title_type_ids` fixture when the
+    test cares which type it gets.
+
+    Args:
+        t: The read fixture to convert.
+        title_type_id: ID of the title type the new title should reference.
+
+    Returns:
+        TitleCreateInternal: The persistence model for `t`.
+    """
+    return TitleCreateInternal(
+        title_type_id=title_type_id, **t.model_dump(exclude={"id", "title_type"})
     )
 
 
@@ -329,7 +352,12 @@ class TitleCreateFactory(factory.Factory):
         model = TitleCreateInternal
 
     name = factory.Faker("name")
-    title_type = "movie"
+    # TitleCreateInternal takes the foreign key, not the code. conftest seeds
+    # DEFAULT_TITLE_TYPES in order into a table that is recreated for every
+    # test, so id 1 is always "movie". Tests that care which type they get
+    # should pass an id from the `title_type_ids` fixture instead of relying
+    # on this default.
+    title_type_id = 1
 
 
 class TransformRequestCreateFactory(factory.Factory):
@@ -352,7 +380,7 @@ class TitleReadFactory(factory.Factory):
 
     id = factory.Faker("pyint")
     name = factory.Faker("name")
-    title_type = TitleTypeEnum.movie
+    title_type = "movie"
 
 
 class TitleReferenceReadFactory(factory.Factory):
