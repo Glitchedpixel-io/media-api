@@ -1,0 +1,531 @@
+"""Turn measurements into risks and a UI verdict.
+
+The verdict line is the point of the report, so the reasoning that produces it
+lives in one auditable place rather than being scattered through the renderer.
+
+Every rule here fires on a *measured or read* fact -- a declared cap, a
+relationship strategy, a row count, a latency percentile -- never on a hunch. If
+the facts needed for a judgement are absent (Phase 3 or Phase 4 skipped), the
+verdict says what is missing instead of guessing, and the endpoint is counted in
+the Gaps section.
+"""
+
+from __future__ import annotations
+
+from .models import DataShape, EndpointRecord, ProbeResult, RouteAnnotation, RouteSurface
+
+# A collection this size cannot be rendered without virtualisation, whatever the
+# latency, so an unpaginated endpoint that can return it is a design problem
+# rather than a performance one.
+LARGE_COLLECTION = 200
+
+# p95 above this makes an endpoint unsuitable for a keystroke-driven interaction
+# (type-ahead, live filter) even when it is fine for a deliberate navigation.
+INTERACTIVE_P95_MS = 200.0
+
+# p95 above this is a page-load problem, not a polish problem.
+SLOW_P95_MS = 1000.0
+
+# A response this large is a mobile-data problem regardless of how fast it is.
+LARGE_PAYLOAD_BYTES = 512 * 1024
+
+# Below this many rows, Postgres sorts a table fast enough that an unindexed
+# sort key is not measurably worse than an indexed one. Reporting it as a "full
+# scan" at that size is technically true and practically misleading -- it buries
+# the defects that are actually costing time. Above it, the warning stands.
+LATENT_SORT_ROWS = 100_000
+
+
+def _bytes(value: int) -> str:
+    """Human-readable byte count, so a 15MB response does not read as 15,516KB."""
+    if value < 1024:
+        return f"{value}B"
+    if value < 1024 * 1024:
+        return f"{value / 1024:.0f}KB"
+    return f"{value / (1024 * 1024):.1f}MB"
+
+
+def _worst_probe(probes: tuple[ProbeResult, ...]) -> ProbeResult | None:
+    """The slowest successful probe for an endpoint."""
+    timed = [p for p in probes if p.status == "ok" and p.timing is not None]
+    if not timed:
+        return None
+    return max(timed, key=lambda p: p.timing.p95_ms if p.timing else 0.0)
+
+
+def _collection_ceiling(
+    surface: RouteSurface,
+    annotation: RouteAnnotation,
+    shape: DataShape | None,
+    probes: tuple[ProbeResult, ...] = (),
+) -> tuple[int | None, str | None]:
+    """How large the unpaginated collection behind an endpoint can get.
+
+    Three sources, strictly ordered, because getting the order wrong produces a
+    confidently wrong verdict:
+
+    1. **What a probe actually received.** If a request to this endpoint came
+       back with 65,745 items, that is the size of the response -- no inference
+       required, and no inference may override it.
+    2. **The table's row count**, when the route takes no path parameter. An
+       endpoint like ``GET /api/streams`` is not scoped to a parent; it returns
+       the table. Reaching for a per-parent relationship here is what made an
+       earlier version of this function call a 15MB response "bounded at 79
+       rows" -- the 79 was streams *per asset*, which this route never applies.
+    3. **The largest per-parent collection**, and only for a route that is
+       scoped by a path parameter, where that genuinely is the bound.
+
+    Returns:
+        A tuple of (largest collection, where the number came from), or
+        (None, None) when nothing establishes it.
+    """
+    observed = [p.item_count for p in probes if p.status == "ok" and p.item_count is not None]
+    if observed:
+        return max(observed), "measured directly from a probe response"
+
+    if shape is None:
+        return None, None
+
+    tables = {t for query in annotation.queries for t in query.tables}
+    scoped = any(p.location == "path" for p in surface.params)
+
+    if not scoped:
+        best: tuple[int, str] | None = None
+        for table in sorted(tables):
+            count = shape.row_counts.get(table)
+            if count is not None and (best is None or count > best[0]):
+                best = (count, f"all {count:,} rows of `{table}`")
+        return (best[0], best[1]) if best else (None, None)
+
+    best_child: tuple[int, str] | None = None
+    for collection in shape.collections:
+        if collection.child_table not in tables:
+            continue
+        if best_child is None or collection.max_children > best_child[0]:
+            best_child = (
+                collection.max_children,
+                f"{collection.child_table}.{collection.fk_column} -> {collection.parent_table}",
+            )
+    if best_child is not None:
+        return best_child
+
+    for table in sorted(tables):
+        count = shape.row_counts.get(table)
+        if count is not None:
+            return count, f"all {count:,} rows of `{table}`"
+    return None, None
+
+
+def assess(
+    surface: RouteSurface,
+    annotation: RouteAnnotation | None,
+    probes: tuple[ProbeResult, ...],
+    shape: DataShape | None,
+) -> tuple[tuple[str, ...], str, str]:
+    """Derive risks and a verdict for one endpoint.
+
+    Args:
+        surface: Phase 1 record.
+        annotation: Phase 2 record, or None if Phase 2 produced nothing.
+        probes: Phase 4 results for this endpoint.
+        shape: Phase 3 results, or None if the phase was skipped.
+
+    Returns:
+        A tuple of (risks, verdict sentence, verdict class). The class is one of
+        ``safe``, ``caution``, ``unsafe``, ``write``, ``unknown``.
+    """
+    risks: list[str] = []
+    if annotation is None:
+        return (
+            ("the handler could not be resolved, so nothing about its cost is known",),
+            "UNKNOWN — the handler could not be analysed; see Gaps.",
+            "unknown",
+        )
+
+    pagination = annotation.pagination
+    worst = _worst_probe(probes)
+    measured = worst is not None
+
+    # -- risks -------------------------------------------------------------
+
+    explicit_loops = [q for q in annotation.n_plus_one if not q.owner.endswith("(ORM lazy load)")]
+    lazy_loads = [q for q in annotation.n_plus_one if q.owner.endswith("(ORM lazy load)")]
+
+    rtt = shape.baseline_rtt_ms if shape else None
+    for query in lazy_loads:
+        cap = pagination.max_limit or 0
+        cost = (
+            f"; at the {rtt:.0f}ms round trip measured against the probed database "
+            f"that is about {cap * rtt / 1000:.0f}s of pure latency at the cap"
+            if rtt and cap
+            else ""
+        )
+        risks.append(
+            f"one extra SELECT per row: {query.owner} is `lazy='select'` and is "
+            f"serialised into the response, so a page of {cap or 'N'} rows costs up "
+            f"to {cap or 'N'} additional queries against "
+            f"`{query.tables[0] if query.tables else '?'}`{cost}"
+        )
+    if explicit_loops:
+        loops = sorted({f"{q.owner} ({q.loop_note})" for q in explicit_loops})
+        risks.append(
+            "queries issued inside a loop, so cost grows with the size of the "
+            "request: " + "; ".join(loops)
+        )
+
+    uncovered_filters = [
+        c for c in annotation.coverage if c.role == "filter" and c.covered is False
+    ]
+    uncovered_sorts = [c for c in annotation.coverage if c.role == "sort" and c.covered is False]
+    uncovered_lookups = [
+        c for c in annotation.coverage if c.role == "lookup" and c.covered is False
+    ]
+
+    if uncovered_sorts:
+        names = ", ".join(f"`{c.column}`" for c in uncovered_sorts)
+        sorted_table = uncovered_sorts[0].table
+        rows = shape.row_counts.get(sorted_table or "") if shape else None
+        if rows is not None and rows < LATENT_SORT_ROWS:
+            risks.append(
+                f"unindexed sort keys ({names}); every page sorts the whole filtered "
+                f"set, but `{sorted_table}` holds only {rows:,} rows, so this is "
+                "latent rather than live -- the measured cost of an unindexed sort is "
+                "currently indistinguishable from an indexed one. It becomes real as "
+                "the table grows"
+            )
+        else:
+            risks.append(
+                f"unindexed sort keys ({names}); the keyset cursor keeps ordering "
+                "correct but every page still sorts the whole filtered set"
+            )
+    if uncovered_filters:
+        names = ", ".join(f"`{c.param}`" for c in uncovered_filters)
+        filtered_table = uncovered_filters[0].table
+        filtered_rows = shape.row_counts.get(filtered_table or "") if shape else None
+        if filtered_rows is not None and filtered_rows < LATENT_SORT_ROWS:
+            risks.append(
+                f"filters that cannot use an index ({names}); each forces a sequential "
+                f"scan, though `{filtered_table}` holds only {filtered_rows:,} rows, so "
+                "the scan is currently cheap. This is a constraint on how large the "
+                "table can grow before search becomes the bottleneck, not a live cost"
+            )
+        else:
+            risks.append(f"filters that cannot use an index ({names}); each forces a full scan")
+    if uncovered_lookups:
+        names = ", ".join(f"`{c.table}.{c.column}`" for c in uncovered_lookups)
+        risks.append(f"unindexed lookup on {names}; the read is a sequential scan")
+
+    if pagination.style == "offset" and pagination.deep_page_ceiling:
+        risks.append(f"deep paging has a hard ceiling: {pagination.deep_page_ceiling}")
+    if pagination.stable_under_writes is False:
+        risks.append(f"ordering is not stable under concurrent writes: {pagination.stability_note}")
+
+    ceiling, source = (None, None)
+    unbounded = pagination.style == "none" and any(
+        r.model and r.model.startswith("list[")
+        for r in surface.responses
+        if r.status == surface.success_status
+    )
+    if unbounded:
+        ceiling, source = _collection_ceiling(surface, annotation, shape, probes)
+        if ceiling is None:
+            risks.append(
+                "no pagination and no page-size cap; the largest possible response "
+                "is UNKNOWN without Phase 3"
+            )
+        elif ceiling >= LARGE_COLLECTION:
+            risks.append(
+                f"no pagination and no page-size cap; the largest collection measured "
+                f"is {ceiling:,} rows ({source})"
+            )
+        else:
+            risks.append(
+                f"no pagination, but the largest collection measured is only "
+                f"{ceiling:,} rows ({source}), so the absent cap is currently latent"
+            )
+
+    if worst and worst.timing:
+        if worst.timing.p95_ms >= SLOW_P95_MS:
+            risks.append(
+                f"measured p95 of {worst.timing.p95_ms:.0f}ms on `{worst.name}` is a "
+                "page-load-scale wait"
+            )
+        elif worst.timing.p95_ms >= INTERACTIVE_P95_MS:
+            risks.append(
+                f"measured p95 of {worst.timing.p95_ms:.0f}ms on `{worst.name}` is too "
+                "slow to drive from a keystroke"
+            )
+    largest = max((p.bytes_ or 0 for p in probes if p.status == "ok"), default=0)
+    if largest >= LARGE_PAYLOAD_BYTES:
+        biggest = max(
+            (p for p in probes if p.status == "ok" and (p.bytes_ or 0) == largest),
+            key=lambda p: p.name,
+        )
+        risks.append(f"largest measured payload is {_bytes(largest)} (`{biggest.name}`)")
+
+    if surface.is_streaming and annotation.filesystem_access:
+        risks.append(
+            "the response size is bounded by the file on disk, not by anything the "
+            "API declares; a client that issues no Range header will be sent the "
+            "whole asset"
+        )
+
+    failed = [p for p in probes if p.status == "error"]
+    for failure in failed:
+        risks.append(f"probe `{failure.name}` failed: {failure.reason}")
+
+    if surface.auth.startswith("none"):
+        risks.append("no authentication is required on this route")
+    if surface.trailing_slash_required:
+        risks.append(
+            "the trailing slash is required; requesting it without one gets a 307, "
+            "which a cross-origin fetch with credentials will not always follow"
+        )
+
+    conditional = [
+        f.name
+        for r in surface.responses
+        if r.status == surface.success_status
+        for f in r.fields
+        if f.conditional_on
+    ]
+    if conditional:
+        risks.append(
+            "fields that are empty unless requested, and indistinguishable from "
+            "genuinely empty: " + ", ".join(f"`{name}`" for name in sorted(conditional))
+        )
+
+    # -- verdict -----------------------------------------------------------
+
+    if surface.method != "GET":
+        verdict = _write_verdict(surface, annotation, explicit_loops)
+        return tuple(risks), verdict, "write"
+
+    if surface.is_streaming:
+        return tuple(risks), _stream_verdict(probes), _stream_class(probes)
+
+    if pagination.style == "keyset":
+        return tuple(risks), *_keyset_verdict(
+            pagination, uncovered_sorts, lazy_loads, worst, measured, probes
+        )
+
+    if pagination.style == "offset":
+        return tuple(risks), *_offset_verdict(pagination, worst, measured)
+
+    if unbounded:
+        return tuple(risks), *_unbounded_verdict(ceiling, source, worst, measured)
+
+    return tuple(risks), *_single_verdict(annotation, worst, measured)
+
+
+def _write_verdict(surface: RouteSurface, annotation: RouteAnnotation, loops: list) -> str:
+    """Verdict text for a mutating endpoint."""
+    if loops:
+        return (
+            "Write path. Safe to call from a form submit, but the work is proportional "
+            "to the size of the payload rather than constant — send small batches and "
+            "show a determinate progress state rather than a spinner."
+        )
+    if annotation.filesystem_access:
+        return (
+            "Write path that touches the filesystem as well as the database. Not safe "
+            "for optimistic UI: it can fail after the database row exists, so the UI "
+            "must wait for the response before showing success."
+        )
+    return (
+        "Write path. Single-row work with no loops; safe to drive from a form submit "
+        "and to treat optimistically, provided the UI reconciles against the response."
+    )
+
+
+def _stream_class(probes: tuple[ProbeResult, ...]) -> str:
+    """Verdict class for a streaming endpoint, from its Range probes."""
+    range_probes = [p for p in probes if "Range" in " ".join(p.notes)]
+    if not range_probes:
+        return "unknown"
+    return "safe" if all(p.status == "ok" for p in range_probes) else "unsafe"
+
+
+def _stream_verdict(probes: tuple[ProbeResult, ...]) -> str:
+    """Verdict text for a streaming endpoint."""
+    ranged = [p for p in probes if p.status == "ok" and "206 Partial Content" in " ".join(p.notes)]
+    ttfb = next((p.timing.ttfb_p50_ms for p in probes if p.status == "ok" and p.timing), None)
+    if not probes or all(p.status != "ok" for p in probes):
+        return (
+            "UNKNOWN — streaming behaviour was not measured. Range support is "
+            "implemented in the service, but whether it works end to end against a "
+            "real file has not been verified; see Gaps."
+        )
+    if ranged:
+        first = f"{ttfb:.0f}ms" if ttfb is not None else "UNKNOWN"
+        return (
+            f"Safe to drive a `<video>` element directly: byte ranges are honoured with "
+            f"206 and a correct Content-Range, and time-to-first-byte is {first}, so "
+            "seeking works without buffering the whole file."
+        )
+    return (
+        "Not safe for a seekable player: Range requests did not return 206 in this "
+        "run, so a scrubber would have to download from the start every time."
+    )
+
+
+def _keyset_verdict(
+    pagination,
+    uncovered_sorts: list,
+    lazy_loads: list,
+    worst: ProbeResult | None,
+    measured: bool,
+    probes: tuple[ProbeResult, ...] = (),
+) -> tuple[str, str]:
+    """Verdict text and class for a cursor-paginated list."""
+    if not measured:
+        return (
+            "UNKNOWN — cursor pagination means deep pages do not degrade the way "
+            "offset does, but no timings were taken, so first-screen cost is "
+            "unmeasured; see Gaps.",
+            "unknown",
+        )
+    p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
+    cap = pagination.max_limit or "uncapped"
+
+    if p95 >= SLOW_P95_MS:
+        cause = (
+            "the per-row lazy load, not the paging" if lazy_loads else "the cost of a single page"
+        )
+        return (
+            f"Not safe as a first-screen query: worst-case p95 is {p95:.0f}ms, and the "
+            f"cause is {cause}. Cursor paging itself holds up — page 400 costs what "
+            "page 1 does — so infinite scroll is sound once the per-page cost is fixed.",
+            "unsafe",
+        )
+    if uncovered_sorts or lazy_loads:
+        detail = []
+        if uncovered_sorts:
+            detail.append(
+                "restrict the sort control to "
+                + ", ".join(f"`{c.column}`" for c in uncovered_sorts if c.covered)
+                if any(c.covered for c in uncovered_sorts)
+                else "expect the sort control to be the expensive part"
+            )
+        if lazy_loads:
+            detail.append("keep page size well under the cap because of the per-row lazy load")
+        return (
+            f"Safe for first-screen browse and for virtualised infinite scroll — the "
+            f"cursor holds up at depth and the cap is {cap}. Caveats: " + "; ".join(detail) + ".",
+            "caution",
+        )
+    return (
+        f"Safe as the backing query for a virtualised full-library scroll: cursor "
+        f"paging does not degrade with depth, the page size is capped at {cap}, and "
+        f"worst-case p95 is {p95:.0f}ms.",
+        "safe",
+    )
+
+
+def _offset_verdict(pagination, worst: ProbeResult | None, measured: bool) -> tuple[str, str]:
+    """Verdict text and class for an offset-paginated list."""
+    if not measured:
+        return (
+            "UNKNOWN — offset paging over Elasticsearch has a hard result-window "
+            "ceiling, but where it actually falls on this index was not measured; "
+            "see Gaps.",
+            "unknown",
+        )
+    p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
+    return (
+        f"Safe for a search-results panel showing the first few pages (worst-case p95 "
+        f"{p95:.0f}ms), and not safe for anything that scrolls indefinitely: the "
+        "offset window is finite and the ordering is by relevance, so a row can move "
+        "between pages while the user is reading. Cap the result set in the UI at a "
+        "few hundred and offer refinement rather than more pages.",
+        "caution",
+    )
+
+
+def _unbounded_verdict(
+    ceiling: int | None,
+    source: str | None,
+    worst: ProbeResult | None,
+    measured: bool,
+) -> tuple[str, str]:
+    """Verdict text and class for an unpaginated collection."""
+    if ceiling is None:
+        return (
+            "UNKNOWN — this endpoint returns an entire collection with no cap, and "
+            "the largest collection in the data was not measured. Do not build a "
+            "screen on it until Phase 3 has run; see Gaps.",
+            "unknown",
+        )
+    p95 = worst.timing.p95_ms if worst and worst.timing else None
+    timing = f", measured p95 {p95:.0f}ms" if p95 is not None else ""
+    if ceiling >= LARGE_COLLECTION:
+        return (
+            f"Not safe to render directly: the largest collection is {ceiling:,} rows "
+            f"({source}){timing}, returned in a single uncapped response. Usable for a "
+            "count or a preview of the first few, but a screen that lists these needs "
+            "either a paginated endpoint or client-side virtualisation plus the "
+            "acceptance that the whole payload crosses the wire first.",
+            "unsafe",
+        )
+    return (
+        f"Safe to render directly: the collection is bounded in practice at "
+        f"{ceiling:,} rows ({source}){timing}. The absence of a cap is latent rather "
+        "than live — worth a page size before the data grows, not before the UI ships.",
+        "safe",
+    )
+
+
+def _single_verdict(
+    annotation: RouteAnnotation, worst: ProbeResult | None, measured: bool
+) -> tuple[str, str]:
+    """Verdict text and class for a single-object read."""
+    uncovered = [c for c in annotation.coverage if c.covered is False]
+    if not measured:
+        if uncovered:
+            return (
+                "UNKNOWN — the read is not index-covered, but was not timed; see Gaps.",
+                "unknown",
+            )
+        return (
+            "Likely safe for a detail view — the read is index-covered — but it was "
+            "not timed; see Gaps.",
+            "unknown",
+        )
+    p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
+    if uncovered:
+        return (
+            f"Usable for a deliberate navigation but not for type-ahead: the lookup is "
+            f"not index-covered and measures p95 {p95:.0f}ms, which will grow with the "
+            "table.",
+            "caution",
+        )
+    if p95 >= INTERACTIVE_P95_MS:
+        return (
+            f"Safe for a detail view (p95 {p95:.0f}ms), too slow to fire on every "
+            "keystroke — debounce or prefetch.",
+            "caution",
+        )
+    return (
+        f"Safe for a detail view and fast enough to prefetch on hover (p95 " f"{p95:.0f}ms).",
+        "safe",
+    )
+
+
+def apply(
+    surface: RouteSurface,
+    annotation: RouteAnnotation | None,
+    probes: tuple[ProbeResult, ...],
+    shape: DataShape | None,
+    usage: object | None,
+) -> EndpointRecord:
+    """Build a fully-assessed endpoint record."""
+    risks, verdict, verdict_class = assess(surface, annotation, probes, shape)
+    return EndpointRecord(
+        surface=surface,
+        annotation=annotation,
+        probes=probes,
+        usage=usage,  # type: ignore[arg-type]
+        risks=risks,
+        verdict=verdict,
+        verdict_class=verdict_class,
+    )
