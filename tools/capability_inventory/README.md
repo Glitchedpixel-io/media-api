@@ -1,0 +1,180 @@
+# capability-inventory
+
+Produces an annotated **capability inventory** of the media-api HTTP surface:
+what each endpoint is, what it costs, what data is reliably present behind it,
+and what a front end can responsibly build on it.
+
+Two artefacts, both committed:
+
+| File | For |
+|---|---|
+| `docs/capability-inventory.md` | humans and LLMs — one section per endpoint, ending in a **UI verdict** |
+| `docs/capability-inventory.json` | machines — the same data, sorted and rounded so successive runs diff cleanly |
+
+The raw OpenAPI document is the skeleton, not the answer. Everything that
+decides whether an endpoint is usable in a UI — query cost, index coverage, fill
+rate, pagination stability, streaming latency — is measured or read out of the
+code.
+
+## Running it
+
+```bash
+# Everything the repository alone can answer. No database, no server.
+uv run capability-inventory --skip-db --skip-probes
+
+# Add the data shape.
+export CAPINV_DATABASE_URL='postgresql://readonly_user:...@host:5432/media'
+uv run capability-inventory --skip-probes
+
+# Everything, against a locally-running instance.
+export CAPINV_BASE_URL='http://127.0.0.1:8000'
+uv run capability-inventory
+```
+
+`python -m tools.capability_inventory` is equivalent to the console script.
+
+## Flags
+
+| Flag | Effect |
+|---|---|
+| `--skip-probes` | Skip Phase 4. No instance is contacted. Every **Measured** line reads `UNKNOWN` and says why. |
+| `--skip-db` | Skip Phase 3. No database is contacted. Row counts, fill rates and collection sizes read `UNKNOWN`. |
+| `--only PATTERN` | Restrict the report to routes whose path matches a glob, e.g. `--only '/api/assets/*'`. Every phase still runs, against the matching subset only. |
+| `--frontend-path DIR` | Phase 5: grep a consumer checkout for call sites. Searches both URL literals and generated-client `operationId`s, and reports them separately. |
+| `--access-log FILE` | Phase 5: parse an access log. Request paths are normalised back to route templates, so `/api/assets/4213` counts against `/api/assets/{asset_id}`. |
+| `--probes-file FILE` | Alternative probe definitions (default: the `probes.yaml` beside the package). |
+| `--markdown-out FILE` / `--json-out FILE` | Alternative output paths. |
+| `--cardinality-scan-limit N` | Distinct-value scan cap per column in Phase 3 (default 5000). Above the cap the count is reported as a floor and flagged. |
+| `--repo-root DIR` | Repository root, if not the working directory. |
+
+## Environment
+
+Credentials come from the environment only. Nothing secret is read from a
+committed file, and the DSN is redacted before it reaches the output.
+
+| Variable | Phase | Required |
+|---|---|---|
+| `CAPINV_DATABASE_URL` | 3 | unless `--skip-db` |
+| `CAPINV_BASE_URL` | 4 | unless `--skip-probes` |
+| `CAPINV_TOKEN` | 4 | only if the target instance enforces auth |
+
+`CAPINV_DATABASE_URL` is deliberately **not** `DATABASE_URL`. The application
+resolves its own database with
+`AliasChoices("TEST_DATABASE_URL", "DATABASE_URL")`, so a `TEST_DATABASE_URL`
+left over in your shell silently outranks `DATABASE_URL` — the harness would
+then profile a different database than you intended and say nothing about it. A
+separate namespace makes that impossible.
+
+## What has to be true about the environment
+
+**Phase 1 and 2** need only the repository. The app object is imported and
+`app.openapi()` is called in process; `APP_ENV` defaults to `test` if unset, and
+every setting has a default, so no `.env`, database or server is involved.
+
+**Phase 3** needs a reachable Postgres holding a realistic library. A read-only
+role is the right way to run it, and the harness does not depend on being given
+one: every statement runs inside `BEGIN READ ONLY` and is asserted to start with
+`SELECT` before it is sent. A table listed in the models but absent from the
+target database is reported as a gap, not skipped silently.
+
+**Phase 4** needs a running instance. The recommended setup is a local
+`uvicorn` with `AUTH_DISABLED=true` pointed at the read-only database — that
+gives realistic query costs and payload sizes without putting probe load on
+production:
+
+```bash
+APP_ENV=development AUTH_DISABLED=true \
+  DATABASE_URL="$CAPINV_DATABASE_URL" \
+  uv run uvicorn app.main:api --port 8000
+```
+
+Two consequences of running it that way, both of which the harness reports
+rather than hides:
+
+- `GET /api/fetch/{asset_id}` and the inbox and accessory routes read the
+  filesystem. Without `MEDIA_ROOT`, `INBOX_ROOT` and `ACCESSORY_ROOT` mounted,
+  those probes come back `unavailable` with the reason, not as fast successes.
+- `GET /api/search/transcripts` needs Elasticsearch. Without it the endpoint
+  returns 503 and the probe is recorded as a failure.
+
+**Phase 5** works with no configuration, but its evidence is weak on its own —
+see below.
+
+## Safety
+
+- **Read-only throughout.** Phase 3 opens a read-only transaction and refuses to
+  emit a non-`SELECT`. Phase 4 refuses to send any method other than `GET`
+  unless that exact `METHOD /path` appears in the `allowlist` in `probes.yaml`,
+  which ships empty.
+- **Nothing is deleted.** Phase 5 produces a list of candidates and the evidence
+  behind each.
+- **Fails loudly.** A missing variable, an unreachable database, an unreachable
+  instance, a malformed `probes.yaml` and a `--only` pattern that matches
+  nothing are all errors. A phase you did not ask to skip never silently
+  produces nothing.
+
+## Editing probes
+
+`probes.yaml` is the whole of Phase 4's configuration; adding a measurement
+needs no code change. Path variables like `{asset_id}` are resolved against the
+running instance rather than hard-coded, so the file stays valid as the library
+changes. A variable that cannot be resolved marks every probe depending on it
+`unavailable` with the reason — it is never quietly dropped.
+
+Deep pagination is expressed per probe:
+
+```yaml
+- name: assets-deep-page
+  path: /api/assets/
+  query: {limit: 50}
+  paginate: {style: keyset, pages: 40}   # follows 40 `page.next` cursors, times page 41
+```
+
+`style: offset` sets the offset directly instead, which is what the
+Elasticsearch-backed search endpoint needs.
+
+## Reading the output
+
+Each endpoint section ends in a **UI verdict**: a judgement about what a front
+end can responsibly do with the endpoint, drawn from the measurements above it.
+That line is the point of the document. Everything above it is the evidence.
+
+Anything the harness could not establish is written `UNKNOWN` with a one-line
+note, and repeated in the **Gaps** section with the specific thing that would
+settle it. There is no smoothing over: a value is measured, or it is a gap.
+
+Two things worth knowing when reading it:
+
+- **`Candidates for removal` is weak evidence by default.** With no
+  `--frontend-path` or `--access-log`, the only references available are inside
+  this repository. Several endpoints here exist for machine consumers that live
+  in other repositories — the transform-request claim and heartbeat routes are a
+  worker pull queue that no front end would ever call. The section says so, and
+  the flag on each row records which kind of evidence produced it.
+- **Fill rate is not reported for `include=`-gated fields.** `AssetORM.tags`,
+  `AssetORM.master_asset`, `TitleORM.tags` and `TitleORM.references` are mapped
+  `lazy="noload"`: without `?include=`, they serialise as `[]`, which is
+  indistinguishable from genuinely having none. A database-derived percentage
+  would describe something the front end never sees, so those fields carry the
+  caveat instead of a number.
+
+## Determinism
+
+Re-running with the same inputs produces the same report apart from timings.
+Collections are sorted by a stable key, floats are rounded at fixed precision,
+and the JSON is written with sorted keys — so a diff shows what actually
+changed about the API, not noise from the harness.
+
+## Layout
+
+| Module | Phase |
+|---|---|
+| `static_surface.py` | 1 — OpenAPI document plus route-table and mapper introspection |
+| `annotate.py` | 2 — router → service → repository call-graph walk |
+| `indexes.py` | 2 — index inventory from the models and the migrations, and the coverage oracle |
+| `data_shape.py` | 3 — read-only SQL |
+| `probes.py` | 4 — the `probes.yaml` runner |
+| `dead_surface.py` | 5 — usage evidence |
+| `verdict.py` | risk and verdict derivation, in one auditable place |
+| `render.py` | Markdown and JSON emitters |
+| `cli.py` | flags, configuration validation, phase orchestration |

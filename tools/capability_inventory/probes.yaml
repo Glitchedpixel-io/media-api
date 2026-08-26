@@ -1,0 +1,242 @@
+# Declarative probe definitions for the capability inventory.
+#
+# Edit this file to change what Phase 4 measures. Nothing here requires a code
+# change, and the harness validates every entry before issuing a single request.
+#
+# SAFETY
+#   The runner refuses any method other than GET unless the exact
+#   "METHOD /path" appears in `allowlist` below. `allowlist` ships empty and
+#   should stay that way unless you are deliberately probing a write against an
+#   instance you are willing to mutate. Probing production writes is not a thing
+#   this harness will do by accident.
+#
+# VARIABLES
+#   `{name}` placeholders in a probe's `path` are filled from `variables`.
+#   A variable is resolved against the API itself, so probes stay valid as the
+#   library changes and the file needs no ids hard-coded into it. If resolution
+#   fails, every probe depending on that variable is reported as `unavailable`
+#   with the reason -- never silently skipped.
+
+version: 1
+
+defaults:
+  # Runs after the discarded warm-up. p50 and p95 are computed over these.
+  runs: 7
+  warmup: 1
+  timeout_seconds: 30
+
+# Non-GET routes that may be probed. Keep empty for read-only runs.
+allowlist: []
+
+variables:
+  asset_id:
+    from_endpoint: /api/assets/
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+  title_id:
+    from_endpoint: /api/titles/
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+  # Same value as title_id. `/api/titles/{parent_title_id}/contents` names its
+  # path parameter differently, and a probe path has to spell the placeholder
+  # exactly as the route declares it or the result cannot be attached to it.
+  parent_title_id:
+    from_endpoint: /api/titles/
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+  tag_id:
+    from_endpoint: /api/tags
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+  scheme_id:
+    from_endpoint: /api/id_schemes
+    pick: 0.id
+  # The title with the most children, so the "4000-item case" is measured rather
+  # than assumed. Resolved by asking for the largest collection the API exposes.
+  # `/api/transform_requests/{request_id}` names its path parameter `request_id`.
+  request_id:
+    from_endpoint: /api/transform_requests
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+
+probes:
+  # -- happy path: first screen ------------------------------------------
+  - name: assets-page-1
+    path: /api/assets/
+    query: {limit: 50}
+    note: default first page a browse screen would issue
+
+  - name: assets-page-1-with-includes
+    path: /api/assets/
+    query: {limit: 50, include: "tags,master_asset,external_ids"}
+    note: same page with every optional relation eager-loaded
+
+  - name: titles-page-1
+    path: /api/titles/
+    query: {limit: 50}
+
+  - name: tags-page-1
+    path: /api/tags
+    query: {limit: 50}
+
+  - name: transform-requests-page-1
+    path: /api/transform_requests
+    query: {limit: 50}
+
+  # -- isolating the two independent costs -------------------------------
+  # `assets-page-1` and `assets-page-1-with-includes` return byte-identical
+  # payloads. Any latency difference between them is the per-row lazy load on
+  # AssetORM.external_ids and nothing else, because `include=` converts those
+  # per-row SELECTs into one selectinload. The scaling probes then show whether
+  # that cost is linear in the number of rows, which is what distinguishes an
+  # N+1 from a fixed overhead.
+  - name: assets-scaling-10-rows
+    path: /api/assets/
+    query: {limit: 10}
+    note: N+1 scaling, 10 rows
+
+  - name: assets-scaling-200-rows
+    path: /api/assets/
+    query: {limit: 200}
+    note: N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
+
+  # -- realistic worst case ---------------------------------------------
+  - name: assets-max-page-unindexed-sort
+    path: /api/assets/
+    query: {limit: 500, sort: "size:desc"}
+    note: largest permitted page on an unindexed sort key, N+1 left in place
+
+  - name: assets-max-page-unindexed-sort-no-n1
+    path: /api/assets/
+    query: {limit: 500, sort: "size:desc", include: "external_ids"}
+    note: >-
+      the same worst case with the per-row lazy load eliminated. The gap between
+      this and the probe above is the N+1; what remains is the sort itself
+
+  - name: assets-indexed-sort-no-n1
+    path: /api/assets/
+    query: {limit: 500, sort: "id:asc", include: "external_ids"}
+    note: >-
+      control for the probe above -- an indexed sort key with the N+1 removed, so
+      the two differ only in whether the sort column is indexed
+
+
+  - name: assets-broadest-filter
+    path: /api/assets/
+    query: {limit: 50, path_part: "e"}
+    note: substring filter matching almost everything; sequential scan by construction
+
+  - name: titles-name-substring
+    path: /api/titles/
+    query: {limit: 50, name: "e"}
+    note: leading-wildcard name search, the broadest a UI search box can send
+
+  # -- deep pagination ---------------------------------------------------
+  - name: assets-deep-page
+    path: /api/assets/
+    query: {limit: 50}
+    paginate: {style: keyset, pages: 40}
+    note: page 41 reached by following cursors; compare against assets-page-1
+
+  - name: titles-deep-page
+    path: /api/titles/
+    query: {limit: 50}
+    paginate: {style: keyset, pages: 40}
+
+  - name: search-transcripts-page-1
+    path: /api/search/transcripts
+    query: {q: "the", size: 25, offset: 0}
+
+  - name: search-transcripts-deep-page
+    path: /api/search/transcripts
+    query: {q: "the", size: 25}
+    paginate: {style: offset, offset: 9975}
+    note: last page inside the default 10,000 max_result_window
+
+  - name: search-transcripts-past-window
+    path: /api/search/transcripts
+    query: {q: "the", size: 25}
+    paginate: {style: offset, offset: 10000}
+    expect_status: [200, 500, 503]
+    note: deliberately past max_result_window; records how the failure surfaces
+
+  # -- unbounded collections --------------------------------------------
+  - name: streams-all
+    path: /api/streams
+    note: no pagination at all; the response is every stream row in the database
+
+  - name: id-schemes-all
+    path: /api/id_schemes
+
+  - name: title-contents
+    path: /api/titles/{parent_title_id}/contents
+    note: unpaginated child list; size is whatever that title happens to hold
+
+  - name: asset-streams
+    path: /api/assets/{asset_id}/streams
+
+  - name: asset-metadata
+    path: /api/assets/{asset_id}/metadata
+
+  - name: asset-external-ids
+    path: /api/assets/{asset_id}/ids
+
+  - name: asset-tags
+    path: /api/assets/{asset_id}/tags
+
+  - name: asset-titles
+    path: /api/assets/{asset_id}/titles
+
+  - name: title-tags
+    path: /api/titles/{title_id}/tags
+
+  # -- single-object reads ----------------------------------------------
+  - name: asset-detail
+    path: /api/assets/{asset_id}
+
+  - name: title-detail
+    path: /api/titles/{title_id}
+
+  - name: tag-detail
+    path: /api/tags/{tag_id}
+
+  - name: transform-request-detail
+    path: /api/transform_requests/{request_id}
+
+  # -- streaming ---------------------------------------------------------
+  - name: fetch-asset-stream
+    path: /api/fetch/{asset_id}
+    stream: true
+    note: time-to-first-byte measured separately from total transfer
+
+  - name: fetch-asset-range
+    path: /api/fetch/{asset_id}
+    stream: true
+    headers: {Range: "bytes=0-1048575"}
+    expect_status: [206]
+    note: first mebibyte only; verifies Content-Range and Accept-Ranges
+
+  - name: fetch-asset-range-suffix
+    path: /api/fetch/{asset_id}
+    stream: true
+    headers: {Range: "bytes=-65536"}
+    expect_status: [206]
+    note: suffix range, the form a seek-to-end scrub issues
+
+  - name: fetch-asset-range-unsatisfiable
+    path: /api/fetch/{asset_id}
+    stream: true
+    headers: {Range: "bytes=99999999999999-"}
+    expect_status: [416]
+    note: verifies the unsatisfiable case returns 416 with a Content-Range header
+
+  # -- unauthenticated surface ------------------------------------------
+  - name: health
+    path: /api/health
+    note: unauthenticated; opens its own database and Elasticsearch connections
+
+  - name: version
+    path: /api/version
+
+  - name: ping
+    path: /api/ping

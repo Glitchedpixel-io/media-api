@@ -37,6 +37,12 @@ prefect = [
     "prefect>=3.6.2,<4.0.0",
 ]
 
+[project.scripts]
+# The capability-inventory harness (tools/capability_inventory). It lives in this
+# project rather than a separate one so it can import the app object directly and
+# generate the OpenAPI document in process, with no server running.
+capability-inventory = "tools.capability_inventory.cli:main"
+
 [project.entry-points."media_api.orchestration_providers"]
 prefect = "app.orchestration.prefect:PrefectProvider"
 webhook = "app.orchestration.webhook:WebhookProvider"
@@ -64,6 +70,8 @@ dev = [
     "mypy>=1.18.2",
     "types-requests>=2.32.4.20250913",
     "ruff>=0.14.2",
+    # Reads tools/capability_inventory/probes.yaml.
+    "pyyaml>=6.0.2",
 ]
 
 [build-system]
@@ -74,7 +82,7 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["app", "tools"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -113,7 +121,8 @@ omit = [
     "*/dependencies.py",
     "*/app_factory.py",
     "app/auth/*",
-    "workers/cli_utils.py"
+    "workers/cli_utils.py",
+    "tools/*"
 ]
 
 [tool.mypy]
