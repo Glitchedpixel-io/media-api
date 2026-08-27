@@ -16,9 +16,20 @@ import argparse
 import fnmatch
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
-from . import annotate, data_shape, dead_surface, indexes, probes, render, static_surface, verdict
+from . import (
+    annotate,
+    data_shape,
+    dead_surface,
+    indexes,
+    load,
+    probes,
+    render,
+    static_surface,
+    verdict,
+)
 from .models import DataShape, Inventory, ProbeResult, Unknown
 
 _DEFAULT_MARKDOWN = Path("docs/capability-inventory.md")
@@ -118,6 +129,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--from-json",
+        metavar="FILE",
+        type=Path,
+        help=(
+            "re-render from a previous run's JSON instead of running any phase. No "
+            "database and no instance are contacted, so a change to the report's "
+            "presentation produces a diff of presentation alone. Risks and verdicts are "
+            "re-derived from the stored measurements, so a change to a threshold in "
+            "verdict.py takes effect without re-probing."
+        ),
+    )
+    parser.add_argument(
         "--include-example-values",
         action="store_true",
         help=(
@@ -166,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         root = _repo_root(args.repo_root)
-        inventory = _run(args, root)
+        inventory = _rerender(args, root) if args.from_json else _run(args, root)
     except SystemExit:
         raise
     except Exception as exc:
@@ -197,6 +220,57 @@ def _display(path: Path, root: Path) -> str:
         return str(path.relative_to(root))
     except ValueError:
         return str(path)
+
+
+def _rerender(args: argparse.Namespace, root: Path) -> Inventory:
+    """Rebuild an inventory from a previous run's JSON, running no phase.
+
+    Risks and verdicts are re-derived rather than carried across verbatim. They
+    are a deterministic function of the stored surface, annotation, probes and
+    data shape -- deriving them again is not a fresh measurement, and it means a
+    change to a threshold in :mod:`.verdict` shows up on the next render instead
+    of waiting for someone to re-run the probe suite.
+
+    Raises:
+        RuntimeError: If ``--from-json`` is combined with a flag that only makes
+            sense for a live run.
+    """
+    for flag, value in (
+        ("--frontend-path", args.frontend_path),
+        ("--access-log", args.access_log),
+    ):
+        if value:
+            raise RuntimeError(
+                f"{flag} cannot be combined with --from-json: Phase 5 evidence is read "
+                "from the stored artefact, not gathered again."
+            )
+
+    source = args.from_json if args.from_json.is_absolute() else root / args.from_json
+    inventory = load.from_json(source)
+
+    endpoints = tuple(
+        verdict.apply(
+            surface=record.surface,
+            annotation=record.annotation,
+            probes=record.probes,
+            shape=inventory.data_shape,
+            usage=record.usage,
+        )
+        for record in inventory.endpoints
+    )
+    if args.only:
+        endpoints = tuple(e for e in endpoints if fnmatch.fnmatch(e.surface.path, args.only))
+        if not endpoints:
+            raise RuntimeError(
+                f"--only {args.only!r} matched no routes in {source}. Patterns are globs "
+                "over the route path, e.g. '/api/assets/*'."
+            )
+
+    notes = tuple(n for n in inventory.notes if not n.startswith("Re-rendered")) + (
+        f"Re-rendered from `{args.from_json}` with no phase re-run; timings are those "
+        "of the recorded run.",
+    )
+    return replace(inventory, endpoints=endpoints, notes=notes)
 
 
 def _run(args: argparse.Namespace, root: Path) -> Inventory:

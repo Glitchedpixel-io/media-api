@@ -13,14 +13,31 @@ report rather than a visible failure:
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
 
-from tools.capability_inventory import data_shape, probes, static_surface
+from tools.capability_inventory import data_shape, load, probes, render, static_surface
 from tools.capability_inventory.annotate import _describe_predicate, _pattern_shape
 from tools.capability_inventory.indexes import IndexLookup
-from tools.capability_inventory.models import IndexInfo
+from tools.capability_inventory.models import (
+    ColumnStats,
+    DataShape,
+    EndpointRecord,
+    FieldInfo,
+    IndexInfo,
+    Inventory,
+    PaginationInfo,
+    ParamInfo,
+    ProbeResult,
+    QueryInfo,
+    ResponseInfo,
+    RouteAnnotation,
+    RouteSurface,
+    Timing,
+    UsageEvidence,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -303,3 +320,413 @@ def test_pick_walks_mappings_and_list_indices() -> None:
 def test_route_paths_are_normalised_to_their_openapi_form(declared: str, published: str) -> None:
     """Without this, every converter-typed route loses its handler and its analysis."""
     assert static_surface._normalise_path(declared) == published
+
+
+# --------------------------------------------------------------------------
+# A small inventory covering every kind of section the renderer emits
+# --------------------------------------------------------------------------
+
+
+def _surface(
+    method: str,
+    path: str,
+    *,
+    model: str = "AssetRead",
+    row_model: str | None = None,
+    fields: tuple[FieldInfo, ...] = (),
+    params: tuple[ParamInfo, ...] = (),
+    body: str | None = None,
+) -> RouteSurface:
+    """Build a route surface with sensible defaults for a test."""
+    return RouteSurface(
+        method=method,
+        path=path,
+        operation_id=f"{method.lower()}_{path.strip('/').replace('/', '_')}",
+        summary=f"{method} {path}",
+        tags=("t",),
+        auth="bearer, no scope or role enforced at the route",
+        handler_module="app.routers.assets.core",
+        handler_name="handler",
+        params=params,
+        request_body=body,
+        responses=(
+            ResponseInfo(
+                status="200",
+                description="ok",
+                model=model,
+                fields=fields,
+                media_type="application/json",
+                row_model=row_model,
+            ),
+            ResponseInfo(status="422", description="Validation Error", model=None),
+        ),
+        success_status="200",
+        is_streaming=False,
+        trailing_slash_required=path.endswith("/") and path != "/",
+    )
+
+
+def _annotation(
+    *, queries: tuple[QueryInfo, ...] = (), loops: tuple[QueryInfo, ...] = (), style: str = "none"
+) -> RouteAnnotation:
+    return RouteAnnotation(
+        service="AssetService",
+        repositories=("SQLAlchemyMediaRepository",),
+        queries=queries,
+        n_plus_one=loops,
+        coverage=(),
+        pagination=PaginationInfo(
+            style=style,
+            default_limit=50 if style == "keyset" else None,
+            max_limit=500 if style == "keyset" else None,
+            stable_under_writes=True if style == "keyset" else None,
+            stability_note="tie-broken on id" if style == "keyset" else "",
+        ),
+        external_calls=(),
+        background_work=(),
+        hard_limits=("`limit` <= 500",),
+        filesystem_access=(),
+        unknowns=(),
+    )
+
+
+def _query(*, in_loop: bool = False) -> QueryInfo:
+    return QueryInfo(
+        owner="SQLAlchemyMediaRepository.list_paged",
+        kind="select",
+        tables=("assets",),
+        in_loop=in_loop,
+        loop_note="for tag_id in tag_ids" if in_loop else None,
+        writes=False,
+        line=118,
+        source_file="app/repositories/media_repository.py",
+    )
+
+
+def _usage(key: str) -> UsageEvidence:
+    return UsageEvidence(
+        endpoint_key=key,
+        referenced=True,
+        strength="weak",
+        callers=(),
+        test_references=("tests/x.py",),
+        note="in-repository evidence only",
+    )
+
+
+def _sample_inventory() -> Inventory:
+    """An inventory exercising a read, a uniform write and a looping write."""
+    listing = EndpointRecord(
+        surface=_surface(
+            "GET",
+            "/api/assets/",
+            model="PaginatedResponse_AssetReadExtended_",
+            row_model="AssetReadExtended",
+            fields=(
+                FieldInfo("id", "int", False),
+                FieldInfo("tags", "list[TagRead]", True, conditional_on="include=tags"),
+            ),
+            params=(ParamInfo("limit", "query", "int", False, 50, "page size", {"maximum": 500}),),
+        ),
+        annotation=_annotation(queries=(_query(),), style="keyset"),
+        probes=(
+            ProbeResult(
+                name="assets-page-1",
+                endpoint_key="GET /api/assets/",
+                method="GET",
+                url="/api/assets/?limit=50",
+                status="ok",
+                http_status=200,
+                timing=Timing(runs=7, p50_ms=1830.0, p95_ms=2520.0, min_ms=1700.0, max_ms=2600.0),
+                bytes_=19471,
+                item_count=50,
+                notes=("first page",),
+            ),
+        ),
+        usage=_usage("GET /api/assets/"),
+        risks=("one extra SELECT per row",),
+        verdict="worst-case p95 is 2.5s, and the cause is the per-row lazy load.",
+        verdict_class="unsafe",
+    )
+    uniform_write = EndpointRecord(
+        surface=_surface("POST", "/api/tags", body="TagCreatePublic", model="TagRead"),
+        annotation=_annotation(queries=(_query(),)),
+        usage=_usage("POST /api/tags"),
+        verdict="single-row write with no loops.",
+        verdict_class="write",
+    )
+    looping_write = EndpointRecord(
+        surface=_surface(
+            "PUT", "/api/assets/{asset_id}/tags", body="TagSet", model="list[TagRead]"
+        ),
+        annotation=_annotation(queries=(_query(in_loop=True),), loops=(_query(in_loop=True),)),
+        usage=_usage("PUT /api/assets/{asset_id}/tags"),
+        risks=("queries issued inside a loop",),
+        verdict="work is proportional to the size of the payload.",
+        verdict_class="caution",
+    )
+    unreferenced = EndpointRecord(
+        surface=_surface("GET", "/api/health", model=None),
+        annotation=_annotation(),
+        usage=UsageEvidence(
+            endpoint_key="GET /api/health",
+            referenced=False,
+            strength="weak",
+            callers=(),
+            test_references=(),
+            note="none",
+        ),
+        verdict="the read is index-covered.",
+        verdict_class="safe",
+    )
+    shape = DataShape(
+        row_counts={"assets": 13321, "tags": 43},
+        columns=(
+            ColumnStats("assets", "path", 1.0, 13321, 13321, distinct=5000, distinct_capped=True),
+            ColumnStats(
+                "assets",
+                "container_format",
+                0.99,
+                13173,
+                13321,
+                distinct=4,
+                facet_candidate=True,
+            ),
+        ),
+        collections=(),
+        server_version="PostgreSQL 17.9",
+        captured_from="read-only Postgres, connection fingerprint abc123",
+        baseline_rtt_ms=28.0,
+    )
+    return Inventory(
+        generated_from="media-api @ app.openapi()",
+        app_version="1.5.4",
+        phases_run=("1", "2", "3", "4", "5"),
+        phases_skipped=(),
+        endpoints=(listing, uniform_write, looping_write, unreferenced),
+        indexes=(IndexInfo("assets_pkey", "assets", ("id",), True, source="primary key"),),
+        data_shape=shape,
+        unknowns=(),
+        notes=("a note",),
+    )
+
+
+# --------------------------------------------------------------------------
+# Rendered-document formatting contract
+# --------------------------------------------------------------------------
+#
+# The report is Markdown, and Markdown fails quietly. A run of `**Label:** value`
+# lines is a single CommonMark paragraph, not four lines, so a renderer collapses
+# it into an unreadable block while the source still looks fine in a diff. A
+# heading without a blank line before it is not a heading at all. None of that
+# raises, so it has to be asserted.
+
+
+ENDPOINT_HEADING = re.compile(r"^### (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /")
+VERDICT_LINE = re.compile(r"^> \*\*(SAFE|CAUTION|NOT SAFE|UNKNOWN)\*\* — \S")
+
+
+def _render_sample() -> str:
+    """Render a small inventory exercising every kind of section."""
+    return render.to_markdown(_sample_inventory())
+
+
+@pytest.fixture(scope="module")
+def rendered() -> str:
+    """The rendered sample document, split once for the whole module."""
+    return _render_sample()
+
+
+def test_no_two_consecutive_bold_label_lines(rendered: str) -> None:
+    """Consecutive `**Label:** value` lines collapse into one paragraph.
+
+    This is the defect the header table exists to prevent, so it is asserted
+    over the whole document rather than over the header alone.
+    """
+    lines = rendered.split("\n")
+    offenders = [
+        (index + 1, previous, line)
+        for index, (previous, line) in enumerate(zip(lines, lines[1:], strict=False))
+        if previous.startswith("**") and line.startswith("**")
+    ]
+    assert not offenders, f"consecutive bold-label lines would render as one block: {offenders}"
+
+
+def test_every_endpoint_section_opens_with_a_verdict(rendered: str) -> None:
+    """The conclusion leads, and its token is one of the four."""
+    lines = rendered.split("\n")
+    headings = [i for i, line in enumerate(lines) if ENDPOINT_HEADING.match(line)]
+    assert headings, "the sample rendered no endpoint sections"
+    for index in headings:
+        window = lines[index + 1 : index + 4]
+        matches = [line for line in window if VERDICT_LINE.match(line)]
+        assert matches, (
+            f"{lines[index]!r} is not followed within two lines by a verdict "
+            f"blockquote; got {window!r}"
+        )
+
+
+def test_exactly_one_verdict_line_per_endpoint_section(rendered: str) -> None:
+    """The token stays greppable: one `> **TOKEN**` line per section."""
+    lines = rendered.split("\n")
+    headings = sum(1 for line in lines if ENDPOINT_HEADING.match(line))
+    verdicts = sum(1 for line in lines if VERDICT_LINE.match(line))
+    assert headings == verdicts, (
+        f"{headings} endpoint sections but {verdicts} verdict lines; "
+        "`grep -c '> \\*\\*NOT SAFE\\*\\*'` has to count sections"
+    )
+
+
+def test_subheadings_are_surrounded_by_blank_lines(rendered: str) -> None:
+    """A `####` heading needs air on both sides or it is not a heading."""
+    lines = rendered.split("\n")
+    for index, line in enumerate(lines):
+        if not line.startswith("#### "):
+            continue
+        assert index > 0 and lines[index - 1] == "", f"no blank line before {line!r}"
+        assert index + 1 < len(lines) and lines[index + 1] == "", f"no blank line after {line!r}"
+
+
+def test_tables_and_lists_are_surrounded_by_blank_lines(rendered: str) -> None:
+    """A table or list that abuts a paragraph is absorbed into it."""
+    lines = rendered.split("\n")
+    for index, line in enumerate(lines):
+        is_table = line.startswith("|")
+        is_list = line.startswith("- ")
+        if not (is_table or is_list):
+            continue
+        previous = lines[index - 1] if index else ""
+        starts_block = not (
+            previous.startswith("|") if is_table else previous.startswith(("- ", "  "))
+        )
+        if starts_block:
+            assert previous == "", f"line {index + 1} starts a block after {previous!r}"
+
+
+def _write_table(rendered: str) -> str:
+    """Just the Write endpoints section.
+
+    Scoping matters: every endpoint appears in the summary table too, so a bare
+    substring search cannot tell a collapsed write from a sectioned one.
+    """
+    _, _, tail = rendered.partition("## Write endpoints")
+    body, _, _ = tail.partition("\n## ")
+    return body
+
+
+def test_uniform_writes_are_collapsed_not_sectioned(rendered: str) -> None:
+    """A single-row write gets a table row, not a section of its own."""
+    assert "## Write endpoints" in rendered
+    assert "### POST /api/tags" not in rendered, "a uniform write should not get a section"
+    assert "| `POST /api/tags` |" in _write_table(rendered)
+
+
+def test_a_looping_write_keeps_its_own_section(rendered: str) -> None:
+    """A write that issues per-item queries has a failure mode worth a section."""
+    assert "### PUT /api/assets/{asset_id}/tags" in rendered
+    assert "| `PUT /api/assets/{asset_id}/tags` |" not in _write_table(rendered)
+
+
+def test_table_facts_are_written_once(rendered: str) -> None:
+    """Row counts live in the appendix, not in every endpoint that reads a table."""
+    assert rendered.count("**13,321 rows.**") == 1
+    assert "### Table: assets" in rendered
+    # Endpoints link to it rather than restating it.
+    assert "[`assets`](#table-assets)" in rendered
+
+
+def test_endpoint_sections_are_separated_by_a_rule(rendered: str) -> None:
+    """A horizontal rule closes each section."""
+    lines = rendered.split("\n")
+    headings = sum(1 for line in lines if ENDPOINT_HEADING.match(line))
+    assert sum(1 for line in lines if line == "---") == headings
+
+
+def test_document_ends_with_exactly_one_newline(rendered: str) -> None:
+    assert rendered.endswith("\n")
+    assert not rendered.endswith("\n\n")
+
+
+def test_no_run_of_blank_lines(rendered: str) -> None:
+    assert "\n\n\n" not in rendered
+
+
+# --------------------------------------------------------------------------
+# The committed artefact, and the loader that lets it be re-rendered
+# --------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+COMMITTED_MARKDOWN = REPO_ROOT / "docs" / "capability-inventory.md"
+COMMITTED_JSON = REPO_ROOT / "docs" / "capability-inventory.json"
+
+
+@pytest.mark.skipif(not COMMITTED_MARKDOWN.is_file(), reason="no committed report to check")
+def test_committed_report_satisfies_the_formatting_contract() -> None:
+    """The real artefact obeys the same rules as the synthetic sample.
+
+    The sample covers every branch; this covers the ninety-six-endpoint document
+    people actually read, and catches a section shape the sample happens not to
+    exercise.
+    """
+    lines = COMMITTED_MARKDOWN.read_text(encoding="utf-8").split("\n")
+
+    consecutive = [
+        index + 1
+        for index, (previous, line) in enumerate(zip(lines, lines[1:], strict=False))
+        if previous.startswith("**") and line.startswith("**")
+    ]
+    assert not consecutive, f"consecutive bold-label lines at {consecutive}"
+
+    headings = [i for i, line in enumerate(lines) if ENDPOINT_HEADING.match(line)]
+    assert headings, "the committed report has no endpoint sections"
+    for index in headings:
+        window = lines[index + 1 : index + 4]
+        assert any(
+            VERDICT_LINE.match(line) for line in window
+        ), f"{lines[index]!r} has no verdict blockquote within two lines"
+
+    for index, line in enumerate(lines):
+        if line.startswith("#### "):
+            assert lines[index - 1] == "", f"no blank line before {line!r}"
+            assert lines[index + 1] == "", f"no blank line after {line!r}"
+
+
+@pytest.mark.skipif(not COMMITTED_JSON.is_file(), reason="no committed JSON to load")
+def test_committed_json_round_trips_through_the_loader() -> None:
+    """`--from-json` can rebuild the inventory the committed JSON describes.
+
+    Re-rendering without re-probing is what keeps a presentation change to a
+    presentation-only diff, so the loader staying in step with the models is
+    load-bearing rather than a convenience.
+    """
+    inventory = load.from_json(COMMITTED_JSON)
+    assert inventory.endpoints, "no endpoints were reconstructed"
+    assert all(e.surface.method for e in inventory.endpoints)
+
+    rendered = render.to_markdown(inventory)
+    assert rendered.startswith("# Capability inventory")
+    assert "## Tables" in rendered
+    assert "\n\n\n" not in rendered
+
+
+def test_loader_names_the_missing_field_rather_than_failing_obscurely(
+    tmp_path: Path,
+) -> None:
+    """A schema drift must say which field moved."""
+    path = tmp_path / "broken.json"
+    path.write_text('{"endpoints": []}', encoding="utf-8")
+    with pytest.raises(load.InventoryFormatError, match="generated_from"):
+        load.from_json(path)
+
+
+def test_loader_rejects_a_non_json_file(tmp_path: Path) -> None:
+    path = tmp_path / "notjson.json"
+    path.write_text("this is not json", encoding="utf-8")
+    with pytest.raises(load.InventoryFormatError, match="not valid JSON"):
+        load.from_json(path)
+
+
+def test_severity_tokens_are_the_documented_four() -> None:
+    """The set a reader learns, and the set the contract asserts, are one set."""
+    assert set(render.SEVERITY_TOKENS) == {"SAFE", "CAUTION", "NOT SAFE", "UNKNOWN"}
+    assert set(render._TOKEN_FOR_CLASS.values()) <= set(render.SEVERITY_TOKENS)

@@ -45,6 +45,7 @@ uv run capability-inventory
 | `--probes-file FILE` | Alternative probe definitions (default: the `probes.yaml` beside the package). |
 | `--markdown-out FILE` / `--json-out FILE` | Alternative output paths. |
 | `--cardinality-scan-limit N` | Distinct-value scan cap per column in Phase 3 (default 5000). Above the cap the count is reported as a floor and flagged. |
+| `--from-json FILE` | Re-render from a previous run's JSON. No phase runs, no database or instance is contacted. Risks and verdicts are re-derived from the stored measurements, so a changed threshold in `verdict.py` takes effect without re-probing. |
 | `--repo-root DIR` | Repository root, if not the working directory. |
 
 ## Environment
@@ -135,9 +136,36 @@ Elasticsearch-backed search endpoint needs.
 
 ## Reading the output
 
-Each endpoint section ends in a **UI verdict**: a judgement about what a front
-end can responsibly do with the endpoint, drawn from the measurements above it.
-That line is the point of the document. Everything above it is the evidence.
+Each endpoint section **opens** with its verdict, as a blockquote tagged `SAFE`,
+`CAUTION`, `NOT SAFE` or `UNKNOWN`. Everything below it in the section is the
+evidence behind it. The verdict leads rather than closes because at ninety-odd
+endpoints nobody reads bottom-up, and because it is the reason the document
+exists.
+
+The four tokens are fixed and there is exactly one per section, so they can be
+counted without parsing anything:
+
+```bash
+grep -c '^> \*\*NOT SAFE\*\*' docs/capability-inventory.md
+```
+
+Three structural rules keep the document readable, and
+`tests/unit/tools/test_capability_inventory.py` asserts all three against the
+rendered output rather than trusting a re-read:
+
+- **Header facts are a table.** A run of `**Label:** value` lines is a single
+  CommonMark paragraph — lazy continuation lines — so a renderer collapses it
+  into one unreadable block while the source still looks fine in a diff. A table
+  cannot collapse.
+- **Uniform writes are collapsed.** A single-row write with no loops and no
+  filesystem work has nothing endpoint-specific to get wrong, and fifty sections
+  saying so bury the endpoints that do. They live in one **Write endpoints**
+  table; any write that loops or touches the filesystem keeps a full section.
+- **Table facts are written once.** Row counts, fill rates, cardinality and
+  collection sizes belong to a database table, not to each of the twenty-seven
+  endpoints that read it. They live in the **Tables** appendix, and each
+  endpoint's **Data shape** links to it and adds only what is true of that
+  endpoint.
 
 Anything the harness could not establish is written `UNKNOWN` with a one-line
 note, and repeated in the **Gaps** section with the specific thing that would
@@ -161,6 +189,15 @@ Two things worth knowing when reading it:
 ## Determinism
 
 Re-running with the same inputs produces the same report apart from timings.
+To change how the report *looks* without disturbing what it *says*, re-render
+from the committed JSON:
+
+```bash
+uv run capability-inventory --from-json docs/capability-inventory.json
+```
+
+That contacts nothing and re-runs no phase, so the diff is presentation alone.
+
 Collections are sorted by a stable key, floats are rounded at fixed precision,
 and the JSON is written with sorted keys — so a diff shows what actually
 changed about the API, not noise from the harness.
@@ -175,6 +212,7 @@ changed about the API, not noise from the harness.
 | `data_shape.py` | 3 — read-only SQL |
 | `probes.py` | 4 — the `probes.yaml` runner |
 | `dead_surface.py` | 5 — usage evidence |
+| `load.py` | rebuilds an inventory from a previous run's JSON, for `--from-json` |
 | `verdict.py` | risk and verdict derivation, in one auditable place |
 | `render.py` | Markdown and JSON emitters |
 | `cli.py` | flags, configuration validation, phase orchestration |
