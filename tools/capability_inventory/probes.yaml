@@ -95,6 +95,16 @@ variables:
   external_id:
     literal: "capinv-probe-no-such-external-id"
 
+  # There is deliberately no `runner_key` variable, so
+  # GET /api/runner_state/{runner_key} stays unprobed.
+  #
+  # A runner is provisioned with its own key and uses it to look up its
+  # configuration, so no client ever discovers a key and there is no listing route
+  # to resolve one from -- the absence is the design, not a gap. Do not add a
+  # literal here: any key hardcoded in this file is wrong on every instance but the
+  # one it was copied from, and a probe that 404s against a real key would report
+  # the endpoint as broken rather than unmeasured.
+
 probes:
   # -- happy path: first screen ------------------------------------------
   - name: assets-page-1
