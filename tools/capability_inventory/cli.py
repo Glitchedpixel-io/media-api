@@ -304,10 +304,20 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
         notes.append(f"Filtered to `--only {pattern}` — {len(routes)} of the full surface.")
 
     # -- Phase 2 -----------------------------------------------------------
-    index_inventory = indexes.from_metadata() + indexes.from_migrations(
-        root / "alembic" / "versions"
-    )
-    lookup = indexes.IndexLookup(index_inventory)
+    # Two collections, deliberately, because they answer different questions.
+    #
+    # The models are the schema the running application has -- CI's `alembic check`
+    # gates that migrations agree with them -- so they are what coverage judgements
+    # must be made against. The migration scan resolves no revision order: an index
+    # created and later dropped or renamed still appears, which is right for a
+    # historical cross-check and wrong for "can this query use an index?". Feeding
+    # both to IndexLookup let a dead object count as live coverage -- `videos` and
+    # `uniq_pending_transform_per_video_and_type` were still being reported as
+    # existing long after 5eab333f4197 renamed them.
+    model_indexes = indexes.from_metadata()
+    migration_indexes = indexes.from_migrations(root / "alembic" / "versions")
+    index_inventory = model_indexes + migration_indexes
+    lookup = indexes.IndexLookup(model_indexes)
     graph = annotate.CodeGraph(root / "app", root)
     analyser = annotate.RouteAnalyser(graph, lookup)
     annotations = {route.key: analyser.analyse(route) for route in routes}

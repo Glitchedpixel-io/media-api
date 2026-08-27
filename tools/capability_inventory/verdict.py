@@ -98,9 +98,18 @@ def _collection_ceiling(
                 best = (count, f"all {count:,} rows of `{table}`")
         return (best[0], best[1]) if best else (None, None)
 
+    # The collection has to be the one the route actually narrows on. Matching on the
+    # child table alone picks the largest per-parent relationship that happens to touch
+    # any table in the query -- including a table joined only for an existence check --
+    # and reports it as this endpoint's ceiling. That produced a "727 rows, NOT SAFE"
+    # verdict for /titles/{id}/references (the number was titles-per-title-type; the
+    # table holds none) and a reassuring "17 rows, safe" for
+    # /transform_requests/{id}/logs (requests-per-asset, a different relationship).
+    narrowed = {(c.table, c.column) for c in annotation.coverage if c.table and c.column}
+
     best_child: tuple[int, str] | None = None
     for collection in shape.collections:
-        if collection.child_table not in tables:
+        if (collection.child_table, collection.fk_column) not in narrowed:
             continue
         if best_child is None or collection.max_children > best_child[0]:
             best_child = (
@@ -110,10 +119,18 @@ def _collection_ceiling(
     if best_child is not None:
         return best_child
 
-    for table in sorted(tables):
+    # No measured relationship matches what the route filters on. The row count of the
+    # table being narrowed is still a true upper bound, so prefer it over an unrelated
+    # relationship -- but only when the route makes clear which table that is.
+    narrowed_tables = {table for table, _ in narrowed if table in tables}
+    if len(narrowed_tables) == 1:
+        table = narrowed_tables.pop()
         count = shape.row_counts.get(table)
         if count is not None:
-            return count, f"all {count:,} rows of `{table}`"
+            return count, f"at most all {count:,} rows of `{table}`"
+
+    # Anything else is a guess. UNKNOWN sends the reader to measure it; a number from
+    # the wrong relationship reads as an answer.
     return None, None
 
 
