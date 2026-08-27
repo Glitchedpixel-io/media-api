@@ -8,7 +8,6 @@ from sqlalchemy.engine import CursorResult
 from app.models import AssetTagORM, TagORM, TitleTagORM
 from app.models.sort_configs import TAG_SORT
 from app.schemas import (
-    PageInfo,
     PaginatedResponse,
     TagCounts,
     TagCreateInternal,
@@ -116,10 +115,7 @@ class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
 
         return PaginatedResponse[TagRead](
             items=items,
-            page=PageInfo(
-                next=self._to_cursor(page.paging.next),
-                prev=self._to_cursor(page.paging.previous),
-            ),
+            page=self._page_info(page),
         )
 
     # ============ Asset Tagging ============

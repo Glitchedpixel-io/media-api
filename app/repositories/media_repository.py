@@ -16,7 +16,6 @@ from app.schemas import (
     AssetRead,
     AssetReadExtended,
     AssetUpdateInternal,
-    PageInfo,
     PaginatedResponse,
 )
 
@@ -122,10 +121,7 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
 
         return PaginatedResponse[AssetReadExtended](
             items=items,
-            page=PageInfo(
-                next=self._to_cursor(page.paging.next),
-                prev=self._to_cursor(page.paging.previous),
-            ),
+            page=self._page_info(page),
         )
 
     def update(self, asset_id: int, update: AssetUpdateInternal) -> AssetRead:  # type: ignore
