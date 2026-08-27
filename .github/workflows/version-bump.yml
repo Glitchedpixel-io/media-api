@@ -65,6 +65,24 @@ jobs:
           fi
           echo "Bump source: $msg"
 
+          # Batching: a PR titled [no-release] lands on main without cutting a version,
+          # so a run of related changes can ship as one release instead of one per merge.
+          # The last PR of the batch omits the marker and carries the bump level for the
+          # whole batch — intermediate markers are not accumulated, so that title must
+          # state the highest level any change in the batch warrants.
+          #
+          # Read from the resolved PR title, not the commit subject, for exactly the
+          # reason the bump level is: a single-commit PR's squash subject is that
+          # commit's own message, which would silently drop a marker placed in the title.
+          #
+          # publish.yml does not infer "no release" from this workflow being skipped —
+          # it checks for a tag on the commit itself. See the comment on its gate job.
+          if echo "$msg" | grep -qiE '\[no-release\]'; then
+            echo "Bump source carries [no-release]; landing untagged."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if echo "$msg" | grep -qiE '\[major\]'; then
             echo "Bump level: major"
             next="$((major + 1)).0.0"
@@ -79,6 +97,7 @@ jobs:
           echo "tag=v$next" >> "$GITHUB_OUTPUT"
 
       - name: Push tag
+        if: steps.next.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -83,6 +83,23 @@ version, and never push a tag by hand.
 | `[major]` | major | `v2.0.0` |
 | `[minor]` | minor | `v1.5.0` |
 | _(neither — the default)_ | patch | `v1.4.3` |
+| `[no-release]` | none — lands untagged | `v1.4.2` (unchanged) |
+
+**Shipping several PRs as one release.** Merging normally cuts a tag *and* an image, a
+GitHub Release and a deploy notification, per PR. To batch a run of related changes, put
+`[no-release]` in each PR's title; those land on `main` untagged and unpublished. The last
+PR of the batch omits the marker and carries the bump level **for the whole batch** —
+markers are not accumulated, so that title must state the highest level any change in the
+batch warrants. Between releases the build stamps a dev version (`1.4.2.dev7+g<sha>`),
+which is correct and expected.
+
+> `[no-release]` is read from the PR title via the API, with the same caveat as the bump
+> level below. `publish.yml` does **not** infer "no release" from Version Bump being
+> skipped — a skipped job still reports the workflow as successful. It checks for a tag on
+> the commit itself, because resolving "the highest tag in the repo" on an untagged commit
+> finds the *previous* release and republishes it: clobbering that release's `openapi.json`,
+> overwriting its image tag with newer code, and deploying a version whose contents
+> silently changed.
 
 > **Do not read the bump marker from the commit subject.** A squash-merge subject only
 > carries the PR title when the PR had more than one commit. For a *single-commit* PR,
