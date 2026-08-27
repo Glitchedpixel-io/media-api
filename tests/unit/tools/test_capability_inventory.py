@@ -26,6 +26,7 @@ from tools.capability_inventory import (
     load,
     probes,
     render,
+    indexes,
     static_surface,
     verdict,
 )
@@ -1280,3 +1281,132 @@ def test_the_shipped_failure_probe_is_flagged() -> None:
         "fetch-asset-range-unsatisfiable",
     ):
         assert by_name[name].records_failure_mode is False, name
+
+
+# --------------------------------------------------------------------------
+# One declaration, one index
+# --------------------------------------------------------------------------
+
+
+def test_a_column_declared_unique_and_indexed_yields_one_index() -> None:
+    """The false duplicate behind #59.
+
+    `mapped_column(String(50), unique=True, index=True)` creates a single unique
+    index, already carrying the name Postgres will use. Synthesising a second
+    `<table>_<col>_key` alongside it invented an index that does not exist, and the
+    pair read as duplicated storage worth a migration to remove.
+    """
+    entries = indexes._deduplicate(
+        [
+            IndexInfo("ix_tags_name", "tags", ("name",), True, source="models"),
+            IndexInfo("tags_name_key", "tags", ("name",), True, source="column unique=True"),
+        ]
+    )
+
+    assert len(entries) == 1
+    assert (
+        entries[0].name == "ix_tags_name"
+    ), "the real Index names it; the synthesised one does not"
+
+
+def test_an_unnamed_unique_constraint_does_not_shadow_the_real_name() -> None:
+    """`assets.path` is `unique=True` with no index=True.
+
+    That renders as an unnamed UniqueConstraint, which the constraint pass called
+    `uq_assets` -- a name Postgres never uses. Postgres names it `assets_path_key`,
+    which is what the column pass produces.
+    """
+    entries = indexes._deduplicate(
+        [
+            IndexInfo("uq_assets", "assets", ("path",), True, source="unique constraint"),
+            IndexInfo("assets_path_key", "assets", ("path",), True, source="column unique=True"),
+        ]
+    )
+
+    assert len(entries) == 1
+    assert entries[0].name == "assets_path_key"
+
+
+def test_genuinely_distinct_indexes_on_one_column_are_kept() -> None:
+    """Deduplication must not collapse indexes that really are different.
+
+    `tags` carries both a unique btree on `name` and a non-unique expression index
+    on `lower(name)`. They serve different queries and both exist.
+    """
+    entries = indexes._deduplicate(
+        [
+            IndexInfo("ix_tags_name", "tags", ("name",), True, source="models"),
+            IndexInfo(
+                "ix_tags_name_lower",
+                "tags",
+                (),
+                False,
+                expression="lower(tags.name)",
+                source="models",
+            ),
+        ]
+    )
+
+    assert len(entries) == 2
+
+
+def test_a_named_composite_constraint_survives() -> None:
+    """A named UniqueConstraint is real and nothing else describes it."""
+    entries = indexes._deduplicate(
+        [
+            IndexInfo(
+                "uq_external_identifier_scheme_id",
+                "external_identifiers",
+                ("scheme_id", "external_id"),
+                True,
+                source="unique constraint",
+            ),
+        ]
+    )
+
+    assert [e.name for e in entries] == ["uq_external_identifier_scheme_id"]
+
+
+def test_partial_indexes_differing_only_by_predicate_are_distinct() -> None:
+    """`title_contents` carries two partial uniques over overlapping columns."""
+    entries = indexes._deduplicate(
+        [
+            IndexInfo(
+                "uq_parent_asset_once",
+                "title_contents",
+                ("parent_title_id", "asset_id"),
+                True,
+                where="asset_id IS NOT NULL",
+                source="models",
+            ),
+            IndexInfo(
+                "uq_parent_child_title_once",
+                "title_contents",
+                ("parent_title_id", "child_title_id"),
+                True,
+                where="child_title_id IS NOT NULL",
+                source="models",
+            ),
+        ]
+    )
+
+    assert len(entries) == 2
+
+
+def test_the_models_report_one_index_per_constrained_column() -> None:
+    """Asserted against the real models, not a fixture.
+
+    Verified against `pg_index` on a schema built from the migrations: each of these
+    columns carries exactly one unique index.
+    """
+    static_surface.load_app()
+    entries = indexes.from_metadata()
+
+    for table, column in (
+        ("assets", "path"),
+        ("tags", "name"),
+        ("id_schemes", "code"),
+        ("title_types", "code"),
+    ):
+        matching = [e for e in entries if e.table == table and e.columns == (column,) and e.unique]
+        assert len(matching) == 1, f"{table}.{column} reported {[e.name for e in matching]}"
