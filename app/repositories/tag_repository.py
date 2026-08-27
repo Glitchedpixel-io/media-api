@@ -202,7 +202,7 @@ class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
 
     def _link_tags(
         self,
-        association: type,
+        association: type[AssetTagORM] | type[TitleTagORM],
         owner_column: str,
         owner_id: int,
         tag_ids: list[int],
