@@ -8,7 +8,7 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 
 ## Run
 
-- **Source:** capinv-prod-rerun @ app.openapi()
+- **Source:** media-api @ app.openapi()
 - **App version:** 1.6.2.dev6+gee853b72c
 - **Phases run:** 1 (static surface), 2 (code annotation), 3 (data shape), 4 (timed probes), 5 (dead surface)
 - **Phases skipped:** none
@@ -23,38 +23,38 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 
 | Endpoint | Auth | Paging | Measured p95 | Verdict | One-line judgement |
 |---|---|---|---|---|---|
-| `GET /api/assets/` | bearer | keyset | 320ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/assets/` | bearer | keyset | 336ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/assets/` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is not index-covered, and it was not timed; see Gaps |
 | `PATCH /api/assets/seen` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}` | bearer | **none** | 130ms | safe | p95 130ms, index-covered |
+| `GET /api/assets/{asset_id}` | bearer | **none** | 127ms | safe | p95 127ms, index-covered |
 | `PATCH /api/assets/{asset_id}` | bearer | — | UNKNOWN | caution | Touches the filesystem as well as the database, so it can fail after the database row already exists |
 | `GET /api/assets/{asset_id}/accessories` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | UNKNOWN | safe | the collection is bounded in practice at 4 rows (assets.master_asset_id -> assets), so it is fine to render directly |
 | `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 104ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 100ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 100ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/ids` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `DELETE /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PATCH /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 162ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 164ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/metadata` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `DELETE /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/streams` | bearer | **none** | 158ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/streams` | bearer | **none** | 157ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 170ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 166ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Work is proportional to the size of the payload, not constant: this endpoint issues queries per item |
 | `PUT /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Work is proportional to the size of the payload, not constant: this endpoint issues queries per item |
 | `DELETE /api/assets/{asset_id}/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 149ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 149ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 158ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly |
 | `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | UNKNOWN | safe | the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets), so it is fine to render directly |
 | `POST /api/assets/{asset_id}/transform_requests` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/external-ids/resolve` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `GET /api/fetch/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404) |
-| `GET /api/health` | **none** | **none** | 128ms | safe | p95 128ms, index-covered |
-| `GET /api/id_schemes` | bearer | **none** | 104ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly |
+| `GET /api/health` | **none** | **none** | 124ms | safe | p95 124ms, index-covered |
+| `GET /api/id_schemes` | bearer | **none** | 98ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly |
 | `POST /api/id_schemes` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/id_schemes/{scheme_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/id_schemes/{scheme_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
@@ -71,13 +71,13 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 | `GET /api/runner_state/{runner_key}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/runner_state/{runner_key}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `POST /api/scanner_run_summaries` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/search/transcripts` | bearer | offset | 5ms | caution | fine for a search-results panel showing the first few pages (worst-case p95 5ms), and not for anything that scrolls indefinitely: the offset window… |
-| `GET /api/streams` | bearer | keyset | 128ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/search/transcripts` | bearer | offset | 4ms | caution | fine for a search-results panel showing the first few pages (worst-case p95 4ms), and not for anything that scrolls indefinitely: the offset window… |
+| `GET /api/streams` | bearer | keyset | 127ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `GET /api/streams/{stream_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/streams/{stream_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/tags` | bearer | keyset | 131ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/tags` | bearer | keyset | 112ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/tags/{tag_id}` | bearer | **none** | 97ms | safe | p95 97ms, index-covered |
+| `GET /api/tags/{tag_id}` | bearer | **none** | 98ms | safe | p95 98ms, index-covered |
 | `PATCH /api/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PUT /api/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/tags/{tag_id}/tags` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
@@ -87,16 +87,16 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 | `DELETE /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/title_types/{title_type_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/` | bearer | keyset | 145ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/titles/` | bearer | keyset | 121ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/titles/` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is not index-covered, and it was not timed; see Gaps |
-| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 200ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 200ms, so it is fine to render directly |
+| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 201ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly |
 | `POST /api/titles/{parent_title_id}/contents` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `POST /api/titles/{parent_title_id}/contents/positioned` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}` | bearer | **none** | 102ms | safe | p95 102ms, index-covered |
+| `GET /api/titles/{title_id}` | bearer | **none** | 105ms | safe | p95 105ms, index-covered |
 | `PATCH /api/titles/{title_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PUT /api/titles/{title_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/titles/{title_id}/ids` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
@@ -106,19 +106,19 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 | `GET /api/titles/{title_id}/references` | bearer | **none** | UNKNOWN | safe | the collection is bounded in practice at 0 rows (at most all 0 rows of `title_references`), so it is fine to render directly |
 | `POST /api/titles/{title_id}/references` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PATCH /api/titles/{title_id}/references/{reference_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}/tags` | bearer | **none** | 120ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 120ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/tags` | bearer | **none** | 139ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 139ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | caution | Work is proportional to the size of the payload, not constant: this endpoint issues queries per item |
 | `PUT /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | caution | Work is proportional to the size of the payload, not constant: this endpoint issues queries per item |
 | `DELETE /api/titles/{title_id}/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/transform_requests` | bearer | keyset | 195ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/transform_requests` | bearer | keyset | 210ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/transform_requests/claim` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/transform_requests/{request_id}` | bearer | **none** | 111ms | safe | p95 111ms, index-covered |
+| `GET /api/transform_requests/{request_id}` | bearer | **none** | 112ms | safe | p95 112ms, index-covered |
 | `PATCH /api/transform_requests/{request_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `PATCH /api/transform_requests/{request_id}/heartbeat` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `POST /api/transform_requests/{request_id}/link` | bearer | — | UNKNOWN | write | Single-row write with no loops |
 | `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
 | `PATCH /api/transform_requests/{request_id}/retry` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/version` | **none** | **none** | 9ms | safe | p95 9ms, index-covered |
+| `GET /api/version` | **none** | **none** | 10ms | safe | p95 10ms, index-covered |
 
 ## Endpoints
 
@@ -186,22 +186,22 @@ Own probe responses carried 10 to 500 items; the largest was 199.0KB (`assets-ma
 
 #### Measured
 
-- `assets-page-1` (`/api/assets/?limit=50`): p50 143ms · p95 157ms · 19.0KB · 50 items · n=7 — default first page a browse screen would issue
-- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 175ms · p95 189ms · 19.0KB · 50 items · n=7 — same page with every optional relation eager-loaded
-- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 136ms · p95 140ms · 3.8KB · 10 items · n=7 — N+1 scaling, 10 rows
-- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 167ms · p95 187ms · 78.8KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
-- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 243ms · p95 279ms · 199.0KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
-- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 251ms · p95 320ms · 199.0KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
-- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 238ms · p95 263ms · 197.6KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
-- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 144ms · p95 156ms · 19.0KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction
-- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 141ms · p95 149ms · 17.9KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
+- `assets-page-1` (`/api/assets/?limit=50`): p50 146ms · p95 152ms · 19.0KB · 50 items · n=7 — default first page a browse screen would issue
+- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 184ms · p95 188ms · 19.0KB · 50 items · n=7 — same page with every optional relation eager-loaded
+- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 130ms · p95 150ms · 3.8KB · 10 items · n=7 — N+1 scaling, 10 rows
+- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 164ms · p95 169ms · 78.8KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
+- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 254ms · p95 262ms · 199.0KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
+- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 255ms · p95 336ms · 199.0KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
+- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 246ms · p95 254ms · 197.6KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
+- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 144ms · p95 150ms · 19.0KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction
+- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 138ms · p95 144ms · 17.9KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
   - deep page reached by following 40 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
 
 #### Risk
 
 - unindexed sort keys (`created_at`, `duration`, `filename`, `mtime`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,329 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 - filters that cannot use an index (`created_since`, `duration_max`, `duration_min`, `filename_ext`, `path_part`, `path_prefix`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,329 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
-- measured p95 of 320ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke
+- measured p95 of 336ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke
 - the trailing slash is required; requesting it without one gets a 307, which a cross-origin fetch with credentials will not always follow
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`
 
@@ -253,7 +253,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/assets/{asset_id}
 
-> **SAFE** — p95 130ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 127ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -291,7 +291,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `asset-detail` (`/api/assets/1065`): p50 124ms · p95 130ms · 358B · n=7
+- `asset-detail` (`/api/assets/1065`): p50 119ms · p95 127ms · 358B · n=7
 
 #### Risk
 
@@ -442,7 +442,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/assets/{asset_id}/ids
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 100ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -477,7 +477,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`)
 
 #### Measured
 
-- `asset-external-ids` (`/api/assets/1065/ids`): p50 99ms · p95 104ms · 2B · 0 items · n=7
+- `asset-external-ids` (`/api/assets/1065/ids`): p50 93ms · p95 100ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -489,7 +489,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`)
 
 ### GET /api/assets/{asset_id}/metadata
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -525,7 +525,7 @@ Own probe responses carried 1 item(s); the largest was 2.9KB (`asset-metadata`).
 
 #### Measured
 
-- `asset-metadata` (`/api/assets/1065/metadata`): p50 151ms · p95 162ms · 2.9KB · 1 items · n=7
+- `asset-metadata` (`/api/assets/1065/metadata`): p50 155ms · p95 164ms · 2.9KB · 1 items · n=7
 
 #### Risk
 
@@ -579,7 +579,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/streams
 
-> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -616,7 +616,7 @@ Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 #### Measured
 
-- `asset-streams` (`/api/assets/1065/streams`): p50 157ms · p95 158ms · 699B · 3 items · n=7
+- `asset-streams` (`/api/assets/1065/streams`): p50 148ms · p95 157ms · 699B · 3 items · n=7
 
 #### Risk
 
@@ -626,7 +626,7 @@ Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 ### GET /api/assets/{asset_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -662,7 +662,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-tags`).
 
 #### Measured
 
-- `asset-tags` (`/api/assets/1065/tags`): p50 152ms · p95 170ms · 2B · 0 items · n=7
+- `asset-tags` (`/api/assets/1065/tags`): p50 150ms · p95 166ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -776,7 +776,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/assets/{asset_id}/titles
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 149ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -812,7 +812,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-titles`).
 
 #### Measured
 
-- `asset-titles` (`/api/assets/1065/titles`): p50 145ms · p95 149ms · 2B · 0 items · n=7
+- `asset-titles` (`/api/assets/1065/titles`): p50 147ms · p95 158ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -966,7 +966,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 ### GET /api/health
 
-> **SAFE** — p95 128ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 124ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -987,7 +987,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `health` (`/api/health`): p50 110ms · p95 128ms · 226B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
+- `health` (`/api/health`): p50 118ms · p95 124ms · 226B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
 
 #### Risk
 
@@ -997,7 +997,7 @@ This endpoint reads no database tables.
 
 ### GET /api/id_schemes
 
-> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1024,7 +1024,7 @@ Own probe responses carried 3 item(s); the largest was 182B (`id-schemes-all`).
 
 #### Measured
 
-- `id-schemes-all` (`/api/id_schemes`): p50 92ms · p95 104ms · 182B · 3 items · n=7
+- `id-schemes-all` (`/api/id_schemes`): p50 89ms · p95 98ms · 182B · 3 items · n=7
 
 #### Risk
 
@@ -1260,7 +1260,7 @@ None identified by this run.
 
 ### GET /api/search/transcripts
 
-> **CAUTION** — fine for a search-results panel showing the first few pages (worst-case p95 5ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.
+> **CAUTION** — fine for a search-results panel showing the first few pages (worst-case p95 4ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.
 
 | | |
 |---|---|
@@ -1301,7 +1301,7 @@ This endpoint reads no database tables.
 - `search-transcripts-page-1` (`/api/search/transcripts?offset=0&q=the&size=25`): ERROR — expected status [200], got 503
 - `search-transcripts-deep-page` (`/api/search/transcripts?offset=9975&q=the&size=25`): ERROR — expected status [200], got 503 — last page inside the default 10,000 max_result_window
   - offset=9975 requested directly
-- `search-transcripts-past-window` (`/api/search/transcripts?offset=10000&q=the&size=25`): p50 3ms · p95 5ms · 54B · n=7 — deliberately past max_result_window; records how the failure surfaces
+- `search-transcripts-past-window` (`/api/search/transcripts?offset=10000&q=the&size=25`): p50 2ms · p95 4ms · 54B · n=7 — deliberately past max_result_window; records how the failure surfaces
   - offset=10000 requested directly
   - responded 503; the probe accepted any of [200, 500, 503], so read the status before the timing
 
@@ -1359,9 +1359,9 @@ Own probe responses carried 3 to 500 items; the largest was 120.1KB (`streams-ma
 
 #### Measured
 
-- `streams-page-1` (`/api/streams?limit=50`): p50 100ms · p95 126ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
-- `streams-max-page` (`/api/streams?limit=500`): p50 117ms · p95 128ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
-- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 100ms · p95 105ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
+- `streams-page-1` (`/api/streams?limit=50`): p50 102ms · p95 122ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
+- `streams-max-page` (`/api/streams?limit=500`): p50 119ms · p95 127ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
+- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 95ms · p95 109ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
 
 #### Risk
 
@@ -1456,7 +1456,7 @@ Own probe responses carried 39 item(s); the largest was 7.2KB (`tags-page-1`).
 
 #### Measured
 
-- `tags-page-1` (`/api/tags?limit=50`): p50 106ms · p95 131ms · 7.2KB · 39 items · n=7
+- `tags-page-1` (`/api/tags?limit=50`): p50 105ms · p95 112ms · 7.2KB · 39 items · n=7
 
 #### Risk
 
@@ -1467,7 +1467,7 @@ Own probe responses carried 39 item(s); the largest was 7.2KB (`tags-page-1`).
 
 ### GET /api/tags/{tag_id}
 
-> **SAFE** — p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 98ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1499,7 +1499,7 @@ Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `tag-detail` (`/api/tags/1`): p50 90ms · p95 97ms · 212B · n=7
+- `tag-detail` (`/api/tags/1`): p50 92ms · p95 98ms · 212B · n=7
 
 #### Risk
 
@@ -1687,8 +1687,8 @@ Own probe responses carried 50 item(s); the largest was 37.3KB (`titles-name-sub
 
 #### Measured
 
-- `titles-page-1` (`/api/titles/?limit=50`): p50 116ms · p95 145ms · 35.5KB · 50 items · n=7
-- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 108ms · p95 119ms · 37.3KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
+- `titles-page-1` (`/api/titles/?limit=50`): p50 114ms · p95 121ms · 35.5KB · 50 items · n=7
+- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 109ms · p95 116ms · 37.3KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
 - `titles-deep-page` (`/api/titles/?limit=50`): UNAVAILABLE — the collection ran out after 32 pages of 50, so there is no page 41 to measure on this instance
 
 #### Risk
@@ -1746,7 +1746,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/titles/{parent_title_id}/contents
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 200ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1783,20 +1783,20 @@ Own probe responses carried 1 item(s); the largest was 505B (`title-contents`).
 
 #### Measured
 
-- `title-contents` (`/api/titles/1/contents`): p50 185ms · p95 200ms · 505B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
+- `title-contents` (`/api/titles/1/contents`): p50 181ms · p95 201ms · 505B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
 
 #### Risk
 
 - one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`
 - one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`
 - no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
-- measured p95 of 200ms on `title-contents` is too slow to drive from a keystroke
+- measured p95 of 201ms on `title-contents` is too slow to drive from a keystroke
 
 ---
 
 ### GET /api/titles/{title_id}
 
-> **SAFE** — p95 102ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 105ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1828,7 +1828,7 @@ Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `title-detail` (`/api/titles/1`): p50 92ms · p95 102ms · 601B · n=7
+- `title-detail` (`/api/titles/1`): p50 93ms · p95 105ms · 601B · n=7
 
 #### Risk
 
@@ -1927,7 +1927,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/titles/{title_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 120ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 139ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1963,7 +1963,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-tags`).
 
 #### Measured
 
-- `title-tags` (`/api/titles/1/tags`): p50 114ms · p95 120ms · 2B · 0 items · n=7
+- `title-tags` (`/api/titles/1/tags`): p50 118ms · p95 139ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -2121,18 +2121,19 @@ Own probe responses carried 50 item(s); the largest was 42.5KB (`transform-reque
 
 #### Measured
 
-- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 187ms · p95 195ms · 42.5KB · 50 items · n=7
+- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 180ms · p95 210ms · 42.5KB · 50 items · n=7
 
 #### Risk
 
 - unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,249 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 - filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,249 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- measured p95 of 210ms on `transform-requests-page-1` is too slow to drive from a keystroke
 
 ---
 
 ### GET /api/transform_requests/{request_id}
 
-> **SAFE** — p95 111ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 112ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2164,7 +2165,7 @@ Reads [`media_transform_requests`](#table-media_transform_requests) — see the 
 
 #### Measured
 
-- `transform-request-detail` (`/api/transform_requests/4`): p50 99ms · p95 111ms · 411B · n=7
+- `transform-request-detail` (`/api/transform_requests/4`): p50 96ms · p95 112ms · 411B · n=7
 
 #### Risk
 
@@ -2216,7 +2217,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/version
 
-> **SAFE** — p95 9ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 10ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2233,7 +2234,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `version` (`/api/version`): p50 5ms · p95 9ms · 77B · n=7
+- `version` (`/api/version`): p50 6ms · p95 10ms · 77B · n=7
 
 #### Risk
 
@@ -2621,102 +2622,11 @@ Children per parent:
 
 | Endpoint | Evidence | Tests referencing it |
 |---|---|---|
-| `GET /api/assets/` | weak: no reference found | none |
-| `POST /api/assets/` | weak: no reference found | none |
-| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | weak: no reference found | none |
-| `PATCH /api/assets/seen` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}` | weak: no reference found | none |
-| `PATCH /api/assets/{asset_id}` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/accessories` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/derived_assets` | weak: no reference found | none |
-| `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/ids` | weak: no reference found | none |
-| `POST /api/assets/{asset_id}/ids` | weak: no reference found | none |
-| `DELETE /api/assets/{asset_id}/ids/{record_id}` | weak: no reference found | none |
-| `PATCH /api/assets/{asset_id}/ids/{record_id}` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/metadata` | weak: no reference found | none |
-| `POST /api/assets/{asset_id}/metadata` | weak: no reference found | none |
-| `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | weak: no reference found | none |
-| `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | weak: no reference found | none |
-| `DELETE /api/assets/{asset_id}/streams` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/streams` | weak: no reference found | none |
-| `POST /api/assets/{asset_id}/streams` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/tags` | weak: no reference found | none |
-| `POST /api/assets/{asset_id}/tags` | weak: no reference found | none |
-| `PUT /api/assets/{asset_id}/tags` | weak: no reference found | none |
-| `DELETE /api/assets/{asset_id}/tags/{tag_id}` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/titles` | weak: no reference found | none |
-| `GET /api/assets/{asset_id}/transform_requests` | weak: no reference found | none |
-| `POST /api/assets/{asset_id}/transform_requests` | weak: no reference found | none |
-| `GET /api/external-ids/resolve` | weak: no reference found | none |
-| `GET /api/fetch/{asset_id}` | weak: no reference found | none |
-| `GET /api/health` | weak: no reference found | none |
-| `GET /api/id_schemes` | weak: no reference found | none |
-| `POST /api/id_schemes` | weak: no reference found | none |
-| `GET /api/id_schemes/{scheme_id}` | weak: no reference found | none |
-| `PATCH /api/id_schemes/{scheme_id}` | weak: no reference found | none |
-| `DELETE /api/inbox` | weak: no reference found | none |
-| `GET /api/inbox` | weak: no reference found | none |
-| `POST /api/inbox` | weak: no reference found | none |
 | `POST /api/jobs` | weak: no reference found | none |
 | `PATCH /api/jobs/{job_key}/completed` | weak: no reference found | none |
 | `PUT /api/jobs/{job_key}/heartbeat` | weak: no reference found | none |
 | `POST /api/log` | weak: no reference found | none |
-| `GET /api/ping` | weak: no reference found | none |
-| `POST /api/run_summaries` | weak: no reference found | none |
-| `POST /api/runner_state` | weak: no reference found | none |
-| `GET /api/runner_state/{runner_key}` | weak: no reference found | none |
-| `PATCH /api/runner_state/{runner_key}` | weak: no reference found | none |
-| `POST /api/scanner_run_summaries` | weak: no reference found | none |
-| `GET /api/search/transcripts` | weak: no reference found | none |
-| `GET /api/streams` | weak: no reference found | none |
-| `GET /api/streams/{stream_id}` | weak: no reference found | none |
-| `PATCH /api/streams/{stream_id}` | weak: no reference found | none |
-| `GET /api/tags` | weak: no reference found | none |
-| `POST /api/tags` | weak: no reference found | none |
-| `GET /api/tags/{tag_id}` | weak: no reference found | none |
-| `PATCH /api/tags/{tag_id}` | weak: no reference found | none |
-| `PUT /api/tags/{tag_id}` | weak: no reference found | none |
-| `GET /api/tags/{tag_id}/tags` | weak: no reference found | none |
-| `POST /api/tags/{tag_id}/tags` | weak: no reference found | none |
-| `GET /api/title_types` | weak: no reference found | none |
-| `POST /api/title_types` | weak: no reference found | none |
-| `DELETE /api/title_types/{title_type_id}` | weak: no reference found | none |
-| `GET /api/title_types/{title_type_id}` | weak: no reference found | none |
-| `PATCH /api/title_types/{title_type_id}` | weak: no reference found | none |
-| `GET /api/titles/` | weak: no reference found | none |
-| `POST /api/titles/` | weak: no reference found | none |
 | `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | weak: no reference found | none |
-| `GET /api/titles/{parent_title_id}/contents` | weak: no reference found | none |
-| `POST /api/titles/{parent_title_id}/contents` | weak: no reference found | none |
-| `POST /api/titles/{parent_title_id}/contents/positioned` | weak: no reference found | none |
-| `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | weak: no reference found | none |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | weak: no reference found | none |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | weak: no reference found | none |
-| `GET /api/titles/{title_id}` | weak: no reference found | none |
-| `PATCH /api/titles/{title_id}` | weak: no reference found | none |
-| `PUT /api/titles/{title_id}` | weak: no reference found | none |
-| `GET /api/titles/{title_id}/ids` | weak: no reference found | none |
-| `POST /api/titles/{title_id}/ids` | weak: no reference found | none |
-| `DELETE /api/titles/{title_id}/ids/{record_id}` | weak: no reference found | none |
-| `PATCH /api/titles/{title_id}/ids/{record_id}` | weak: no reference found | none |
-| `GET /api/titles/{title_id}/references` | weak: no reference found | none |
-| `POST /api/titles/{title_id}/references` | weak: no reference found | none |
-| `PATCH /api/titles/{title_id}/references/{reference_id}` | weak: no reference found | none |
-| `GET /api/titles/{title_id}/tags` | weak: no reference found | none |
-| `POST /api/titles/{title_id}/tags` | weak: no reference found | none |
-| `PUT /api/titles/{title_id}/tags` | weak: no reference found | none |
-| `DELETE /api/titles/{title_id}/tags/{tag_id}` | weak: no reference found | none |
-| `GET /api/transform_requests` | weak: no reference found | none |
-| `POST /api/transform_requests/claim` | weak: no reference found | none |
-| `GET /api/transform_requests/{request_id}` | weak: no reference found | none |
-| `PATCH /api/transform_requests/{request_id}` | weak: no reference found | none |
-| `PATCH /api/transform_requests/{request_id}/heartbeat` | weak: no reference found | none |
-| `POST /api/transform_requests/{request_id}/link` | weak: no reference found | none |
-| `GET /api/transform_requests/{request_id}/logs` | weak: no reference found | none |
-| `PATCH /api/transform_requests/{request_id}/retry` | weak: no reference found | none |
-| `GET /api/version` | weak: no reference found | none |
 
 Nothing has been deleted. This is a list of questions, not actions.
 

@@ -91,7 +91,12 @@ def _search_root(root: Path) -> list[Path]:
     for path in root.rglob("*"):
         if not path.is_file() or path.suffix not in _SOURCE_SUFFIXES:
             continue
-        if any(part in _SKIP_DIRECTORIES for part in path.parts):
+        # Judged against the path *below* the search root. Matching the absolute
+        # parts makes the scan depend on where the checkout happens to sit: a
+        # repository inside a directory named `.claude`, `build` or `coverage`
+        # then matches nothing at all, and every endpoint reports as
+        # unreferenced -- a whole API surface presented as dead code.
+        if any(part in _SKIP_DIRECTORIES for part in path.relative_to(root).parts):
             continue
         out.append(path)
     return sorted(out)

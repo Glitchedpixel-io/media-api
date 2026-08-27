@@ -1,7 +1,7 @@
 {
   "app_version": "1.6.2.dev6+gee853b72c",
   "data_shape": {
-    "baseline_rtt_ms": 25.94,
+    "baseline_rtt_ms": 25.54,
     "captured_from": "read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)",
     "collections": [
       {
@@ -1839,10 +1839,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 156.6,
-            "min_ms": 134.8,
-            "p50_ms": 143.2,
-            "p95_ms": 156.6,
+            "max_ms": 152.3,
+            "min_ms": 133.9,
+            "p50_ms": 145.5,
+            "p95_ms": 152.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1862,10 +1862,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 189.2,
-            "min_ms": 168.5,
-            "p50_ms": 174.9,
-            "p95_ms": 189.2,
+            "max_ms": 188.3,
+            "min_ms": 179.9,
+            "p50_ms": 183.5,
+            "p95_ms": 188.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1885,10 +1885,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 140.5,
-            "min_ms": 124.8,
-            "p50_ms": 135.8,
-            "p95_ms": 140.5,
+            "max_ms": 149.6,
+            "min_ms": 121.0,
+            "p50_ms": 130.1,
+            "p95_ms": 149.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1908,10 +1908,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 187.1,
-            "min_ms": 151.6,
-            "p50_ms": 167.3,
-            "p95_ms": 187.1,
+            "max_ms": 169.3,
+            "min_ms": 156.9,
+            "p50_ms": 163.8,
+            "p95_ms": 169.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1931,10 +1931,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 279.1,
-            "min_ms": 233.4,
-            "p50_ms": 243.1,
-            "p95_ms": 279.1,
+            "max_ms": 262.5,
+            "min_ms": 237.7,
+            "p50_ms": 254.0,
+            "p95_ms": 262.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1954,10 +1954,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 319.7,
-            "min_ms": 238.4,
-            "p50_ms": 251.2,
-            "p95_ms": 319.7,
+            "max_ms": 336.4,
+            "min_ms": 233.4,
+            "p50_ms": 254.6,
+            "p95_ms": 336.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1977,10 +1977,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 262.6,
-            "min_ms": 220.1,
-            "p50_ms": 237.8,
-            "p95_ms": 262.6,
+            "max_ms": 254.2,
+            "min_ms": 239.3,
+            "p50_ms": 246.4,
+            "p95_ms": 254.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2000,10 +2000,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 156.4,
-            "min_ms": 133.5,
-            "p50_ms": 143.5,
-            "p95_ms": 156.4,
+            "max_ms": 149.6,
+            "min_ms": 136.1,
+            "p50_ms": 143.7,
+            "p95_ms": 149.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2024,10 +2024,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 149.3,
-            "min_ms": 140.2,
-            "p50_ms": 141.1,
-            "p95_ms": 149.3,
+            "max_ms": 143.5,
+            "min_ms": 137.2,
+            "p50_ms": 138.4,
+            "p95_ms": 143.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2038,7 +2038,7 @@
       "risks": [
         "unindexed sort keys (`created_at`, `duration`, `filename`, `mtime`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,329 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
         "filters that cannot use an index (`created_since`, `duration_max`, `duration_min`, `filename_ext`, `path_part`, `path_prefix`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,329 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 320ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke",
+        "measured p95 of 336ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke",
         "the trailing slash is required; requesting it without one gets a 307, which a cross-origin fetch with credentials will not always follow",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
@@ -2312,9 +2312,24 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/__init__.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/api/assets/test_files.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/api/assets/test_streams.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
@@ -2518,9 +2533,25 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/__init__.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/api/assets/test_files.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/api/assets/test_streams.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/services/test_media_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -2721,9 +2752,13 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/by-scheme/{scheme_id}/{external_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/services/test_media_service.py"
+        ]
       },
       "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -2857,9 +2892,14 @@
         "callers": [],
         "endpoint_key": "PATCH /api/assets/seen",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_media_repository_contract.py",
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/services/test_media_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -2927,10 +2967,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 129.7,
-            "min_ms": 120.6,
-            "p50_ms": 123.6,
-            "p95_ms": 129.7,
+            "max_ms": 127.4,
+            "min_ms": 116.0,
+            "p50_ms": 118.9,
+            "p95_ms": 127.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3091,11 +3131,28 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/__init__.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/api/assets/test_files.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/api/assets/test_streams.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/api/test_file_stream_router.py",
+          "tests/unit/services/test_file_stream_service.py",
+          "tests/unit/services/test_media_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "p95 130ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 127ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -3378,9 +3435,24 @@
         "callers": [],
         "endpoint_key": "PATCH /api/assets/{asset_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/__init__.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/api/assets/test_files.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/api/assets/test_streams.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/services/test_media_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
       "verdict_class": "caution"
@@ -3537,9 +3609,12 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/accessories",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_files.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -3753,9 +3828,14 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/derived_assets",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_media_repository_contract.py",
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/services/test_media_service.py"
+        ]
       },
       "verdict": "the collection is bounded in practice at 4 rows (assets.master_asset_id -> assets), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
@@ -3995,9 +4075,13 @@
         "callers": [],
         "endpoint_key": "PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_relationships.py",
+          "tests/unit/services/test_media_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -4093,10 +4177,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 104.3,
-            "min_ms": 87.6,
-            "p50_ms": 99.3,
-            "p95_ms": 104.3,
+            "max_ms": 99.6,
+            "min_ms": 88.3,
+            "p50_ms": 92.6,
+            "p95_ms": 99.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4217,11 +4301,15 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/ids",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 100ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -4434,9 +4522,13 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/{asset_id}/ids",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -4599,9 +4691,11 @@
         "callers": [],
         "endpoint_key": "DELETE /api/assets/{asset_id}/ids/{record_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_id_schemes_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -4811,9 +4905,11 @@
         "callers": [],
         "endpoint_key": "PATCH /api/assets/{asset_id}/ids/{record_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_id_schemes_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -4894,10 +4990,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 162.2,
-            "min_ms": 145.2,
-            "p50_ms": 151.2,
-            "p95_ms": 162.2,
+            "max_ms": 164.2,
+            "min_ms": 147.7,
+            "p50_ms": 154.6,
+            "p95_ms": 164.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5010,11 +5106,13 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/metadata",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -5214,9 +5312,11 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/{asset_id}/metadata",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -5392,9 +5492,11 @@
         "callers": [],
         "endpoint_key": "DELETE /api/assets/{asset_id}/metadata/{metadata_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -5565,9 +5667,12 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/metadata/{metadata_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/services/test_metadata_service.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -5790,9 +5895,11 @@
         "callers": [],
         "endpoint_key": "PATCH /api/assets/{asset_id}/metadata/{metadata_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -5947,9 +6054,14 @@
         "callers": [],
         "endpoint_key": "DELETE /api/assets/{asset_id}/streams",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_stream_repository_contract.py",
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_streams.py",
+          "tests/unit/services/test_stream_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -6040,10 +6152,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 158.3,
-            "min_ms": 136.6,
-            "p50_ms": 156.8,
-            "p95_ms": 158.3,
+            "max_ms": 156.6,
+            "min_ms": 143.7,
+            "p50_ms": 147.7,
+            "p95_ms": 156.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6204,11 +6316,14 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/streams",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_streams.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6443,9 +6558,12 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/{asset_id}/streams",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_streams.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -6541,10 +6659,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 170.0,
-            "min_ms": 143.4,
-            "p50_ms": 152.4,
-            "p95_ms": 170.0,
+            "max_ms": 165.9,
+            "min_ms": 141.2,
+            "p50_ms": 150.2,
+            "p95_ms": 165.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6664,11 +6782,15 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7020,9 +7142,13 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/{asset_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
       "verdict_class": "caution"
@@ -7281,9 +7407,13 @@
         "callers": [],
         "endpoint_key": "PUT /api/assets/{asset_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
       "verdict_class": "caution"
@@ -7456,9 +7586,14 @@
         "callers": [],
         "endpoint_key": "DELETE /api/assets/{asset_id}/tags/{tag_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_tag_repository_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/assets/test_tags.py",
+          "tests/unit/services/test_tag_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -7540,10 +7675,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 149.3,
-            "min_ms": 138.5,
-            "p50_ms": 145.4,
-            "p95_ms": 149.3,
+            "max_ms": 157.6,
+            "min_ms": 135.1,
+            "p50_ms": 146.6,
+            "p95_ms": 157.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -7669,11 +7804,15 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/titles",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/assets/test_core.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 149ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7922,9 +8061,13 @@
         "callers": [],
         "endpoint_key": "GET /api/assets/{asset_id}/transform_requests",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/unit/api/assets/test_transform_requests.py"
+        ]
       },
       "verdict": "the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
@@ -8179,9 +8322,14 @@
         "callers": [],
         "endpoint_key": "POST /api/assets/{asset_id}/transform_requests",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_inbox_api.py",
+          "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/services/test_transform_request_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -8348,9 +8496,11 @@
         "callers": [],
         "endpoint_key": "GET /api/external-ids/resolve",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -8550,9 +8700,11 @@
         "callers": [],
         "endpoint_key": "GET /api/fetch/{asset_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_file_stream_router.py"
+        ]
       },
       "verdict": "streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404). Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.",
       "verdict_class": "unknown"
@@ -8607,10 +8759,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 128.0,
-            "min_ms": 102.9,
-            "p50_ms": 110.0,
-            "p95_ms": 128.0,
+            "max_ms": 123.8,
+            "min_ms": 102.8,
+            "p50_ms": 117.7,
+            "p95_ms": 123.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8650,11 +8802,13 @@
         "callers": [],
         "endpoint_key": "GET /api/health",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "p95 128ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 124ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -8709,10 +8863,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 104.2,
-            "min_ms": 85.0,
-            "p50_ms": 91.7,
-            "p95_ms": 104.2,
+            "max_ms": 98.2,
+            "min_ms": 83.5,
+            "p50_ms": 89.2,
+            "p95_ms": 98.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8780,11 +8934,16 @@
         "callers": [],
         "endpoint_key": "GET /api/id_schemes",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/unit/api/test_id_schemes.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -8942,9 +9101,14 @@
         "callers": [],
         "endpoint_key": "POST /api/id_schemes",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/unit/api/test_id_schemes.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -9081,9 +9245,12 @@
         "callers": [],
         "endpoint_key": "GET /api/id_schemes/{scheme_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/unit/api/test_id_schemes.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -9260,9 +9427,12 @@
         "callers": [],
         "endpoint_key": "PATCH /api/id_schemes/{scheme_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_id_schemes_api.py",
+          "tests/unit/api/test_id_schemes.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -9365,9 +9535,12 @@
         "callers": [],
         "endpoint_key": "DELETE /api/inbox",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_inbox_api.py",
+          "tests/unit/api/test_inbox.py"
+        ]
       },
       "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
       "verdict_class": "caution"
@@ -9470,9 +9643,13 @@
         "callers": [],
         "endpoint_key": "GET /api/inbox",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_inbox_api.py",
+          "tests/unit/api/test_inbox.py",
+          "tests/unit/services/test_inbox_service.py"
+        ]
       },
       "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
       "verdict_class": "unknown"
@@ -9715,9 +9892,12 @@
         "callers": [],
         "endpoint_key": "POST /api/inbox",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_inbox_api.py",
+          "tests/unit/api/test_inbox.py"
+        ]
       },
       "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
       "verdict_class": "caution"
@@ -10312,7 +10492,7 @@
           "status": "ok",
           "timing": {
             "max_ms": 2.0,
-            "min_ms": 1.5,
+            "min_ms": 1.3,
             "p50_ms": 1.6,
             "p95_ms": 2.0,
             "runs": 7,
@@ -10354,9 +10534,11 @@
         "callers": [],
         "endpoint_key": "GET /api/ping",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "p95 2ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
@@ -10557,9 +10739,12 @@
         "callers": [],
         "endpoint_key": "POST /api/run_summaries",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_run_summaries.py",
+          "tests/unit/services/test_run_summary_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -10712,9 +10897,14 @@
         "callers": [],
         "endpoint_key": "POST /api/runner_state",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_runner_state_api.py",
+          "tests/unit/api/test_runner_state.py",
+          "tests/unit/services/test_runner_state_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -10844,9 +11034,15 @@
         "callers": [],
         "endpoint_key": "GET /api/runner_state/{runner_key}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_runner_state_repository_contract.py",
+          "tests/integration/api/test_runner_state_api.py",
+          "tests/unit/api/test_runner_state.py",
+          "tests/unit/services/test_runner_state_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -11025,9 +11221,14 @@
         "callers": [],
         "endpoint_key": "PATCH /api/runner_state/{runner_key}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_runner_state_api.py",
+          "tests/unit/api/test_runner_state.py",
+          "tests/unit/services/test_runner_state_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -11276,9 +11477,12 @@
         "callers": [],
         "endpoint_key": "POST /api/scanner_run_summaries",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_scanner_run_summaries.py",
+          "tests/unit/services/test_run_summary_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -11419,10 +11623,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 4.9,
+            "max_ms": 4.0,
             "min_ms": 2.5,
-            "p50_ms": 3.0,
-            "p95_ms": 4.9,
+            "p50_ms": 2.5,
+            "p95_ms": 4.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11640,11 +11844,13 @@
         "callers": [],
         "endpoint_key": "GET /api/search/transcripts",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_search_transcripts_router.py"
+        ]
       },
-      "verdict": "fine for a search-results panel showing the first few pages (worst-case p95 5ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
+      "verdict": "fine for a search-results panel showing the first few pages (worst-case p95 4ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
       "verdict_class": "caution"
     },
     {
@@ -11758,10 +11964,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 125.8,
-            "min_ms": 95.8,
-            "p50_ms": 99.8,
-            "p95_ms": 125.8,
+            "max_ms": 121.9,
+            "min_ms": 98.4,
+            "p50_ms": 101.5,
+            "p95_ms": 121.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11781,10 +11987,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 127.7,
-            "min_ms": 112.8,
-            "p50_ms": 116.9,
-            "p95_ms": 127.7,
+            "max_ms": 127.1,
+            "min_ms": 114.1,
+            "p50_ms": 119.3,
+            "p95_ms": 127.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11804,10 +12010,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 104.9,
-            "min_ms": 89.2,
-            "p50_ms": 100.1,
-            "p95_ms": 104.9,
+            "max_ms": 109.4,
+            "min_ms": 89.8,
+            "p50_ms": 95.3,
+            "p95_ms": 109.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11998,9 +12204,14 @@
         "callers": [],
         "endpoint_key": "GET /api/streams",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_streams_api.py",
+          "tests/unit/api/test_streams.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
@@ -12196,9 +12407,14 @@
         "callers": [],
         "endpoint_key": "GET /api/streams/{stream_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_streams_api.py",
+          "tests/unit/api/test_streams.py",
+          "tests/unit/services/test_stream_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -12434,9 +12650,14 @@
         "callers": [],
         "endpoint_key": "PATCH /api/streams/{stream_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_streams_api.py",
+          "tests/unit/api/test_streams.py",
+          "tests/unit/services/test_stream_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -12551,10 +12772,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 130.8,
-            "min_ms": 87.8,
-            "p50_ms": 105.8,
-            "p95_ms": 130.8,
+            "max_ms": 111.7,
+            "min_ms": 96.5,
+            "p50_ms": 105.4,
+            "p95_ms": 111.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -12713,9 +12934,15 @@
         "callers": [],
         "endpoint_key": "GET /api/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_tag_repository_contract.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
@@ -12904,9 +13131,15 @@
         "callers": [],
         "endpoint_key": "POST /api/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py",
+          "tests/unit/services/test_tag_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -12963,10 +13196,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 96.9,
-            "min_ms": 83.7,
-            "p50_ms": 89.6,
-            "p95_ms": 96.9,
+            "max_ms": 98.0,
+            "min_ms": 85.4,
+            "p50_ms": 91.6,
+            "p95_ms": 98.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13082,11 +13315,15 @@
         "callers": [],
         "endpoint_key": "GET /api/tags/{tag_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py",
+          "tests/unit/services/test_tag_service.py"
+        ]
       },
-      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 98ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -13287,9 +13524,13 @@
         "callers": [],
         "endpoint_key": "PATCH /api/tags/{tag_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py",
+          "tests/unit/services/test_tag_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -13492,9 +13733,12 @@
         "callers": [],
         "endpoint_key": "PUT /api/tags/{tag_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -13766,9 +14010,12 @@
         "callers": [],
         "endpoint_key": "GET /api/tags/{tag_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py"
+        ]
       },
       "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
       "verdict_class": "unknown"
@@ -13974,9 +14221,12 @@
         "callers": [],
         "endpoint_key": "POST /api/tags/{tag_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/test_tags.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -14082,9 +14332,11 @@
         "callers": [],
         "endpoint_key": "GET /api/title_types",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_types_api.py"
+        ]
       },
       "verdict": "the collection is bounded in practice at 8 rows (all 8 rows of `title_types`), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
@@ -14244,9 +14496,12 @@
         "callers": [],
         "endpoint_key": "POST /api/title_types",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_types_api.py",
+          "tests/unit/services/test_title_type_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -14424,9 +14679,12 @@
         "callers": [],
         "endpoint_key": "DELETE /api/title_types/{title_type_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_types_api.py",
+          "tests/unit/services/test_title_type_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -14563,9 +14821,12 @@
         "callers": [],
         "endpoint_key": "GET /api/title_types/{title_type_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_types_api.py",
+          "tests/unit/services/test_title_type_service.py"
+        ]
       },
       "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
@@ -14742,9 +15003,12 @@
         "callers": [],
         "endpoint_key": "PATCH /api/title_types/{title_type_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_types_api.py",
+          "tests/unit/services/test_title_type_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -14847,10 +15111,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 144.7,
-            "min_ms": 104.6,
-            "p50_ms": 116.0,
-            "p95_ms": 144.7,
+            "max_ms": 120.9,
+            "min_ms": 110.5,
+            "p50_ms": 113.8,
+            "p95_ms": 120.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14870,10 +15134,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 118.9,
-            "min_ms": 105.0,
-            "p50_ms": 107.6,
-            "p95_ms": 118.9,
+            "max_ms": 115.8,
+            "min_ms": 101.8,
+            "p50_ms": 108.7,
+            "p95_ms": 115.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15047,9 +15311,22 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_title_types_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/__init__.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/api/titles/test_core.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
@@ -15240,9 +15517,24 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_title_types_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/__init__.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/api/titles/test_core.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/services/test_title_service.py",
+          "tests/unit/services/test_title_type_resolution.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -15529,10 +15821,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 200.2,
-            "min_ms": 171.2,
-            "p50_ms": 185.4,
-            "p95_ms": 200.2,
+            "max_ms": 200.9,
+            "min_ms": 169.8,
+            "p50_ms": 181.0,
+            "p95_ms": 200.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15544,7 +15836,7 @@
         "one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`",
         "one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`",
         "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent",
-        "measured p95 of 200ms on `title-contents` is too slow to drive from a keystroke"
+        "measured p95 of 201ms on `title-contents` is too slow to drive from a keystroke"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -15665,11 +15957,15 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/{parent_title_id}/contents",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/test_contents.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 200ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -16011,9 +16307,13 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/{parent_title_id}/contents",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/test_contents.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -16384,9 +16684,12 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/{parent_title_id}/contents/positioned",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/unit/api/titles/test_contents.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -16549,9 +16852,14 @@
         "callers": [],
         "endpoint_key": "DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_title_content_repository_contract.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/services/test_title_content_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -16754,9 +17062,13 @@
         "callers": [],
         "endpoint_key": "PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/services/test_title_content_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -17127,9 +17439,11 @@
         "callers": [],
         "endpoint_key": "PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/titles/test_contents.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -17186,10 +17500,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 102.1,
-            "min_ms": 89.0,
-            "p50_ms": 92.5,
-            "p95_ms": 102.1,
+            "max_ms": 105.2,
+            "min_ms": 83.9,
+            "p50_ms": 93.0,
+            "p95_ms": 105.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17293,11 +17607,24 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/{title_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_title_types_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/__init__.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/api/titles/test_core.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/services/test_title_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "p95 102ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 105ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -17509,9 +17836,23 @@
         "callers": [],
         "endpoint_key": "PATCH /api/titles/{title_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_title_types_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/__init__.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/api/titles/test_core.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/services/test_title_service.py",
+          "tests/unit/services/test_title_type_resolution.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -17725,9 +18066,21 @@
         "callers": [],
         "endpoint_key": "PUT /api/titles/{title_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/integration/api/test_title_contents_api.py",
+          "tests/integration/api/test_title_types_api.py",
+          "tests/integration/api/test_titles_api.py",
+          "tests/unit/api/titles/__init__.py",
+          "tests/unit/api/titles/test_contents.py",
+          "tests/unit/api/titles/test_core.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -17924,9 +18277,11 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/{title_id}/ids",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py"
+        ]
       },
       "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
       "verdict_class": "unknown"
@@ -18140,9 +18495,11 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/{title_id}/ids",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -18304,9 +18661,11 @@
         "callers": [],
         "endpoint_key": "DELETE /api/titles/{title_id}/ids/{record_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -18515,9 +18874,11 @@
         "callers": [],
         "endpoint_key": "PATCH /api/titles/{title_id}/ids/{record_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_external_identifiers_api.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -18685,9 +19046,14 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/{title_id}/references",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_title_reference_repository_contract.py",
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/services/test_title_reference_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the collection is bounded in practice at 0 rows (at most all 0 rows of `title_references`), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
@@ -18869,9 +19235,12 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/{title_id}/references",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -19062,9 +19431,12 @@
         "callers": [],
         "endpoint_key": "PATCH /api/titles/{title_id}/references/{reference_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/titles/test_references.py",
+          "tests/unit/services/test_title_reference_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -19160,10 +19532,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 120.3,
-            "min_ms": 111.7,
-            "p50_ms": 114.5,
-            "p95_ms": 120.3,
+            "max_ms": 139.1,
+            "min_ms": 115.9,
+            "p50_ms": 118.3,
+            "p95_ms": 139.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -19282,11 +19654,14 @@
         "callers": [],
         "endpoint_key": "GET /api/titles/{title_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/titles/test_tags.py"
+        ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 120ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 139ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -19637,9 +20012,12 @@
         "callers": [],
         "endpoint_key": "POST /api/titles/{title_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/titles/test_tags.py"
+        ]
       },
       "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
       "verdict_class": "caution"
@@ -19897,9 +20275,12 @@
         "callers": [],
         "endpoint_key": "PUT /api/titles/{title_id}/tags",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/titles/test_tags.py"
+        ]
       },
       "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
       "verdict_class": "caution"
@@ -20071,9 +20452,14 @@
         "callers": [],
         "endpoint_key": "DELETE /api/titles/{title_id}/tags/{tag_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/contracts/repositories/test_tag_repository_contract.py",
+          "tests/integration/api/test_tags_api.py",
+          "tests/unit/api/titles/test_tags.py",
+          "tests/unit/services/test_tag_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -20206,10 +20592,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 195.2,
-            "min_ms": 177.6,
-            "p50_ms": 186.9,
-            "p95_ms": 195.2,
+            "max_ms": 210.1,
+            "min_ms": 170.6,
+            "p50_ms": 180.1,
+            "p95_ms": 210.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20219,7 +20605,8 @@
       ],
       "risks": [
         "unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,249 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,249 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
+        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,249 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "measured p95 of 210ms on `transform-requests-page-1` is too slow to drive from a keystroke"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -20454,9 +20841,15 @@
         "callers": [],
         "endpoint_key": "GET /api/transform_requests",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_pagination_contract.py",
+          "tests/integration/api/test_transform_requests_api.py",
+          "tests/unit/api/test_transform_requests.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
@@ -20738,9 +21131,12 @@
         "callers": [],
         "endpoint_key": "POST /api/transform_requests/claim",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_transform_requests_api.py",
+          "tests/unit/api/test_transform_requests.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -20797,10 +21193,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 110.6,
-            "min_ms": 88.8,
-            "p50_ms": 99.3,
-            "p95_ms": 110.6,
+            "max_ms": 111.5,
+            "min_ms": 88.1,
+            "p50_ms": 95.8,
+            "p95_ms": 111.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20976,11 +21372,17 @@
         "callers": [],
         "endpoint_key": "GET /api/transform_requests/{request_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_transform_requests_api.py",
+          "tests/unit/api/test_transform_requests.py",
+          "tests/unit/services/test_transform_request_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "p95 111ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 112ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -21241,9 +21643,15 @@
         "callers": [],
         "endpoint_key": "PATCH /api/transform_requests/{request_id}",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/integration/api/test_transform_requests_api.py",
+          "tests/unit/api/test_transform_requests.py",
+          "tests/unit/services/test_transform_request_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -21392,9 +21800,11 @@
         "callers": [],
         "endpoint_key": "PATCH /api/transform_requests/{request_id}/heartbeat",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_transform_requests.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -21660,9 +22070,12 @@
         "callers": [],
         "endpoint_key": "POST /api/transform_requests/{request_id}/link",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/test_transform_requests.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -21806,9 +22219,13 @@
         "callers": [],
         "endpoint_key": "GET /api/transform_requests/{request_id}/logs",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/api/test_transform_requests.py",
+          "tests/unit/services/test_transform_request_service.py",
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
       "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
       "verdict_class": "unknown"
@@ -22065,9 +22482,13 @@
         "callers": [],
         "endpoint_key": "PATCH /api/transform_requests/{request_id}/retry",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/integration/api/test_assets_api.py",
+          "tests/unit/api/test_transform_requests.py",
+          "tests/unit/services/test_transform_request_service.py"
+        ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
@@ -22109,10 +22530,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 8.6,
-            "min_ms": 3.9,
-            "p50_ms": 5.3,
-            "p95_ms": 8.6,
+            "max_ms": 10.2,
+            "min_ms": 3.8,
+            "p50_ms": 5.7,
+            "p95_ms": 10.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -22152,15 +22573,17 @@
         "callers": [],
         "endpoint_key": "GET /api/version",
         "note": "in-repository evidence only, from tests/ and scripts/. The app tree is excluded: a router declaring its own path says nothing about whether anything calls it. An endpoint called exclusively by an external worker or front end therefore looks unreferenced here.",
-        "referenced": false,
+        "referenced": true,
         "strength": "weak",
-        "test_references": []
+        "test_references": [
+          "tests/unit/tools/test_capability_inventory.py"
+        ]
       },
-      "verdict": "p95 9ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 10ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     }
   ],
-  "generated_from": "capinv-prod-rerun @ app.openapi()",
+  "generated_from": "media-api @ app.openapi()",
   "indexes": [
     {
       "columns": [
