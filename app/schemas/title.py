@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ._dynamic import make_partial_model
+from .artwork import ArtworkRead
 from .mixins import IDMixin
 from .tag import TagRead
 from .title_reference import TitleReferenceRead
@@ -61,6 +62,16 @@ class TitleRead(TitleAttrs, IDMixin):
 
 
 class TitleReadExtended(TitleRead):
+    poster: ArtworkRead | None = Field(
+        None,
+        title="Poster",
+        description=(
+            "The poster to show for this title, resolved from the title's own artwork "
+            "or, failing that, borrowed from the first entry of its contents. Null "
+            "when the title has none and nothing beneath it does either, and also when "
+            "`include=poster` was not requested -- ask for it to tell the two apart."
+        ),
+    )
     tags: list[TagRead] | None = Field(
         None, title="List of tags", description="Tags applied to this title"
     )

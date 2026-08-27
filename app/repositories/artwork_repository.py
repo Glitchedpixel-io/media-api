@@ -1,7 +1,11 @@
 # app/repositories/artwork_repository.py
-from sqlalchemy import func, select
+from collections.abc import Sequence
 
-from app.models import ArtworkKindORM, ArtworkORM
+from sqlalchemy import Integer, Text, func, literal, select
+from sqlalchemy.sql import ColumnElement, Select
+from sqlalchemy.dialects.postgresql import array
+
+from app.models import ArtworkKindORM, ArtworkORM, TitleContentORM, TitleORM
 from app.schemas import (
     ArtworkCreateInternal,
     ArtworkKindCreateInternal,
@@ -15,6 +19,14 @@ from app.schemas.enums import EntityTypeEnum
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import ArtworkKindRepository, ArtworkRepository
+
+#: How far down a title's contents to look for artwork it can borrow.
+#:
+#: Deep enough for the nesting the data actually has -- collection, series, season,
+#: episode is four -- with headroom, and shallow enough that a pathological chain
+#: cannot make a page read expensive. The measured maximum contents list is 35 wide;
+#: depth is the dimension that multiplies.
+MAX_RESOLUTION_DEPTH = 8
 
 
 class SQLAlchemyArtworkKindRepository(SQLAlchemyBaseRepository, ArtworkKindRepository):
@@ -198,6 +210,124 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
             raise NotFoundError
         self.db.delete(orm)
         self._safe_commit()
+
+    def resolve_for_titles(
+        self, title_ids: Sequence[int], kind_id: int, max_depth: int = MAX_RESOLUTION_DEPTH
+    ) -> dict[int, ArtworkRead]:
+        """Resolve each title's artwork of a kind, falling back to its contents.
+
+        A title uses its own primary artwork if it has one. Otherwise it borrows from
+        the first entry of its contents, in ``order_key`` order, recursing into child
+        titles -- so a season with no poster shows its first episode's, and an episode
+        with none shows its asset's. A title with nothing beneath it resolves to
+        nothing, which is the browse grid's placeholder case rather than an error.
+
+        **One query for the whole page**, not one per title. ``GET /api/titles/`` caps
+        at 500 rows, and a resolution walk evaluated per row is #49 again -- a
+        relationship serialised into a list response at one extra SELECT per row, which
+        measured 14.6s at the cap against 263ms without it.
+
+        The walk is over a **DAG, not a tree**: containment nests, and whether cycles
+        are prevented at all is still open (#88). The depth cap alone would not save a
+        cycle -- it would bound the damage, not avoid revisiting -- so the recursive
+        term also carries the set of titles already on its path and refuses to re-enter
+        one. Either guard alone is insufficient; the cap bounds legitimate depth, the
+        path set bounds illegitimate repetition.
+
+        Every containment edge is walked. Once #90 distinguishes intrinsic from curated
+        containment, only intrinsic edges should be followed -- a curated collection
+        borrowing its poster from an unrelated member is probably wrong -- but that
+        distinction does not exist yet, and inventing it here would guess at it.
+
+        Args:
+            title_ids: The titles to resolve for. An empty sequence issues no query.
+            kind_id: The artwork kind to resolve, e.g. the id of ``poster``.
+            max_depth: How many levels of containment to descend.
+
+        Returns:
+            dict[int, ArtworkRead]: Title id -> resolved artwork, omitting titles that
+                resolved to nothing.
+        """
+        if not title_ids:
+            return {}
+
+        # Depth 0: each requested title, standing for itself, so its own artwork wins
+        # before anything beneath it is considered.
+        #
+        # `ord` accumulates the order_key of each edge taken, which is what makes
+        # "the first entry of its contents" mean the same thing at every level. Its
+        # element type carries collation="C" to match `title_contents.order_key`:
+        # that column is deliberately C-collated so LexoRank keys order bytewise, and
+        # a recursive CTE whose seed and recursive terms disagree on collation is
+        # rejected outright by Postgres.
+        seed = select(
+            TitleORM.id.label("root_id"),
+            TitleORM.id.label("title_id"),
+            literal(None, Integer).label("asset_id"),
+            literal(0, Integer).label("depth"),
+            array([], type_=Text(collation="C")).label("ord"),
+            array([TitleORM.id]).label("seen"),
+        ).where(TitleORM.id.in_(title_ids))
+
+        walk = seed.cte("artwork_walk", recursive=True)
+        step = (
+            select(
+                walk.c.root_id,
+                TitleContentORM.child_title_id.label("title_id"),
+                TitleContentORM.asset_id.label("asset_id"),
+                (walk.c.depth + 1).label("depth"),
+                (walk.c.ord + array([TitleContentORM.order_key])).label("ord"),
+                (walk.c.seen + array([TitleContentORM.child_title_id])).label("seen"),
+            )
+            .select_from(walk)
+            .join(TitleContentORM, TitleContentORM.parent_title_id == walk.c.title_id)
+            # Only titles have contents; an asset row is a leaf.
+            .where(walk.c.title_id.isnot(None))
+            .where(walk.c.depth < max_depth)
+            .where(~walk.c.seen.contains(array([TitleContentORM.child_title_id])))
+        )
+        walk = walk.union_all(step)
+
+        # Two index-friendly joins unioned, rather than one join with an OR across
+        # entity_type: an OR cannot use ix_artwork_entity_kind_primary, and this read
+        # exists to be cheap.
+        def _matches(entity_type: EntityTypeEnum, column: ColumnElement[int | None]) -> Select:
+            return (
+                select(
+                    walk.c.root_id,
+                    ArtworkORM.id.label("artwork_id"),
+                    walk.c.depth,
+                    walk.c.ord,
+                )
+                .select_from(walk)
+                .join(
+                    ArtworkORM,
+                    (ArtworkORM.entity_type == entity_type) & (ArtworkORM.entity_id == column),
+                )
+                .where(ArtworkORM.artwork_kind_id == kind_id)
+                .where(ArtworkORM.is_primary.is_(True))
+            )
+
+        matches = (
+            _matches(EntityTypeEnum.title, walk.c.title_id)
+            .union_all(_matches(EntityTypeEnum.asset, walk.c.asset_id))
+            .subquery("artwork_matches")
+        )
+        nearest = (
+            select(matches.c.root_id, matches.c.artwork_id)
+            .distinct(matches.c.root_id)
+            .order_by(matches.c.root_id, matches.c.depth, matches.c.ord)
+            .subquery("artwork_nearest")
+        )
+
+        rows = self.db.execute(
+            select(nearest.c.root_id, ArtworkORM).join(
+                ArtworkORM, ArtworkORM.id == nearest.c.artwork_id
+            )
+        ).all()
+        return {
+            root_id: ArtworkRead.model_validate(orm, from_attributes=True) for root_id, orm in rows
+        }
 
     def count_for_entity(self, entity_type: EntityTypeEnum, entity_id: int) -> int:
         stmt = (
