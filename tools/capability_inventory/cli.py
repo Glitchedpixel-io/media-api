@@ -16,6 +16,7 @@ import argparse
 import fnmatch
 import os
 import sys
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 
@@ -174,6 +175,28 @@ def _repo_root(candidate: Path) -> Path:
             "--repo-root."
         )
     return root
+
+
+def _project_name(root: Path) -> str:
+    """The project's own name, so the report does not depend on its directory.
+
+    Running from a git worktree puts the checkout in a directory named for the
+    branch, which would otherwise change the report's identity line and produce
+    a diff that says nothing about the API.
+
+    Args:
+        root: The validated repository root.
+
+    Returns:
+        The name declared in ``pyproject.toml``, or the directory name if it
+        cannot be read.
+    """
+    try:
+        data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return root.name
+    name = data.get("project", {}).get("name")
+    return str(name).strip() if name else root.name
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -442,7 +465,7 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
     )
 
     return Inventory(
-        generated_from=f"{root.name} @ app.openapi()",
+        generated_from=f"{_project_name(root)} @ app.openapi()",
         app_version=_app_version(),
         phases_run=tuple(phases_run),
         phases_skipped=tuple(phases_skipped),

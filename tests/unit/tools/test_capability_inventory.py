@@ -19,7 +19,16 @@ from typing import Any
 
 import pytest
 
-from tools.capability_inventory import data_shape, load, probes, render, static_surface, verdict
+from tools.capability_inventory import (
+    cli,
+    data_shape,
+    dead_surface,
+    load,
+    probes,
+    render,
+    static_surface,
+    verdict,
+)
 from tools.capability_inventory.annotate import _describe_predicate, _pattern_shape
 from tools.capability_inventory.indexes import IndexLookup
 from tools.capability_inventory.models import (
@@ -406,6 +415,80 @@ def test_an_unresolved_query_variable_reports_unavailable_not_a_crash() -> None:
     assert result.status == "unavailable"
     assert "nope" in (result.reason or "")
     assert result.endpoint_key == "GET /api/streams"
+
+
+# --------------------------------------------------------------------------
+# Usage evidence
+# --------------------------------------------------------------------------
+
+
+def test_skip_list_is_judged_below_the_search_root(tmp_path: Path) -> None:
+    """A checkout living inside a skipped directory must still be scanned.
+
+    `_SKIP_DIRECTORIES` exists to skip vendored trees *within* the scan. Matching
+    it against the absolute path instead made the result depend on where the
+    repository sits on disk: run the harness from `.claude/worktrees/<branch>/`
+    and every file is excluded, the scan finds nothing, and all 96 endpoints are
+    reported as candidates for removal. That is a whole API surface presented as
+    dead code, with no failure anywhere to signal it.
+    """
+    checkout = tmp_path / ".claude" / "worktrees" / "some-branch"
+    (checkout / "tests").mkdir(parents=True)
+    (checkout / "tests" / "test_assets.py").write_text('client.get("/api/assets/")\n')
+    (checkout / "tests" / "node_modules").mkdir()
+    (checkout / "tests" / "node_modules" / "vendored.py").write_text("noise\n")
+
+    found = dead_surface._search_root(checkout / "tests")
+
+    assert [p.name for p in found] == ["test_assets.py"], (
+        "the real file must be found despite `.claude` above the root, and the "
+        "vendored directory below it must still be skipped"
+    )
+
+
+def test_a_referenced_endpoint_is_not_a_removal_candidate(tmp_path: Path) -> None:
+    """End-to-end guard on the regression, through the public entry point."""
+    checkout = tmp_path / ".claude" / "worktrees" / "some-branch"
+    (checkout / "tests").mkdir(parents=True)
+    (checkout / "tests" / "test_assets.py").write_text('client.get("/api/assets/")\n')
+
+    route = RouteSurface(
+        method="GET",
+        path="/api/assets/",
+        operation_id="list_assets",
+        summary=None,
+        tags=(),
+        auth="bearer",
+        handler_module="app.routers.assets",
+        handler_name="list_assets",
+        params=(),
+        request_body=None,
+        responses=(),
+        success_status="200",
+        is_streaming=False,
+        trailing_slash_required=True,
+    )
+    evidence = dead_surface.from_repository((route,), checkout)
+
+    assert evidence["GET /api/assets/"].referenced is True
+    assert evidence["GET /api/assets/"].test_references == ("tests/test_assets.py",)
+
+
+def test_report_identity_comes_from_the_project_not_the_directory(tmp_path: Path) -> None:
+    """Otherwise a worktree run rewrites the identity line for no real reason."""
+    root = tmp_path / "capinv-some-branch"
+    root.mkdir()
+    (root / "pyproject.toml").write_text('[project]\nname = "media-api"\n')
+
+    assert cli._project_name(root) == "media-api"
+
+
+def test_report_identity_falls_back_to_the_directory_name(tmp_path: Path) -> None:
+    root = tmp_path / "fallback-name"
+    root.mkdir()
+    (root / "pyproject.toml").write_text("this is not valid toml =\n")
+
+    assert cli._project_name(root) == "fallback-name"
 
 
 def test_percentiles_are_nearest_rank_over_the_sample() -> None:
