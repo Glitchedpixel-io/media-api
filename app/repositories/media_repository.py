@@ -110,8 +110,8 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
                 stmt = stmt.options(selectinload(AssetORM.tags))
             if "master_asset" in inclusions:
                 stmt = stmt.options(selectinload(AssetORM.master_asset))
-            if "external_ids" in inclusions:
-                stmt = stmt.options(selectinload(AssetORM.external_ids))
+            # external_ids needs no branch here: it is lazy="selectin" on the model, so it
+            # is always eager-loaded. include=external_ids stays accepted and is a no-op.
 
         # Use the cursor to fetch the required page
         cursor = params.after or params.before

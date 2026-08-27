@@ -77,11 +77,15 @@ class AssetORM(Base):
         secondary="asset_tags", back_populates="assets", lazy="noload"
     )
 
+    # Eager by default: AssetReadExtended serialises external_ids unconditionally, so a
+    # lazy load here costs one SELECT per row returned. Unlike tags and master_asset,
+    # this field is not gated behind include=, so there is no request that wants it unloaded.
     external_ids: Mapped[list[ExternalIdentifierORM]] = relationship(
         back_populates="asset",
         primaryjoin="and_(AssetORM.id==foreign(ExternalIdentifierORM.entity_id), ExternalIdentifierORM.entity_type=='asset')",
         cascade="all, delete-orphan",
         viewonly=True,
+        lazy="selectin",
     )
 
     __table_args__ = (
