@@ -184,6 +184,17 @@ probes:
       the filtered read a client actually wants; streams.asset_id is unindexed until #53
       lands, so a slow result here is that index, not the paging
 
+  - name: inbox-full
+    path: /api/inbox
+    note: >-
+      the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is
+      sitting in the inbox at the time, so read it as a sample rather than a ceiling
+
+  - name: inbox-top-level
+    path: /api/inbox
+    query: {depth: 1}
+    note: one level only, the cheapest useful request a client can make
+
   - name: id-schemes-all
     path: /api/id_schemes
 
