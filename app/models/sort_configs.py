@@ -24,12 +24,6 @@ TITLE_SORT = SortConfig(
     # Callers must join TitleORM.type for this to resolve; see
     # SQLAlchemyTitleRepository.list_paged.
     field_overrides={"title_type": TitleTypeORM.code.expression},
-    sentinels={
-        "mtime": {
-            "asc": DT_MAX,
-            "desc": DT_MIN,
-        },
-    },
 )
 
 TAG_SORT = SortConfig(
@@ -40,16 +34,26 @@ TAG_SORT = SortConfig(
         "color",
     },
     id_field="id",
-    sentinels={
-        "mtime": {
-            "asc": DT_MAX,
-            "desc": DT_MIN,
-        },
-    },
 )
 
 ASSET_SORT = SortConfig(
     model=AssetORM,
+    # `mtime` was offered here and is not any more: nothing sorted by it. The front
+    # end lists the other six and defaults to created_at:desc; the runner client
+    # sorts by id. It was also the only key needing NULL sentinels, for the 1% of
+    # rows that have no mtime. `sort=mtime:desc` is now a 422 rather than a scan
+    # nobody asked for.
+    #
+    # Of the rest, `id` and `path` are index-covered, and `created_at` -- the front
+    # end's default -- is served by ix_assets_created_at. `size`, `duration` and
+    # `filename` are deliberately unindexed: measured at 13k rows they cost 1-2ms a
+    # page, at 130k 11-14ms, and at 1.3M 63-89ms. Cheap at today's size, and each
+    # wants an index before `assets` reaches roughly a million rows.
+    #
+    # A single-column index is enough for any of them. The keyset cursor compares
+    # (sort column, id) as a tuple, but measured at 1.3M rows a single-column index
+    # serves that in 0.3ms against 0.6ms for a composite (created_at, id): the
+    # composite is wider and buys nothing.
     allowed_fields={
         "id",
         "created_at",
@@ -57,15 +61,8 @@ ASSET_SORT = SortConfig(
         "filename",
         "path",
         "duration",
-        "mtime",
     },
     id_field="id",
-    sentinels={
-        "mtime": {
-            "asc": DT_MAX,
-            "desc": DT_MIN,
-        },
-    },
 )
 
 STREAM_SORT = SortConfig(

@@ -119,11 +119,14 @@ def test_list_filtered_pagination_and_sort(bundle):
         )
         bundle.tags.add_asset_tags(a.id, [tag.id])
 
-    # First page, mtime-desc, limit=5
-    first = bundle.assets.list_paged(AssetListParams(limit=5, sort="mtime:desc"))
+    # First page, size-desc, limit=5. This used `mtime:desc` until #62 removed mtime
+    # from the asset sort keys; the test is about sorting and page coverage rather
+    # than about that column, and `size` varies across the seeded rows in the same
+    # way, so it exercises the same behaviour.
+    first = bundle.assets.list_paged(AssetListParams(limit=5, sort="size:desc"))
     assert len(first.items) <= 5
-    mtimes = [it.mtime for it in first.items]
-    assert mtimes == sorted(mtimes, reverse=True)
+    sizes = [it.size for it in first.items]
+    assert sizes == sorted(sizes, reverse=True)
 
     # despite having tags, none should be present unless included
     assert all(not item.tags for item in first.items)
@@ -133,8 +136,8 @@ def test_list_filtered_pagination_and_sort(bundle):
 
     assert len(seen) == 20
     # Ensure global non-increasing order across concatenated pages
-    all_mtimes = [it.mtime for it in all_items]
-    assert all_mtimes == sorted(all_mtimes, reverse=True)
+    all_sizes = [it.size for it in all_items]
+    assert all_sizes == sorted(all_sizes, reverse=True)
 
 
 @pytest.mark.contract
