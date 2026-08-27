@@ -1096,3 +1096,89 @@ def test_a_probe_still_outranks_every_inference() -> None:
 
     assert ceiling == 65_739
     assert source == "measured directly from a probe response"
+
+
+def test_variables_resolve_in_dependency_order_not_alphabetical() -> None:
+    """A variable read from an endpoint another variable addresses.
+
+    `metadata_id` comes from `/api/assets/{asset_id}/metadata`. Alphabetical order
+    happens to work for that pair and fails for others -- `external_id` sorts
+    before `title_id` -- so the order has to follow the dependencies.
+    """
+    order = [
+        name
+        for name, _ in probes._resolution_order(
+            {
+                "metadata_id": {"from_endpoint": "/api/assets/{asset_id}/metadata"},
+                "asset_id": {"from_endpoint": "/api/assets/"},
+                "aaa_first_alphabetically": {"from_endpoint": "/api/titles/{title_id}/ids"},
+                "title_id": {"from_endpoint": "/api/titles/"},
+            },
+            [],
+        )
+    ]
+
+    assert order.index("asset_id") < order.index("metadata_id")
+    assert order.index("title_id") < order.index("aaa_first_alphabetically")
+
+
+def test_a_variable_needing_an_undeclared_one_is_reported_not_silently_dropped() -> None:
+    """A gap must name what is missing rather than becoming an unexplained UNKNOWN."""
+    unknowns: list = []
+
+    order = probes._resolution_order(
+        {"metadata_id": {"from_endpoint": "/api/assets/{asset_id}/metadata"}}, unknowns
+    )
+
+    assert order == []
+    assert len(unknowns) == 1
+    assert "asset_id" in unknowns[0].resolution
+
+
+def test_a_cycle_between_variables_is_reported_rather_than_looping() -> None:
+    unknowns: list = []
+
+    order = probes._resolution_order(
+        {
+            "a": {"from_endpoint": "/x/{b}"},
+            "b": {"from_endpoint": "/y/{a}"},
+        },
+        unknowns,
+    )
+
+    assert order == []
+    assert len(unknowns) == 2
+
+
+def test_literals_and_independent_variables_still_resolve() -> None:
+    """The common case has no dependencies and must be unaffected."""
+    order = [
+        name
+        for name, _ in probes._resolution_order(
+            {
+                "external_id": {"literal": "nope"},
+                "asset_id": {"from_endpoint": "/api/assets/"},
+            },
+            [],
+        )
+    ]
+
+    assert sorted(order) == ["asset_id", "external_id"]
+
+
+def test_every_probe_placeholder_has_a_declared_variable() -> None:
+    """A probe naming a variable that does not exist can never run.
+
+    Cheap to get wrong by hand, and the failure surfaces only as an `unavailable`
+    probe buried in a report, so it is asserted against the shipped file.
+    """
+    config = probes.load_config(Path(probes.__file__).with_name("probes.yaml"))
+    declared = set(config.variables)
+
+    for spec in config.probes:
+        used = probes._placeholders(spec.path)
+        for value in spec.query.values():
+            if isinstance(value, str):
+                used |= probes._placeholders(value)
+        missing = used - declared
+        assert not missing, f"probe {spec.name!r} uses undeclared variable(s) {missing}"
