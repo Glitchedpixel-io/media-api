@@ -40,6 +40,7 @@ def test_settings(
     media_root = root / "media"
     inbox_root = root / "inbox"
     accessory_root = root / "accessory-store"
+    artwork_root = root / "artwork-store"
     media_root.mkdir(parents=True, exist_ok=True)
     inbox_root.mkdir(parents=True, exist_ok=True)
     return replace(
@@ -48,6 +49,7 @@ def test_settings(
             media_root=str(media_root),
             inbox_root=str(inbox_root),
             accessory_root=str(accessory_root),
+            artwork_root=str(artwork_root),
         ),
         elasticsearch=ElasticsearchConfig(),
     )

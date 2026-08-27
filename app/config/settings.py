@@ -122,6 +122,7 @@ class _Settings(BaseSettings):
     media_root: str = Field(str(BASE_DIR / "media"))
     accessory_root: str = Field(str(BASE_DIR / "accessory-store"))
     inbox_root: str = Field(str(BASE_DIR / "inbox"))
+    artwork_root: str = Field(str(BASE_DIR / "artwork-store"))
 
     # Elasticsearch
     elasticsearch_url: str | None = Field(None)
@@ -195,6 +196,7 @@ def _build_media_config(s: _Settings) -> MediaConfig:
         media_root=s.media_root,
         accessory_root=s.accessory_root,
         inbox_root=s.inbox_root,
+        artwork_root=s.artwork_root,
     )
 
 
