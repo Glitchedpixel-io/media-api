@@ -360,6 +360,24 @@ def _handlers(api: Any) -> dict[tuple[str, str], tuple[str, str]]:
     return out
 
 
+def _served_paths(api: Any) -> set[tuple[str, str]]:
+    """Every (method, path) the app answers, including paths not in the schema.
+
+    The OpenAPI document is not the whole surface. A route registered with
+    ``include_in_schema=False`` -- the unslashed aliases of the assets and titles
+    collections -- is served but not published, so judging "is a trailing slash
+    required?" from the document alone reports a redirect that cannot happen.
+    """
+    from fastapi.routing import APIRoute  # noqa: PLC0415 -- deferred with the app import.
+
+    return {
+        (method.upper(), _normalise_path(route.path))
+        for route in api.routes
+        if isinstance(route, APIRoute)
+        for method in route.methods
+    }
+
+
 def _describe_auth(operation: dict[str, Any], spec: dict[str, Any]) -> str:
     """Describe an operation's authentication requirement.
 
@@ -392,6 +410,7 @@ def collect(api: Any) -> tuple[tuple[RouteSurface, ...], dict[str, Any]]:
     conditional = _conditional_fields(spec)
     streaming = _streaming_returns(api)
     handlers = _handlers(api)
+    served = _served_paths(api)
 
     routes: list[RouteSurface] = []
     for path, methods in spec.get("paths", {}).items():
@@ -419,7 +438,11 @@ def collect(api: Any) -> tuple[tuple[RouteSurface, ...], dict[str, Any]]:
                     responses=responses,
                     success_status=success,
                     is_streaming=(upper, path) in streaming,
-                    trailing_slash_required=path.endswith("/") and path != "/",
+                    trailing_slash_required=(
+                        path.endswith("/")
+                        and path != "/"
+                        and (upper, path.rstrip("/")) not in served
+                    ),
                 )
             )
     routes.sort(key=lambda r: (r.path, r.method))
