@@ -26,6 +26,7 @@ dependencies = [
     "logfire[fastapi,sqlalchemy]>=4.14.2,<5.0.0",
     "opentelemetry-instrumentation-elasticsearch>=0.59b0,<0.60",
     "ecdsa==0.19.1",
+    "python-multipart>=0.0.32",
 ]
 
 [project.optional-dependencies]

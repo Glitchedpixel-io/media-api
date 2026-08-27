@@ -10,6 +10,7 @@ no foreign key on ``artwork.entity_id``, because its target table depends on
 
 from __future__ import annotations
 
+import io
 from datetime import UTC, datetime
 from unittest.mock import create_autospec
 
@@ -30,9 +31,10 @@ from app.schemas import (
     ArtworkKindRead,
     ArtworkPatchPublic,
     ArtworkRead,
+    ArtworkUploadForm,
 )
 from app.schemas.enums import EntityTypeEnum
-from app.services import ArtworkKindService, ArtworkService
+from app.services import ArtworkKindService, ArtworkService, ArtworkStore, StoredArtwork
 
 PATH_A = "ab/12/" + "ab12" + "0" * 60 + ".jpg"
 
@@ -85,8 +87,27 @@ def assets():
 
 
 @pytest.fixture
-def service(repo, kinds, titles, assets) -> ArtworkService:
-    return ArtworkService(repo, kinds, titles, assets)
+def store():
+    mock = create_autospec(ArtworkStore, instance=True)
+    mock.store.return_value = StoredArtwork(
+        digest="ab12" + "0" * 60,
+        suffix=".jpg",
+        mime="image/jpeg",
+        size=1234,
+        storage_path=PATH_A,
+        already_present=False,
+    )
+    return mock
+
+
+@pytest.fixture
+def service(repo, kinds, titles, assets, store) -> ArtworkService:
+    return ArtworkService(repo, kinds, titles, assets, store)
+
+
+def _upload(**overrides) -> ArtworkUploadForm:
+    defaults = dict(artwork_kind="poster", is_primary=False)
+    return ArtworkUploadForm(**{**defaults, **overrides})
 
 
 def _create_payload(**overrides) -> ArtworkCreatePublic:
@@ -317,3 +338,158 @@ class TestArtworkKindService:
     def test_list_delegates(self, kind_service, kinds):
         kinds.list_all.return_value = [POSTER]
         assert kind_service.get_artwork_kinds() == [POSTER]
+
+
+@pytest.mark.unit
+class TestRegisterUpload:
+    """The ordering rule is the substance here.
+
+    Everything checkable without the bytes is checked before anything reaches disk, so
+    an ordinary client mistake never leaves a file behind. What remains -- file
+    written, row rejected -- is the deliberate direction, because a content-addressed
+    orphan is inert while a row pointing at nothing renders as a broken image forever.
+    """
+
+    def test_a_successful_upload_stores_then_registers(self, service, repo, store):
+        repo.create.return_value = _read()
+        service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+
+        store.store.assert_called_once()
+        internal = repo.create.call_args.args[0]
+        assert internal.storage_path == PATH_A
+        assert internal.mime == "image/jpeg"
+
+    def test_the_path_and_mime_come_from_the_store_not_the_caller(self, service, repo, store):
+        """ArtworkUploadForm carries neither field, so there is nothing to spoof --
+        this asserts the derived values are what actually get persisted."""
+        repo.create.return_value = _read()
+        service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        internal = repo.create.call_args.args[0]
+        assert (internal.storage_path, internal.mime) == (
+            store.store.return_value.storage_path,
+            store.store.return_value.mime,
+        )
+
+    def test_a_missing_entity_is_rejected_before_the_file_is_written(
+        self, service, titles, store, repo
+    ):
+        titles.exists.return_value = False
+        with pytest.raises(HTTPException) as exc:
+            service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        assert exc.value.status_code == 404
+        store.store.assert_not_called()
+        repo.create.assert_not_called()
+
+    def test_an_unknown_kind_is_rejected_before_the_file_is_written(
+        self, service, kinds, store, repo
+    ):
+        """The cheapest check that can fail must fail first, or a typo in a kind code
+        leaves an orphan for every retry."""
+        kinds.get_by_code.return_value = None
+        with pytest.raises(HTTPException) as exc:
+            service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        assert exc.value.status_code == 422
+        store.store.assert_not_called()
+        repo.create.assert_not_called()
+
+    def test_a_refused_file_never_reaches_the_repository(self, service, store, repo):
+        store.store.side_effect = HTTPException(status_code=415, detail="not an image")
+        with pytest.raises(HTTPException) as exc:
+            service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        assert exc.value.status_code == 415
+        repo.create.assert_not_called()
+
+    def test_the_insert_never_carries_is_primary(self, service, repo, store):
+        """A second primary would collide with the unique index and surface as a 409
+        for what the caller reasonably means. Promotion happens after the insert."""
+        repo.create.return_value = _read()
+        repo.set_primary.return_value = _read(is_primary=True)
+        service.register_upload(
+            EntityTypeEnum.title, 42, _upload(is_primary=True), io.BytesIO(b"x")
+        )
+        assert repo.create.call_args.args[0].is_primary is False
+
+    def test_requesting_primary_promotes_after_the_insert(self, service, repo, store):
+        repo.create.return_value = _read(id=5)
+        repo.set_primary.return_value = _read(id=5, is_primary=True)
+        result = service.register_upload(
+            EntityTypeEnum.title, 42, _upload(is_primary=True), io.BytesIO(b"x")
+        )
+        repo.set_primary.assert_called_once_with(5)
+        assert result.is_primary is True
+
+    def test_not_requesting_primary_leaves_the_incumbent_alone(self, service, repo, store):
+        repo.create.return_value = _read()
+        service.register_upload(
+            EntityTypeEnum.title, 42, _upload(is_primary=False), io.BytesIO(b"x")
+        )
+        repo.set_primary.assert_not_called()
+
+    def test_provenance_is_carried_through(self, service, repo, store):
+        repo.create.return_value = _read()
+        service.register_upload(
+            EntityTypeEnum.title,
+            42,
+            _upload(source_scheme_id=1, source_external_id="abc", source_url="https://x/y.jpg"),
+            io.BytesIO(b"x"),
+        )
+        internal = repo.create.call_args.args[0]
+        assert (internal.source_scheme_id, internal.source_external_id) == (1, "abc")
+        assert internal.source_url == "https://x/y.jpg"
+
+    def test_half_a_provenance_pair_is_refused_by_the_form(self):
+        with pytest.raises(ValueError):
+            _upload(source_scheme_id=1)
+
+    def test_uploading_against_an_asset_checks_the_asset_repository(
+        self, service, assets, titles, repo, store
+    ):
+        repo.create.return_value = _read(entity_type=EntityTypeEnum.asset)
+        service.register_upload(EntityTypeEnum.asset, 42, _upload(), io.BytesIO(b"x"))
+        assets.exists.assert_called_once_with(42)
+        titles.exists.assert_not_called()
+
+
+@pytest.mark.unit
+class TestPrimaryViaPatch:
+    """PATCH is how the DoD asks for primary to change, so is_primary cannot simply be
+    written through -- it has to demote the incumbent."""
+
+    def test_setting_primary_true_goes_through_set_primary(self, service, repo):
+        repo.update.return_value = _read()
+        repo.set_primary.return_value = _read(is_primary=True)
+        result = service.update_artwork(1, ArtworkPatchPublic(is_primary=True), exclude_none=True)
+        repo.set_primary.assert_called_once_with(1)
+        assert result.is_primary is True
+
+    def test_the_flag_is_not_written_straight_through(self, service, repo):
+        """Writing it via repo.update would hit uq_artwork_one_primary_per_kind and
+        turn "make this the poster" into a 409 the caller cannot act on."""
+        repo.update.return_value = _read()
+        repo.set_primary.return_value = _read(is_primary=True)
+        service.update_artwork(1, ArtworkPatchPublic(is_primary=True), exclude_none=True)
+        first_update = repo.update.call_args_list[0].args[1]
+        assert "is_primary" not in first_update.model_dump(exclude_unset=True)
+
+    def test_setting_primary_false_demotes_without_promoting_anything(self, service, repo):
+        """An entity is allowed no primary at all -- a title whose poster was
+        withdrawn should look like that, not silently promote a replacement."""
+        repo.update.return_value = _read()
+        service.update_artwork(1, ArtworkPatchPublic(is_primary=False), exclude_none=False)
+        repo.set_primary.assert_not_called()
+        assert repo.update.call_args.args[1].is_primary is False
+
+    def test_other_fields_are_applied_alongside_a_promotion(self, service, repo):
+        repo.update.return_value = _read()
+        repo.set_primary.return_value = _read(is_primary=True)
+        service.update_artwork(1, ArtworkPatchPublic(width=900, is_primary=True), exclude_none=True)
+        assert repo.update.call_args_list[0].args[1].width == 900
+        repo.set_primary.assert_called_once_with(1)
+
+    def test_a_patch_touching_nothing_still_404s_for_a_missing_row(self, service, repo):
+        """repo.update is called even with an empty payload, so the ID is still
+        checked rather than the call silently succeeding."""
+        repo.update.side_effect = NotFoundError
+        with pytest.raises(HTTPException) as exc:
+            service.update_artwork(1, ArtworkPatchPublic(), exclude_none=True)
+        assert exc.value.status_code == 404

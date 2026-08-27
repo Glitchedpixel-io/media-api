@@ -16,6 +16,8 @@ from app.elasticsearch_client import close_es, get_es_manager, initialize_es
 from app.middleware import RequestIdMiddleware
 from app.orchestration.loader import build_provider_registry
 from app.orchestration.registry import init_provider_registry
+from app.routers.artwork import kinds_router as artwork_kinds_router
+from app.routers.artwork import router as artwork_router
 from app.routers.assets import router as assets_router
 from app.routers.external_ids import router as external_ids_router
 from app.routers.file_stream import router as file_stream_router
@@ -105,6 +107,18 @@ def _include_routers(api: FastAPI) -> None:
         assets_router,
         prefix="/api/assets",
         tags=["assets"],
+        dependencies=[Depends(get_current_user)],
+    )
+    api.include_router(
+        artwork_router,
+        prefix="/api/artwork",
+        tags=["artwork"],
+        dependencies=[Depends(get_current_user)],
+    )
+    api.include_router(
+        artwork_kinds_router,
+        prefix="/api/artwork_kinds",
+        tags=["artwork"],
         dependencies=[Depends(get_current_user)],
     )
     api.include_router(

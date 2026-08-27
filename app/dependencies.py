@@ -46,6 +46,7 @@ from app.repositories import (
 from app.services import (
     ArtworkKindService,
     ArtworkService,
+    ArtworkStore,
     ExternalIdentifierService,
     FileStreamService,
     IdSchemeService,
@@ -207,7 +208,10 @@ def get_artwork_kind_service(db: Session = Depends(get_db_session)) -> ArtworkKi
     return ArtworkKindService(SQLAlchemyArtworkKindRepository(db))
 
 
-def get_artwork_service(db: Session = Depends(get_db_session)) -> ArtworkService:
+def get_artwork_service(
+    db: Session = Depends(get_db_session),
+    config: MediaConfig = Depends(get_media_config),
+) -> ArtworkService:
     """Artwork, constructed from one session across four repositories.
 
     The session is injected directly rather than chaining Depends(get_*_repository):
@@ -219,6 +223,7 @@ def get_artwork_service(db: Session = Depends(get_db_session)) -> ArtworkService
         SQLAlchemyArtworkKindRepository(db),
         SQLAlchemyTitleRepository(db),
         SQLAlchemyMediaRepository(db),
+        ArtworkStore(config),
     )
 
 
