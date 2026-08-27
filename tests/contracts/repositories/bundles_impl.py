@@ -7,6 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from app.config import AppConfig
 from app.models import Base
 from app.repositories import (
+    SQLAlchemyArtworkKindRepository,
+    SQLAlchemyArtworkRepository,
     FileInboxRepository,
     SQLAlchemyJobRepository,
     SQLAlchemyMediaRepository,
@@ -25,6 +27,7 @@ from app.repositories import (
 )
 
 from ._bundles import (
+    ArtworkRepoBundle,
     InboxRepoBundle,
     JobRepoBundle,
     MediaRepoBundle,
@@ -177,6 +180,17 @@ def inbox_bundler(test_settings: AppConfig) -> InboxRepoBundle:
 def external_identifier_bundler(session, engine) -> ExternalIdentifierRepoBundle:
     return ExternalIdentifierRepoBundle(
         external_identifiers=SQLAlchemyExternalIdentifierRepository(session),
+        id_schemes=SQLAlchemyIdSchemeRepository(session),
+        assets=SQLAlchemyMediaRepository(session),
+        titles=SQLAlchemyTitleRepository(session),
+        close=lambda: (session.close()),
+    )
+
+
+def artwork_bundler(session, engine) -> ArtworkRepoBundle:
+    return ArtworkRepoBundle(
+        artwork=SQLAlchemyArtworkRepository(session),
+        artwork_kinds=SQLAlchemyArtworkKindRepository(session),
         id_schemes=SQLAlchemyIdSchemeRepository(session),
         assets=SQLAlchemyMediaRepository(session),
         titles=SQLAlchemyTitleRepository(session),

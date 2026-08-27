@@ -3,6 +3,12 @@ from pathlib import Path
 from typing import Protocol
 
 from app.schemas import (
+    ArtworkCreateInternal,
+    ArtworkKindCreateInternal,
+    ArtworkKindRead,
+    ArtworkKindUpdateInternal,
+    ArtworkRead,
+    ArtworkUpdateInternal,
     AssetCreateInternal,
     AssetListParams,
     AssetRead,
@@ -310,3 +316,49 @@ class ExternalIdentifierRepository(Protocol):
         self, record_id: int, update: ExternalIdentifierUpdateInternal
     ) -> ExternalIdentifierRead: ...
     def delete(self, record_id: int) -> None: ...
+
+
+class ArtworkKindRepository(Protocol):
+    """The artwork kinds an artwork can be categorised as.
+
+    The same lookup-table shape as ``TitleTypeRepository``, for the same reason (#41).
+    """
+
+    def create(self, kind: ArtworkKindCreateInternal) -> ArtworkKindRead: ...
+    def get(self, kind_id: int) -> ArtworkKindRead | None: ...
+    def exists(self, kind_id: int) -> bool: ...
+    def get_by_code(self, code: str) -> ArtworkKindRead | None: ...
+    def list_all(self) -> list[ArtworkKindRead]: ...
+    def update(
+        self,
+        kind_id: int,
+        update: ArtworkKindUpdateInternal,  # type: ignore
+    ) -> ArtworkKindRead: ...
+    def delete(self, kind_id: int) -> None: ...
+    def usage_count(self, kind_id: int) -> int: ...
+
+
+class ArtworkRepository(Protocol):
+    """Artwork belonging to a title or an asset, via the typed association pattern.
+
+    ``entity_id`` has no foreign key -- its target table depends on ``entity_type``,
+    which Postgres cannot express -- so the service layer owns that integrity check,
+    exactly as it does for ``ExternalIdentifierRepository``.
+    """
+
+    def create(self, artwork: ArtworkCreateInternal) -> ArtworkRead: ...
+    def get(self, artwork_id: int) -> ArtworkRead | None: ...
+    def list_for_entity(
+        self, entity_type: EntityTypeEnum, entity_id: int, kind_id: int | None = None
+    ) -> list[ArtworkRead]: ...
+    def get_primary(
+        self, entity_type: EntityTypeEnum, entity_id: int, kind_id: int
+    ) -> ArtworkRead | None: ...
+    def update(
+        self,
+        artwork_id: int,
+        update: ArtworkUpdateInternal,  # type: ignore
+    ) -> ArtworkRead: ...
+    def set_primary(self, artwork_id: int) -> ArtworkRead: ...
+    def delete(self, artwork_id: int) -> None: ...
+    def count_for_entity(self, entity_type: EntityTypeEnum, entity_id: int) -> int: ...
