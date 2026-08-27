@@ -1,7 +1,7 @@
 {
   "app_version": "1.6.2.dev6+gee853b72c",
   "data_shape": {
-    "baseline_rtt_ms": 25.91,
+    "baseline_rtt_ms": 25.94,
     "captured_from": "read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)",
     "collections": [
       {
@@ -440,8 +440,8 @@
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.9987,
-        "non_null": 3021,
+        "fill_rate": 0.999,
+        "non_null": 3022,
         "table": "jobs",
         "top_values": [],
         "total": 3025
@@ -895,7 +895,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "created_at",
@@ -903,10 +903,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "dry_run",
@@ -914,32 +914,32 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "error_count",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.7164,
+        "fill_rate": 0.7059,
         "non_null": 48,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "excluded_count",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.1194,
+        "fill_rate": 0.1176,
         "non_null": 8,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "extras",
@@ -947,10 +947,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "folder_count",
@@ -961,7 +961,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "id",
@@ -969,10 +969,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "no_metadata_count",
@@ -983,7 +983,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "previously_seen_count",
@@ -991,10 +991,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "processed_count",
@@ -1002,10 +1002,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "relative_to_path",
@@ -1016,7 +1016,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "running_time",
@@ -1024,10 +1024,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "scan_path",
@@ -1038,7 +1038,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "started_at",
@@ -1046,10 +1046,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "total_count",
@@ -1060,7 +1060,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "unsupported_file_count",
@@ -1071,7 +1071,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "worker_name",
@@ -1079,10 +1079,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "worker_type",
@@ -1090,10 +1090,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 67,
+        "non_null": 68,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 67
+        "total": 68
       },
       {
         "column": "asset_id",
@@ -1601,7 +1601,7 @@
       "metadata": 14540,
       "run_summaries": 1089,
       "runner_state": 5,
-      "scanner_run_summaries": 67,
+      "scanner_run_summaries": 68,
       "streams": 65175,
       "tags": 43,
       "title_contents": 2147,
@@ -1839,10 +1839,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 152.3,
-            "min_ms": 135.8,
-            "p50_ms": 142.9,
-            "p95_ms": 152.3,
+            "max_ms": 156.6,
+            "min_ms": 134.8,
+            "p50_ms": 143.2,
+            "p95_ms": 156.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1862,10 +1862,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 190.8,
-            "min_ms": 175.1,
-            "p50_ms": 176.8,
-            "p95_ms": 190.8,
+            "max_ms": 189.2,
+            "min_ms": 168.5,
+            "p50_ms": 174.9,
+            "p95_ms": 189.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1885,10 +1885,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 148.2,
-            "min_ms": 118.4,
-            "p50_ms": 129.8,
-            "p95_ms": 148.2,
+            "max_ms": 140.5,
+            "min_ms": 124.8,
+            "p50_ms": 135.8,
+            "p95_ms": 140.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1908,10 +1908,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 169.2,
-            "min_ms": 147.2,
-            "p50_ms": 162.9,
-            "p95_ms": 169.2,
+            "max_ms": 187.1,
+            "min_ms": 151.6,
+            "p50_ms": 167.3,
+            "p95_ms": 187.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1931,10 +1931,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 263.5,
-            "min_ms": 230.8,
-            "p50_ms": 254.5,
-            "p95_ms": 263.5,
+            "max_ms": 279.1,
+            "min_ms": 233.4,
+            "p50_ms": 243.1,
+            "p95_ms": 279.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1954,10 +1954,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 268.6,
-            "min_ms": 234.3,
-            "p50_ms": 245.4,
-            "p95_ms": 268.6,
+            "max_ms": 319.7,
+            "min_ms": 238.4,
+            "p50_ms": 251.2,
+            "p95_ms": 319.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -1977,10 +1977,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 257.0,
-            "min_ms": 215.0,
-            "p50_ms": 237.6,
-            "p95_ms": 257.0,
+            "max_ms": 262.6,
+            "min_ms": 220.1,
+            "p50_ms": 237.8,
+            "p95_ms": 262.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2000,10 +2000,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 167.2,
-            "min_ms": 133.3,
-            "p50_ms": 144.5,
-            "p95_ms": 167.2,
+            "max_ms": 156.4,
+            "min_ms": 133.5,
+            "p50_ms": 143.5,
+            "p95_ms": 156.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2024,10 +2024,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 146.9,
-            "min_ms": 135.3,
-            "p50_ms": 140.4,
-            "p95_ms": 146.9,
+            "max_ms": 149.3,
+            "min_ms": 140.2,
+            "p50_ms": 141.1,
+            "p95_ms": 149.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2038,7 +2038,7 @@
       "risks": [
         "unindexed sort keys (`created_at`, `duration`, `filename`, `mtime`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,329 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
         "filters that cannot use an index (`created_since`, `duration_max`, `duration_min`, `filename_ext`, `path_part`, `path_prefix`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,329 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 269ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke",
+        "measured p95 of 320ms on `assets-max-page-unindexed-sort-no-n1` is too slow to drive from a keystroke",
         "the trailing slash is required; requesting it without one gets a 307, which a cross-origin fetch with credentials will not always follow",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
@@ -2927,10 +2927,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 140.2,
-            "min_ms": 117.2,
-            "p50_ms": 131.9,
-            "p95_ms": 140.2,
+            "max_ms": 129.7,
+            "min_ms": 120.6,
+            "p50_ms": 123.6,
+            "p95_ms": 129.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3095,7 +3095,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "p95 140ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 130ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -4093,10 +4093,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 105.1,
-            "min_ms": 88.3,
-            "p50_ms": 98.6,
-            "p95_ms": 105.1,
+            "max_ms": 104.3,
+            "min_ms": 87.6,
+            "p50_ms": 99.3,
+            "p95_ms": 104.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4221,7 +4221,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -4894,10 +4894,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 169.5,
-            "min_ms": 143.4,
-            "p50_ms": 154.7,
-            "p95_ms": 169.5,
+            "max_ms": 162.2,
+            "min_ms": 145.2,
+            "p50_ms": 151.2,
+            "p95_ms": 162.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5014,7 +5014,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6040,10 +6040,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 169.3,
-            "min_ms": 145.4,
-            "p50_ms": 152.2,
-            "p95_ms": 169.3,
+            "max_ms": 158.3,
+            "min_ms": 136.6,
+            "p50_ms": 156.8,
+            "p95_ms": 158.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6208,7 +6208,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6541,10 +6541,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 161.7,
-            "min_ms": 136.8,
-            "p50_ms": 152.9,
-            "p95_ms": 161.7,
+            "max_ms": 170.0,
+            "min_ms": 143.4,
+            "p50_ms": 152.4,
+            "p95_ms": 170.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6668,7 +6668,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7540,10 +7540,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 162.7,
-            "min_ms": 147.2,
-            "p50_ms": 157.7,
-            "p95_ms": 162.7,
+            "max_ms": 149.3,
+            "min_ms": 138.5,
+            "p50_ms": 145.4,
+            "p95_ms": 149.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -7673,7 +7673,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 149ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -8607,10 +8607,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 142.3,
-            "min_ms": 109.4,
-            "p50_ms": 120.9,
-            "p95_ms": 142.3,
+            "max_ms": 128.0,
+            "min_ms": 102.9,
+            "p50_ms": 110.0,
+            "p95_ms": 128.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8654,7 +8654,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "p95 142ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 128ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -8709,10 +8709,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 97.7,
-            "min_ms": 84.7,
-            "p50_ms": 94.7,
-            "p95_ms": 97.7,
+            "max_ms": 104.2,
+            "min_ms": 85.0,
+            "p50_ms": 91.7,
+            "p95_ms": 104.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8784,7 +8784,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 104ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -10311,10 +10311,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 2.5,
-            "min_ms": 1.4,
-            "p50_ms": 1.5,
-            "p95_ms": 2.5,
+            "max_ms": 2.0,
+            "min_ms": 1.5,
+            "p50_ms": 1.6,
+            "p95_ms": 2.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11419,10 +11419,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 4.3,
-            "min_ms": 2.4,
-            "p50_ms": 2.4,
-            "p95_ms": 4.3,
+            "max_ms": 4.9,
+            "min_ms": 2.5,
+            "p50_ms": 3.0,
+            "p95_ms": 4.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11644,7 +11644,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "fine for a search-results panel showing the first few pages (worst-case p95 4ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
+      "verdict": "fine for a search-results panel showing the first few pages (worst-case p95 5ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
       "verdict_class": "caution"
     },
     {
@@ -11758,10 +11758,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 123.8,
-            "min_ms": 92.3,
-            "p50_ms": 99.6,
-            "p95_ms": 123.8,
+            "max_ms": 125.8,
+            "min_ms": 95.8,
+            "p50_ms": 99.8,
+            "p95_ms": 125.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11781,15 +11781,38 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 123.4,
-            "min_ms": 116.9,
-            "p50_ms": 120.2,
-            "p95_ms": 123.4,
+            "max_ms": 127.7,
+            "min_ms": 112.8,
+            "p50_ms": 116.9,
+            "p95_ms": 127.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
           },
           "url": "/api/streams?limit=500"
+        },
+        {
+          "bytes_": 742,
+          "endpoint_key": "GET /api/streams",
+          "http_status": 200,
+          "item_count": 3,
+          "method": "GET",
+          "name": "streams-by-asset",
+          "notes": [
+            "the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging"
+          ],
+          "reason": null,
+          "status": "ok",
+          "timing": {
+            "max_ms": 104.9,
+            "min_ms": 89.2,
+            "p50_ms": 100.1,
+            "p95_ms": 104.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/streams?asset_id=1065&limit=50"
         }
       ],
       "risks": [
@@ -12528,10 +12551,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 110.8,
-            "min_ms": 94.9,
-            "p50_ms": 104.5,
-            "p95_ms": 110.8,
+            "max_ms": 130.8,
+            "min_ms": 87.8,
+            "p50_ms": 105.8,
+            "p95_ms": 130.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -12940,10 +12963,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 95.2,
-            "min_ms": 82.5,
-            "p50_ms": 86.8,
-            "p95_ms": 95.2,
+            "max_ms": 96.9,
+            "min_ms": 83.7,
+            "p50_ms": 89.6,
+            "p95_ms": 96.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13063,7 +13086,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "p95 95ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -14824,10 +14847,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 111.5,
-            "min_ms": 100.0,
-            "p50_ms": 107.7,
-            "p95_ms": 111.5,
+            "max_ms": 144.7,
+            "min_ms": 104.6,
+            "p50_ms": 116.0,
+            "p95_ms": 144.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14847,10 +14870,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 120.1,
-            "min_ms": 98.6,
-            "p50_ms": 110.5,
-            "p95_ms": 120.1,
+            "max_ms": 118.9,
+            "min_ms": 105.0,
+            "p50_ms": 107.6,
+            "p95_ms": 118.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15506,10 +15529,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 190.6,
-            "min_ms": 174.3,
-            "p50_ms": 185.1,
-            "p95_ms": 190.6,
+            "max_ms": 200.2,
+            "min_ms": 171.2,
+            "p50_ms": 185.4,
+            "p95_ms": 200.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15520,7 +15543,8 @@
       "risks": [
         "one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`",
         "one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`",
-        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent",
+        "measured p95 of 200ms on `title-contents` is too slow to drive from a keystroke"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -15645,7 +15669,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 191ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 200ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -17162,10 +17186,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 97.7,
-            "min_ms": 90.9,
-            "p50_ms": 95.2,
-            "p95_ms": 97.7,
+            "max_ms": 102.1,
+            "min_ms": 89.0,
+            "p50_ms": 92.5,
+            "p95_ms": 102.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17273,7 +17297,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "p95 98ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 102ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -19136,10 +19160,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 129.9,
-            "min_ms": 114.1,
-            "p50_ms": 119.0,
-            "p95_ms": 129.9,
+            "max_ms": 120.3,
+            "min_ms": 111.7,
+            "p50_ms": 114.5,
+            "p95_ms": 120.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -19262,7 +19286,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 130ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 120ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -20182,10 +20206,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 185.8,
-            "min_ms": 171.9,
-            "p50_ms": 178.8,
-            "p95_ms": 185.8,
+            "max_ms": 195.2,
+            "min_ms": 177.6,
+            "p50_ms": 186.9,
+            "p95_ms": 195.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20773,10 +20797,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 102.8,
-            "min_ms": 87.8,
-            "p50_ms": 92.7,
-            "p95_ms": 102.8,
+            "max_ms": 110.6,
+            "min_ms": 88.8,
+            "p50_ms": 99.3,
+            "p95_ms": 110.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20956,7 +20980,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "p95 103ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 111ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -22085,10 +22109,10 @@
           "reason": null,
           "status": "ok",
           "timing": {
-            "max_ms": 9.1,
-            "min_ms": 2.1,
-            "p50_ms": 3.7,
-            "p95_ms": 9.1,
+            "max_ms": 8.6,
+            "min_ms": 3.9,
+            "p50_ms": 5.3,
+            "p95_ms": 8.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -22855,11 +22879,6 @@
   ],
   "phases_skipped": [],
   "unknowns": [
-    {
-      "question": "which endpoint probe `streams-by-asset (GET /api/streams?asset_id={asset_id}&limit=50)` exercised",
-      "resolution": "the probe's method and path do not match any route in this run; correct the path in probes.yaml, or drop --only",
-      "scope": "Phase 4"
-    },
     {
       "question": "whether an endpoint has any real caller",
       "resolution": "re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories",
