@@ -1851,3 +1851,71 @@ class TestAssetsListQueryCount:
             f"{counts[2]} for 2 rows, {counts[6]} for 6 rows"
         )
         assert counts[6] < 6, f"expected a bounded number of queries, got {counts[6]} for 6 rows"
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestAssetsPathPrefixFilter:
+    """`?path_prefix=` behaviour, which had no test before #60.
+
+    The filter was rewritten from `path ILIKE 'x%'` to `lower(path) LIKE 'x%'` so it
+    can use ix_assets_path_lower -- ILIKE cannot use any index under this database's
+    en_US.utf8 collation. The two forms are meant to be equivalent, and nothing
+    asserted that, so these tests pin the behaviour rather than the implementation.
+    """
+
+    def _seed(self, media_repository: MediaRepository, *paths: str) -> None:
+        for path in paths:
+            asset = AssetReadFactory(path=path, filename=Path(path).name)
+            media_repository.create(
+                AssetCreateInternal(
+                    **asset.model_dump(exclude={"id", "created_at", "master_asset_id"})  # type: ignore
+                )
+            )
+
+    def test_matches_only_paths_under_the_prefix(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        self._seed(
+            media_repository,
+            "shows/alpha/ep1.mkv",
+            "shows/alpha/ep2.mkv",
+            "shows/beta/ep1.mkv",
+            "movies/alpha/film.mkv",
+        )
+
+        body = client.get("/api/assets?path_prefix=shows/alpha&limit=50").json()
+
+        assert {item["path"] for item in body["items"]} == {
+            "shows/alpha/ep1.mkv",
+            "shows/alpha/ep2.mkv",
+        }
+
+    def test_is_case_insensitive(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        """The property most at risk from the ILIKE rewrite."""
+        self._seed(media_repository, "Shows/Alpha/ep1.mkv")
+
+        body = client.get("/api/assets?path_prefix=shows/alpha&limit=50").json()
+
+        assert [item["path"] for item in body["items"]] == ["Shows/Alpha/ep1.mkv"]
+
+    def test_anchors_at_the_start_rather_than_matching_anywhere(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        """A prefix filter must not behave like a substring one."""
+        self._seed(media_repository, "archive/shows/alpha/ep1.mkv", "shows/alpha/ep2.mkv")
+
+        body = client.get("/api/assets?path_prefix=shows/alpha&limit=50").json()
+
+        assert [item["path"] for item in body["items"]] == ["shows/alpha/ep2.mkv"]
+
+    def test_a_prefix_matching_nothing_is_an_empty_page(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        self._seed(media_repository, "shows/alpha/ep1.mkv")
+
+        body = client.get("/api/assets?path_prefix=nothing/here&limit=50").json()
+
+        assert body["items"] == []

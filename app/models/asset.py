@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -104,5 +105,21 @@ class AssetORM(Base):
         CheckConstraint(
             "size >= 0",
             name="ck_asset_valid_size",
+        ),
+        # Backs the path_prefix filter on GET /api/assets/.
+        #
+        # `text_pattern_ops` is the load-bearing half. This database collates
+        # en_US.utf8, and under any non-C collation a btree cannot serve a LIKE
+        # prefix at all -- not even a case-sensitive one. Measured at 300k rows:
+        # the plain unique index on `path` sequential-scans an ILIKE prefix (51ms),
+        # a bare lower(path) index sequential-scans the rewritten predicate too
+        # (39ms), and only this one is used (0.4ms, bitmap index scan).
+        # The expression is labelled because `postgresql_ops` is keyed by column key
+        # or label -- keyed by the rendered expression it is silently ignored, and
+        # the index ships without the opclass that makes it work at all.
+        Index(
+            "ix_assets_path_lower",
+            func.lower(path).label("path_lower"),
+            postgresql_ops={"path_lower": "text_pattern_ops"},
         ),
     )
