@@ -1,5 +1,6 @@
 # app/utils/paths.py
 import os
+import re
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 
@@ -72,6 +73,76 @@ def accessory_relative_path(asset_id: int, chunk_size: int = 2) -> str:
     components = [base36[i : i + chunk_size] for i in range(0, len(base36), chunk_size)]
     components.append(str(asset_id))
     return str(Path(*components))
+
+
+#: A lowercase hex SHA-256, which is the only digest form this layout accepts.
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+#: A file extension: a single leading dot, then lowercase alphanumerics. Deliberately
+#: a shape rather than an allow-list of formats -- the security property needed here is
+#: "contains no path separator and no second dot", and an allow-list would have to be
+#: kept in step with every new image format for no extra safety.
+_SUFFIX_RE = re.compile(r"^\.[a-z0-9]{1,8}$")
+
+
+def artwork_relative_path(digest: str, suffix: str, chunk_size: int = 2) -> str:
+    """Compute the content-addressed path for an artwork file, relative to ARTWORK_ROOT.
+
+    Artwork is keyed by the digest of its contents rather than by the entity it
+    belongs to. A season and every episode under it routinely share one poster, so
+    content addressing stores that once instead of once per entity, and
+    ``accessory_relative_path`` has no title-side equivalent to borrow.
+
+    Example: digest ``ab12...`` with suffix ``.jpg`` -> ``ab/12/ab12....jpg``.
+
+    Args:
+        digest (str): Lowercase hex SHA-256 of the file's contents.
+        suffix (str): File extension including the leading dot, e.g. ``".jpg"``.
+        chunk_size (int): Characters per fan-out directory. Defaults to 2, matching
+            ``accessory_relative_path``.
+
+    Returns:
+        str: The path relative to ARTWORK_ROOT.
+
+    Raises:
+        ValueError: If the digest is not a lowercase hex SHA-256, the suffix is not a
+            bare extension, or ``chunk_size`` would not leave a fan-out.
+    """
+    if not _SHA256_RE.match(digest):
+        # Rejecting the digest here is what makes traversal impossible by construction:
+        # a 64-character hex string cannot contain a separator, a dot, or "..".
+        raise ValueError("digest must be a lowercase hex SHA-256")
+    if not _SUFFIX_RE.match(suffix):
+        raise ValueError(f"Invalid artwork suffix: {suffix!r}")
+    if chunk_size < 1 or chunk_size * 2 > len(digest):
+        raise ValueError("chunk_size must leave room for two fan-out components")
+
+    first = digest[:chunk_size]
+    second = digest[chunk_size : chunk_size * 2]
+    return str(Path(first, second, f"{digest}{suffix}"))
+
+
+def resolve_artwork_path(digest: str, suffix: str, root: Path, chunk_size: int = 2) -> Path:
+    """Resolve an artwork file's absolute path under a root.
+
+    Composes :func:`artwork_relative_path` with :func:`resolve_under_root`, so callers
+    get the same containment check the accessory listing applies rather than joining
+    the root themselves.
+
+    Args:
+        digest (str): Lowercase hex SHA-256 of the file's contents.
+        suffix (str): File extension including the leading dot.
+        root (Path): ARTWORK_ROOT.
+        chunk_size (int): Characters per fan-out directory.
+
+    Returns:
+        Path: The absolute path, guaranteed to sit under ``root``.
+
+    Raises:
+        ValueError: If the digest or suffix is rejected, or the result escapes ``root``.
+    """
+    relative = artwork_relative_path(digest, suffix, chunk_size=chunk_size)
+    return resolve_under_root(relative, root.resolve())
 
 
 def resolve_under_root(relative_path: str, root: Path) -> Path:

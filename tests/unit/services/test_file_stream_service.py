@@ -22,7 +22,10 @@ def media_service() -> MediaService:
 @pytest.fixture
 def config(tmp_path: Path) -> MediaConfig:
     return MediaConfig(
-        media_root=str(tmp_path), accessory_root=str(tmp_path), inbox_root=str(tmp_path)
+        media_root=str(tmp_path),
+        accessory_root=str(tmp_path),
+        inbox_root=str(tmp_path),
+        artwork_root=str(tmp_path),
     )
 
 
