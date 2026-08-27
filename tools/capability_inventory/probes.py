@@ -139,6 +139,14 @@ def load_config(path: Path) -> ProbeConfig:
         probe_path = str(entry.get("path") or "").strip()
         if not probe_path.startswith("/"):
             raise ProbeConfigError(f"{path}: probe {name!r} has no absolute path")
+        if "?" in probe_path:
+            raise ProbeConfigError(
+                f"{path}: probe {name!r} puts a query string in `path` "
+                f"({probe_path!r}). Use the `query:` key instead. A path carrying a "
+                "query string matches no route, so the probe would run and time "
+                "successfully but its result could never be attached to an endpoint "
+                "-- the endpoint would report UNKNOWN while the file looked correct."
+            )
 
         method = str(entry.get("method") or "GET").strip().upper()
         if method != "GET" and f"{method} {probe_path}" not in allowlist:
@@ -353,7 +361,8 @@ class ProbeRunner:
 
         Args:
             spec: The validated probe definition.
-            variables: Resolved path variables.
+            variables: Resolved probe variables, substituted into both the path
+                and any string query value.
 
         Returns:
             The result. Never raises for an ordinary probe failure -- the
@@ -361,6 +370,10 @@ class ProbeRunner:
         """
         try:
             path = spec.path.format(**variables)
+            query = {
+                key: value.format(**variables) if isinstance(value, str) else value
+                for key, value in spec.query.items()
+            }
         except KeyError as exc:
             return ProbeResult(
                 name=spec.name,
@@ -369,13 +382,12 @@ class ProbeRunner:
                 url=spec.path,
                 status="unavailable",
                 reason=(
-                    f"path variable {exc} could not be resolved against the probed "
+                    f"probe variable {exc} could not be resolved against the probed "
                     "instance, so this probe was not run"
                 ),
                 notes=(spec.note,) if spec.note else (),
             )
 
-        query = dict(spec.query)
         notes: list[str] = [spec.note] if spec.note else []
 
         if spec.paginate:
