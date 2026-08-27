@@ -32,8 +32,16 @@ class InboxService:
         self.assets = media_repository
         self.transforms = transform_request_repository
 
-    def list_inbox(self) -> list[InboxItem]:
-        return self.inbox.list_all()
+    def list_inbox(self, depth: int | None = None) -> list[InboxItem]:
+        """List the inbox tree.
+
+        Args:
+            depth: How many levels to walk, or None for the repository's maximum.
+
+        Returns:
+            list[InboxItem]: Top-level entries, bounded by the repository's caps.
+        """
+        return self.inbox.list_all(depth)
 
     def delete(self, item: InboxDeleteRequest) -> None:
         try:
