@@ -32,6 +32,14 @@ defaults:
   timeout_seconds: 30
 
 # Non-GET routes that may be probed. Keep empty for read-only runs.
+#
+# It is deliberately empty, and the mutating endpoints are deliberately unmeasured
+# as a result. Timing a write means performing it, and this report is run against
+# production data; the alternatives -- a seeded throwaway instance, or writing and
+# undoing -- either measure the wrong scale or leave the mutation behind when a
+# probe run dies part-way. What a write costs is established from its query shape
+# instead, and the per-payload cost of the tag writes is asserted by a query-count
+# test rather than a timing.
 allowlist: []
 
 variables:
@@ -64,6 +72,38 @@ variables:
     from_endpoint: /api/transform_requests
     query: {limit: 1, sort: "id:asc"}
     pick: items.0.id
+  stream_id:
+    from_endpoint: /api/streams
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
+  title_type_id:
+    from_endpoint: /api/title_types
+    pick: 0.id
+  # Read from an endpoint that is itself addressed by a variable. Resolution is
+  # ordered by dependency, not alphabetically, so `asset_id` is available here.
+  metadata_id:
+    from_endpoint: /api/assets/{asset_id}/metadata
+    pick: 0.id
+  scheme_code:
+    from_endpoint: /api/id_schemes
+    pick: 0.code
+  # Deliberately a value no row holds. A by-scheme lookup that misses runs the
+  # same query as one that hits and cannot short-circuit, so it measures the scan
+  # honestly -- and unlike a real pair it needs no title to happen to carry an
+  # identifier in the scheme that `scheme_id` resolved to, which would couple
+  # these probes to the shape of whatever data the instance holds.
+  external_id:
+    literal: "capinv-probe-no-such-external-id"
+
+  # There is deliberately no `runner_key` variable, so
+  # GET /api/runner_state/{runner_key} stays unprobed.
+  #
+  # A runner is provisioned with its own key and uses it to look up its
+  # configuration, so no client ever discovers a key and there is no listing route
+  # to resolve one from -- the absence is the design, not a gap. Do not add a
+  # literal here: any key hardcoded in this file is wrong on every instance but the
+  # one it was copied from, and a probe that 404s against a real key would report
+  # the endpoint as broken rather than unmeasured.
 
 probes:
   # -- happy path: first screen ------------------------------------------
@@ -272,6 +312,75 @@ probes:
     expect_status: [416]
     note: >-
       verifies the unsatisfiable case returns 416 with a Content-Range header; a 404 means no file on this instance
+
+  # -- detail reads: index-covered, previously untimed --------------------
+  # Individually cheap, but "likely fine" was an inference. These turn a dozen
+  # UNKNOWN verdicts into measurements.
+  - name: asset-accessories
+    path: /api/assets/{asset_id}/accessories
+
+  - name: asset-derived-assets
+    path: /api/assets/{asset_id}/derived_assets
+
+  - name: asset-transform-requests
+    path: /api/assets/{asset_id}/transform_requests
+
+  - name: asset-metadata-one
+    path: /api/assets/{asset_id}/metadata/{metadata_id}
+    note: metadata_id is read from this asset's own metadata list
+
+  - name: stream-one
+    path: /api/streams/{stream_id}
+
+  - name: id-scheme-one
+    path: /api/id_schemes/{scheme_id}
+
+  - name: title-types-all
+    path: /api/title_types
+    note: bounded by the number of title types, which is small and fixed
+
+  - name: title-type-one
+    path: /api/title_types/{title_type_id}
+
+  - name: child-tags
+    path: /api/tags/{tag_id}/tags
+    query: {limit: 50}
+    note: keyset like the parent listing; first screen of one tag's children
+
+  - name: title-ids
+    path: /api/titles/{title_id}/ids
+    note: >-
+      uncapped, and each row lazy-loads its scheme; this is the endpoint the
+      report flagged for one extra SELECT per identifier
+
+  - name: title-references
+    path: /api/titles/{title_id}/references
+
+  - name: transform-request-logs
+    path: /api/transform_requests/{request_id}/logs
+    note: uncapped; the collection size behind it was never measured
+
+  # -- identifier lookups -------------------------------------------------
+  # Probed with an external id no row holds. A miss runs the same query as a hit
+  # and cannot short-circuit, so it measures the lookup honestly without needing
+  # the instance to hold a particular scheme/identifier pairing.
+  - name: asset-by-scheme
+    path: /api/assets/by-scheme/{scheme_id}/{external_id}
+    expect_status: [404]
+    note: measures the lookup, which costs the same whether or not it finds a row
+
+  - name: title-by-scheme
+    path: /api/titles/by-scheme/{scheme_id}/{external_id}
+    expect_status: [404]
+    note: measures the lookup, which costs the same whether or not it finds a row
+
+  - name: external-id-resolve
+    path: /api/external-ids/resolve
+    query: {scheme: "{scheme_code}", external_id: "{external_id}"}
+    expect_status: [404]
+    note: >-
+      the join the report judged index coverage for; the composite
+      uq(scheme_id, external_id) serves it because the join pins scheme_id
 
   # -- unauthenticated surface ------------------------------------------
   - name: health

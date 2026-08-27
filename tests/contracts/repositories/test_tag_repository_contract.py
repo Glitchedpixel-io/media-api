@@ -342,3 +342,117 @@ def test_tag_stats(bundle):
         bundle.tags.add_asset_tags(asset.id, [tag.id])
     stats = bundle.tags.get_tag_usage_stats(tag.id)
     assert stats and stats.tag_id == tag.id and stats.asset_count == 17 and stats.title_count == 10
+
+
+# --- Bulk name resolution (#52, #46) -----------------------------------------
+
+
+@pytest.mark.contract
+def test_get_or_create_by_names_creates_only_what_is_missing(bundle):
+    """Pre-existing tags are reused, not duplicated."""
+    existing = bundle.tags.create(TagCreateFactory(name="action"))
+
+    tags = bundle.tags.get_or_create_by_names(["action", "drama", "scifi"])
+    bundle.tags.db.commit()  # get_or_create_by_names flushes; the caller owns the commit
+
+    by_name = {tag.name: tag for tag in tags}
+    assert set(by_name) == {"action", "drama", "scifi"}
+    assert by_name["action"].id == existing.id, "an existing tag must be reused"
+
+
+@pytest.mark.contract
+def test_get_or_create_by_names_is_case_and_duplicate_insensitive(bundle):
+    """The same name in several forms is one tag, not three."""
+    tags = bundle.tags.get_or_create_by_names(["Drama", "drama", "DRAMA"])
+    bundle.tags.db.commit()
+
+    assert len(tags) == 1
+    assert tags[0].name == "drama"
+
+
+@pytest.mark.contract
+def test_creating_a_name_that_already_exists_does_not_raise(bundle):
+    """#46: the loser of a create race must get the tag, not an error.
+
+    The race itself is inherently timing-dependent, so what is asserted here is the
+    property that removes it: creating a name that already exists is absorbed by
+    ON CONFLICT DO NOTHING rather than raising a unique violation, and the caller is
+    handed the existing row.
+    """
+    first = bundle.tags.get_or_create_by_names(["horror"])
+    bundle.tags.db.commit()
+
+    second = bundle.tags.get_or_create_by_names(["horror"])
+    bundle.tags.db.commit()
+
+    assert first[0].id == second[0].id
+    assert len(bundle.tags.get_by_names(["horror"])) == 1
+
+
+@pytest.mark.contract
+def test_get_by_names_resolves_in_one_call_and_omits_the_unknown(bundle):
+    bundle.tags.create(TagCreateFactory(name="action"))
+    bundle.tags.create(TagCreateFactory(name="scifi"))
+
+    found = bundle.tags.get_by_names(["action", "scifi", "nothing-here"])
+
+    assert {tag.name for tag in found} == {"action", "scifi"}
+
+
+@pytest.mark.contract
+def test_created_tags_are_rolled_back_if_the_request_fails(bundle):
+    """#52: the batch is one transaction, so a later failure undoes the tags.
+
+    Previously each created tag was committed as it was made, so a failure part-way
+    left some of them behind with no way to tell which from the response.
+    """
+    bundle.tags.get_or_create_by_names(["alpha", "beta", "gamma"])
+    # The tags are visible inside the transaction...
+    assert len(bundle.tags.get_by_names(["alpha", "beta", "gamma"])) == 3
+
+    # ...and gone once it is rolled back, which is what a failed request does.
+    bundle.tags.db.rollback()
+
+    assert bundle.tags.get_by_names(["alpha", "beta", "gamma"]) == []
+
+
+@pytest.mark.contract
+def test_linking_returns_only_what_it_actually_linked(bundle):
+    """A repeat request reports nothing added rather than claiming a re-tag."""
+    asset = bundle.assets.create(AssetCreateFactory())
+    tags = bundle.tags.get_or_create_by_names(["action", "drama"])
+    ids = [tag.id for tag in tags]
+
+    first = bundle.tags.add_asset_tags(asset.id, ids)
+    second = bundle.tags.add_asset_tags(asset.id, ids)
+
+    assert {tag.name for tag in first} == {"action", "drama"}
+    assert second == [], "already-linked tags must not be reported as newly added"
+    assert len(bundle.tags.get_asset_tags(asset.id)) == 2
+
+
+@pytest.mark.contract
+def test_linking_ignores_unknown_tag_ids(bundle):
+    """Unchanged behaviour: an unknown id is skipped, not a foreign-key error."""
+    asset = bundle.assets.create(AssetCreateFactory())
+    tag = bundle.tags.create(TagCreateFactory(name="action"))
+
+    linked = bundle.tags.add_asset_tags(asset.id, [tag.id, 999_999])
+
+    assert [t.id for t in linked] == [tag.id]
+    assert len(bundle.tags.get_asset_tags(asset.id)) == 1
+
+
+@pytest.mark.contract
+def test_title_linking_matches_asset_linking(bundle):
+    """The two association tables are the same operation and must behave alike."""
+    title = bundle.titles.create(TitleCreateFactory())
+    tags = bundle.tags.get_or_create_by_names(["action", "drama"])
+    ids = [tag.id for tag in tags]
+
+    first = bundle.tags.add_title_tags(title.id, ids)
+    second = bundle.tags.add_title_tags(title.id, ids)
+
+    assert {tag.name for tag in first} == {"action", "drama"}
+    assert second == []
+    assert len(bundle.tags.get_title_tags(title.id)) == 2
