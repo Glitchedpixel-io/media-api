@@ -6,7 +6,6 @@ from sqlalchemy.orm import selectinload
 from app.models import TransformRequestORM
 from app.models.sort_configs import TRANSFORM_REQUEST_SORT
 from app.schemas import (
-    PageInfo,
     PaginatedResponse,
     TransformRequestCreateInternal,
     TransformRequestListParams,
@@ -79,10 +78,7 @@ class SQLAlchemyTransformRequestRepository(SQLAlchemyBaseRepository, TransformRe
 
         return PaginatedResponse[TransformRequestReadExpanded](
             items=items,
-            page=PageInfo(
-                next=self._to_cursor(page.paging.next),
-                prev=self._to_cursor(page.paging.previous),
-            ),
+            page=self._page_info(page),
         )
 
     def update(

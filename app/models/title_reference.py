@@ -17,7 +17,10 @@ class TitleReferenceORM(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("titles.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("titles.id", ondelete="CASCADE"),
+        index=True,  # references are only ever read for one title
+        nullable=False,
     )
     reference_type: Mapped[TitleReferenceTypeEnum] = mapped_column(
         Enum(TitleReferenceTypeEnum, name="title_reference_type_enum"), nullable=False

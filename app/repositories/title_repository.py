@@ -6,7 +6,6 @@ from sqlalchemy.orm import contains_eager, selectinload
 from app.models import TitleORM
 from app.models.sort_configs import TITLE_SORT
 from app.schemas import (
-    PageInfo,
     PaginatedResponse,
     TitleCreateInternal,
     TitleListParams,
@@ -73,10 +72,7 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
 
         return PaginatedResponse[TitleReadExtended](
             items=items,
-            page=PageInfo(
-                next=self._to_cursor(page.paging.next),
-                prev=self._to_cursor(page.paging.previous),
-            ),
+            page=self._page_info(page),
         )
 
     def update(self, title_id: int, update: TitleUpdateInternal) -> TitleRead:  # type: ignore

@@ -24,7 +24,10 @@ class StreamORM(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     asset_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        index=True,  # every read of this table filters on it; see get_asset_streams
+        nullable=False,
     )
     stream_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     codec_type: Mapped[str] = mapped_column(Text, nullable=False)

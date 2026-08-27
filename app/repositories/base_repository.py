@@ -1,8 +1,10 @@
 # app/repositories/base_repository.py
 
-from sqlakeyset import Marker, serialize_bookmark, unserialize_bookmark
+from sqlakeyset import Marker, Page, serialize_bookmark, unserialize_bookmark
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
+
+from app.schemas import PageInfo
 
 from ._exc import map_sqla_error
 
@@ -40,6 +42,36 @@ class SQLAlchemyBaseRepository:
     @staticmethod
     def _to_cursor(marker: Marker | None) -> str | None:
         return serialize_bookmark(marker) if marker is not None else None
+
+    @staticmethod
+    def _page_info(page: Page) -> PageInfo:
+        """Build the cursor pair for a page, honouring the documented null contract.
+
+        ``PageInfo.next`` promises null on the last page, and callers write
+        ``while (next)`` loops against that promise. sqlakeyset's ``paging.next`` is a
+        marker for "everything after the last row I returned", which it produces
+        unconditionally -- on the final page, on a single-page collection, and on an
+        empty one. Serialising it directly therefore never yields the null the schema
+        advertises, and such a loop runs forever, fetching empty pages.
+
+        ``paging.has_next`` / ``has_previous`` are the questions actually being asked,
+        so the marker is only serialised when there is a further page to point at.
+
+        Args:
+            page: The page returned by ``sqlakeyset.select_page``.
+
+        Returns:
+            PageInfo: Cursors for the adjacent pages; null where none exists.
+        """
+        paging = page.paging
+        return PageInfo(
+            next=SQLAlchemyBaseRepository._to_cursor(paging.next) if paging.has_next else None,
+            prev=(
+                SQLAlchemyBaseRepository._to_cursor(paging.previous)
+                if paging.has_previous
+                else None
+            ),
+        )
 
     @staticmethod
     def _from_cursor(cursor: str | None) -> Marker | None:

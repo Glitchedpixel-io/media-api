@@ -19,7 +19,10 @@ class MetadataORM(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     asset_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        index=True,  # the metadata endpoints are all scoped to one asset
+        nullable=False,
     )
     metadata_type: Mapped[str] = mapped_column(Text, nullable=False)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
