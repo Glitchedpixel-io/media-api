@@ -454,6 +454,7 @@ class RouteAnalyser:
         eager_loaded: dict[str, bool] = {}
         list_methods: list[_MethodContext] = []
         predicates: set[tuple[str, str, str]] = set()
+        joined: set[tuple[str, str]] = set()
 
         for param, class_name in services.items():
             for call in _calls_on(endpoint, param):
@@ -471,6 +472,7 @@ class RouteAnalyser:
                     eager_loaded,
                     list_methods,
                     predicates,
+                    joined,
                     unknowns,
                     surface,
                     depth=0,
@@ -488,7 +490,7 @@ class RouteAnalyser:
         )
 
         pagination = self._pagination(surface, list_methods, unknowns)
-        coverage = self._coverage(surface, list_methods, predicates, pagination, unknowns)
+        coverage = self._coverage(surface, list_methods, predicates, joined, pagination, unknowns)
         implicit = self._implicit_n_plus_one(surface, eager_loaded, pagination)
         queries.extend(implicit)
 
@@ -573,6 +575,7 @@ class RouteAnalyser:
         eager_loaded: dict[str, bool],
         list_methods: list[_MethodContext],
         predicates: set[tuple[str, str, str]],
+        joined: set[tuple[str, str]],
         unknowns: list[Unknown],
         surface: RouteSurface,
         depth: int,
@@ -630,6 +633,19 @@ class RouteAnalyser:
                     if described:
                         predicates.add(described)
 
+            # A join condition pins a column as firmly as a WHERE clause does, and that
+            # decides whether a composite index applies: uq(scheme_id, external_id)
+            # serves a lookup on external_id precisely because the join fixes scheme_id.
+            # Kept apart from `predicates` because these are not caller-supplied filters
+            # -- they inform coverage without appearing as parameters in the report.
+            if isinstance(func, ast.Attribute) and func.attr == "join" and node.args:
+                for onclause in node.args:
+                    if isinstance(onclause, ast.Compare):
+                        for side in [onclause.left, *onclause.comparators]:
+                            reference = _column_ref(side)
+                            if reference:
+                                joined.add(reference)
+
             # Bare-name calls: statement constructors and eager loaders.
             if isinstance(func, ast.Name):
                 if func.id in _EAGER_LOADERS:
@@ -684,6 +700,7 @@ class RouteAnalyser:
                             eager_loaded,
                             list_methods,
                             predicates,
+                            joined,
                             unknowns,
                             surface,
                             depth + 1,
@@ -707,6 +724,7 @@ class RouteAnalyser:
                         eager_loaded,
                         list_methods,
                         predicates,
+                        joined,
                         unknowns,
                         surface,
                         depth + 1,
@@ -736,6 +754,7 @@ class RouteAnalyser:
                         eager_loaded,
                         list_methods,
                         predicates,
+                        joined,
                         unknowns,
                         surface,
                         depth + 1,
@@ -878,6 +897,7 @@ class RouteAnalyser:
         surface: RouteSurface,
         list_methods: list[_MethodContext],
         predicates: set[tuple[str, str, str]],
+        joined: set[tuple[str, str]],
         pagination: PaginationInfo,
         unknowns: list[Unknown],
     ) -> tuple[FilterCoverage, ...]:
@@ -891,7 +911,7 @@ class RouteAnalyser:
         if not list_methods and self._es_clauses(surface) is None:
             # Not a list endpoint: there are no caller-selectable filters, but
             # the predicates the handler narrows on still decide its cost.
-            return self._lookup_coverage(predicates)
+            return self._lookup_coverage(predicates, joined)
 
         es_clauses = self._es_clauses(surface)
         if es_clauses is not None:
@@ -1033,12 +1053,51 @@ class RouteAnalyser:
             )
         return tuple(out)
 
-    def _lookup_coverage(self, predicates: set[tuple[str, str, str]]) -> tuple[FilterCoverage, ...]:
-        """Report index coverage for the predicates a non-list handler narrows on."""
+    def _constrained_columns(
+        self,
+        table: str,
+        predicates: set[tuple[str, str, str]],
+        joined: set[tuple[str, str]],
+    ) -> frozenset[str]:
+        """Every column of ``table`` the query pins, by WHERE clause or by join.
+
+        Args:
+            table: Table name to collect constraints for.
+            predicates: WHERE-clause predicates, as ``(ORM class, column, operator)``.
+            joined: Join-condition columns, as ``(ORM class, column)``.
+
+        Returns:
+            frozenset[str]: Column names pinned on ``table``.
+        """
+        columns = {
+            column for orm, column, _ in predicates if self.graph.orm_tables.get(orm, orm) == table
+        }
+        columns |= {
+            column for orm, column in joined if self.graph.orm_tables.get(orm, orm) == table
+        }
+        return frozenset(columns)
+
+    def _lookup_coverage(
+        self,
+        predicates: set[tuple[str, str, str]],
+        joined: set[tuple[str, str]] = frozenset(),  # type: ignore[assignment]
+    ) -> tuple[FilterCoverage, ...]:
+        """Report index coverage for the predicates a non-list handler narrows on.
+
+        Args:
+            predicates: ``(ORM class, column, operator)`` for each WHERE clause.
+            joined: ``(ORM class, column)`` for each column a join condition pins.
+                These are not reported as parameters, but they decide whether a
+                composite index applies to a column that is not its first.
+
+        Returns:
+            One :class:`FilterCoverage` per predicate.
+        """
         out: list[FilterCoverage] = []
         for orm, column, operator in sorted(predicates):
             table = self.graph.orm_tables.get(orm, orm)
-            covered, index, note = self.lookup.judge(table, column, operator)
+            constrained = self._constrained_columns(table, predicates, joined)
+            covered, index, note = self.lookup.judge(table, column, operator, constrained)
             out.append(
                 FilterCoverage(
                     param=f"{table}.{column}",

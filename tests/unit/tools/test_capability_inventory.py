@@ -18,14 +18,16 @@ from pathlib import Path
 
 import pytest
 
-from tools.capability_inventory import data_shape, load, probes, render, static_surface
+from tools.capability_inventory import data_shape, load, probes, render, static_surface, verdict
 from tools.capability_inventory.annotate import _describe_predicate, _pattern_shape
 from tools.capability_inventory.indexes import IndexLookup
 from tools.capability_inventory.models import (
+    CollectionStats,
     ColumnStats,
     DataShape,
     EndpointRecord,
     FieldInfo,
+    FilterCoverage,
     IndexInfo,
     Inventory,
     PaginationInfo,
@@ -118,6 +120,60 @@ def test_non_leading_column_of_a_composite_index_is_not_covered(lookup: IndexLoo
     covered_leading, index, _ = lookup.judge("external_identifiers", "scheme_id", "==")
     assert covered_leading is True
     assert index == "uq_external_identifier_scheme_id"
+
+
+def test_composite_index_applies_when_a_join_pins_its_leading_column(
+    lookup: IndexLookup,
+) -> None:
+    """The false "sequential scan" that sent #53 after an index it did not need.
+
+    `resolve_by_code` joins id_schemes on scheme_id and filters external_id. The join
+    pins the leading column, so `uq(scheme_id, external_id)` serves the lookup --
+    measured at 300k rows, the planner index-scans it. Judging external_id in
+    isolation reported a sequential scan.
+    """
+    covered, index, note = lookup.judge(
+        "external_identifiers", "external_id", "==", frozenset({"scheme_id"})
+    )
+
+    assert covered is True
+    assert index == "uq_external_identifier_scheme_id"
+    assert "scheme_id" in note, "the note should say which constraint makes it apply"
+
+
+def test_composite_index_does_not_apply_when_the_leading_column_is_free(
+    lookup: IndexLookup,
+) -> None:
+    """Constraining an unrelated column must not conjure coverage."""
+    covered, _, note = lookup.judge(
+        "external_identifiers", "external_id", "==", frozenset({"entity_id"})
+    )
+
+    assert covered is False
+    assert "sequential scan" in note
+
+
+def test_lookup_refuses_indexes_from_the_migration_scan() -> None:
+    """Coverage must be judged against the live schema, not the migration history.
+
+    The scan does not resolve revision order, so `videos` and
+    `uniq_pending_transform_per_video_and_type` still appear in it long after
+    5eab333f4197 renamed them. Merging both collections into the lookup let a dead
+    object count as live coverage; this guard makes that unrepresentable.
+    """
+    with pytest.raises(ValueError, match="live schema"):
+        IndexLookup(
+            (
+                IndexInfo("assets_pkey", "assets", ("id",), True, source="primary key"),
+                IndexInfo(
+                    "ix_videos_master_asset_id",
+                    "videos",
+                    ("master_asset_id",),
+                    False,
+                    source="migration 31d43b7e01c0",
+                ),
+            )
+        )
 
 
 def test_unresolved_input_reports_unknown_rather_than_false(lookup: IndexLookup) -> None:
@@ -367,14 +423,18 @@ def _surface(
 
 
 def _annotation(
-    *, queries: tuple[QueryInfo, ...] = (), loops: tuple[QueryInfo, ...] = (), style: str = "none"
+    *,
+    queries: tuple[QueryInfo, ...] = (),
+    loops: tuple[QueryInfo, ...] = (),
+    style: str = "none",
+    coverage: tuple[FilterCoverage, ...] = (),
 ) -> RouteAnnotation:
     return RouteAnnotation(
         service="AssetService",
         repositories=("SQLAlchemyMediaRepository",),
         queries=queries,
         n_plus_one=loops,
-        coverage=(),
+        coverage=coverage,
         pagination=PaginationInfo(
             style=style,
             default_limit=50 if style == "keyset" else None,
@@ -730,3 +790,155 @@ def test_severity_tokens_are_the_documented_four() -> None:
     """The set a reader learns, and the set the contract asserts, are one set."""
     assert set(render.SEVERITY_TOKENS) == {"SAFE", "CAUTION", "NOT SAFE", "UNKNOWN"}
     assert set(render._TOKEN_FOR_CLASS.values()) <= set(render.SEVERITY_TOKENS)
+
+
+# --------------------------------------------------------------------------
+# Collection ceiling
+# --------------------------------------------------------------------------
+
+
+def _collection(child: str, fk: str, parent: str, max_children: int) -> CollectionStats:
+    return CollectionStats(
+        parent_table=parent,
+        child_table=child,
+        fk_column=fk,
+        parents_with_children=1,
+        parents_total=1,
+        min_children=0,
+        median_children=0.0,
+        p95_children=float(max_children),
+        max_children=max_children,
+    )
+
+
+def _narrowed_on(table: str, column: str) -> FilterCoverage:
+    """The coverage entry a scoped read produces for its own lookup."""
+    return FilterCoverage(
+        param=f"{table}.{column}",
+        role="lookup",
+        table=table,
+        column=column,
+        operator="==",
+        covered=True,
+        index=None,
+        note="",
+    )
+
+
+def _shape(*collections: CollectionStats, row_counts: dict[str, int] | None = None) -> DataShape:
+    return DataShape(
+        row_counts=row_counts or {},
+        columns=(),
+        collections=collections,
+        server_version="PostgreSQL 17.9",
+        captured_from="test",
+    )
+
+
+def _query_on(*tables: str) -> QueryInfo:
+    return QueryInfo(
+        owner="SQLAlchemyThingRepository.list_for",
+        kind="select",
+        tables=tables,
+        in_loop=False,
+        loop_note=None,
+        writes=False,
+        line=1,
+        source_file="app/repositories/thing_repository.py",
+    )
+
+
+def _scoped(path: str) -> RouteSurface:
+    """A route scoped by a path parameter, which is what selects source 3."""
+    return _surface(
+        "GET",
+        path,
+        params=(ParamInfo(name="id", location="path", type_="int", required=True),),
+    )
+
+
+def test_ceiling_uses_the_relationship_the_route_actually_narrows_on() -> None:
+    """The false NOT SAFE on /titles/{title_id}/references.
+
+    That route filters `title_references.title_id`, and the table holds no rows. It
+    was reported as "727 rows" because `titles` -- joined only for a 404 existence
+    check -- is the child of a much larger relationship, and the ceiling matched on
+    child table alone.
+    """
+    annotation = _annotation(
+        queries=(_query_on("title_references", "titles"),),
+        coverage=(_narrowed_on("title_references", "title_id"),),
+    )
+    shape = _shape(
+        _collection("titles", "title_type_id", "title_types", 727),
+        _collection("title_references", "title_id", "titles", 0),
+    )
+
+    ceiling, source = verdict._collection_ceiling(
+        _scoped("/api/titles/{title_id}/references"), annotation, shape
+    )
+
+    assert ceiling == 0
+    assert source is not None and "title_references.title_id" in source
+
+
+def test_ceiling_refuses_an_unrelated_relationship_rather_than_reassuring() -> None:
+    """The false SAFE on /transform_requests/{request_id}/logs -- the worse direction.
+
+    No measured relationship describes logs-per-request, so the honest answer is that
+    the ceiling is unknown. Reporting requests-per-asset instead cleared the endpoint
+    on a number about a different relationship entirely.
+    """
+    annotation = _annotation(
+        queries=(_query_on("run_logs", "media_transform_requests"),),
+        coverage=(_narrowed_on("run_logs", "request_id"),),
+    )
+    shape = _shape(_collection("media_transform_requests", "asset_id", "assets", 17))
+
+    ceiling, source = verdict._collection_ceiling(
+        _scoped("/api/transform_requests/{request_id}/logs"), annotation, shape
+    )
+
+    assert ceiling is None, "an unrelated relationship must not become the ceiling"
+    assert source is None
+
+
+def test_ceiling_falls_back_to_the_row_count_of_the_narrowed_table() -> None:
+    """With no matching relationship, the table's own size is still a true bound."""
+    annotation = _annotation(
+        queries=(_query_on("title_references"),),
+        coverage=(_narrowed_on("title_references", "title_id"),),
+    )
+    shape = _shape(row_counts={"title_references": 40})
+
+    ceiling, source = verdict._collection_ceiling(
+        _scoped("/api/titles/{title_id}/references"), annotation, shape
+    )
+
+    assert ceiling == 40
+    assert source is not None and "at most" in source
+
+
+def test_a_probe_still_outranks_every_inference() -> None:
+    """Source order is unchanged: what a probe actually received is never overridden."""
+    annotation = _annotation(
+        queries=(_query_on("streams"),),
+        coverage=(_narrowed_on("streams", "asset_id"),),
+    )
+    shape = _shape(_collection("streams", "asset_id", "assets", 79))
+    probe = ProbeResult(
+        name="streams-all",
+        endpoint_key="GET /api/streams",
+        method="GET",
+        url="/api/streams",
+        status="ok",
+        http_status=200,
+        item_count=65_739,
+    )
+
+    ceiling, source = verdict._collection_ceiling(
+        _scoped("/api/streams/{stream_id}"), annotation, shape, (probe,)
+    )
+
+    assert ceiling == 65_739
+    assert source == "measured directly from a probe response"

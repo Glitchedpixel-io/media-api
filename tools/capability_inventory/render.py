@@ -652,8 +652,13 @@ def _index_inventory(inventory: Inventory) -> list[str]:
     lines = [
         "## Index inventory",
         "",
-        "Every index the coverage judgements above were made against, merged from the "
-        "SQLAlchemy metadata and the Alembic migrations.",
+        "Indexes declared by the SQLAlchemy models, which is the schema the running "
+        "application has and the only source the coverage judgements above are made "
+        "against, followed by every `op.create_index` in the migration history as a "
+        "cross-check. Migration rows are **historical, not current**: revision order is "
+        "not resolved, so an index created and later dropped or renamed still appears "
+        "here. A row sourced from a migration with no matching model row is either drift "
+        "or an object that has since been removed — check before acting on it.",
         "",
         "| Table | Index | Columns | Unique | Source |",
         "|---|---|---|---|---|",

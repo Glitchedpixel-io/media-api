@@ -207,8 +207,25 @@ class IndexLookup:
         """Build the lookup.
 
         Args:
-            indexes: The merged index inventory.
+            indexes: Indexes describing the *live* schema -- i.e. those read from
+                the SQLAlchemy metadata.
+
+        Raises:
+            ValueError: If any index came from the migration scan. That scan does
+                not resolve revision order, so an index created and later dropped
+                or renamed still appears in it; judging coverage against those
+                lets a dead object read as live. This is a constructor guard
+                rather than a convention because the two collections are merged
+                for the report, and passing the merged tuple here is the easy
+                mistake to make -- it is the one that shipped.
         """
+        historical = sorted({i.source for i in indexes if i.source.startswith("migration ")})
+        if historical:
+            raise ValueError(
+                "IndexLookup must be built from the live schema, but was given indexes "
+                f"sourced from {', '.join(historical)}. Pass indexes.from_metadata() "
+                "only; the migration scan is a historical cross-check for the report."
+            )
         self._indexes = indexes
         self._by_leading: dict[tuple[str, str], list[IndexInfo]] = {}
         self._expressions: dict[str, list[IndexInfo]] = {}
@@ -224,9 +241,40 @@ class IndexLookup:
         """Every index in the inventory."""
         return self._indexes
 
-    def covering(self, table: str, column: str) -> IndexInfo | None:
-        """Return an index whose leading column is ``column``, if any."""
-        candidates = self._by_leading.get((table, column), [])
+    def covering(
+        self, table: str, column: str, constrained: frozenset[str] = frozenset()
+    ) -> IndexInfo | None:
+        """Return an index that can serve a lookup on ``column``, if any.
+
+        A composite index serves a column that is not its first only when every
+        column before it is *also* constrained by the same query. Those companion
+        constraints do not have to be ``WHERE`` clauses: a join condition pins a
+        column just as well, which is how
+        ``uq_external_identifier_scheme_id (scheme_id, external_id)`` serves a
+        lookup on ``external_id`` in a query that joins ``id_schemes`` on
+        ``scheme_id``. Judging the column on its own reports that as a sequential
+        scan when the planner does an index scan.
+
+        Args:
+            table: Table being read.
+            column: Column the predicate applies to.
+            constrained: Other columns of ``table`` pinned by the same query,
+                from ``WHERE`` clauses and join conditions alike.
+
+        Returns:
+            The index the planner can use, or None if no index applies.
+        """
+        candidates = list(self._by_leading.get((table, column), []))
+
+        for index in self._indexes:
+            if index.table != table or column not in index.columns:
+                continue
+            position = index.columns.index(column)
+            if position == 0:
+                continue  # already collected above
+            if all(earlier in constrained for earlier in index.columns[:position]):
+                candidates.append(index)
+
         if not candidates:
             return None
         # Prefer a single-column index; it is the one the planner will reach for.
@@ -250,7 +298,11 @@ class IndexLookup:
         return None
 
     def judge(
-        self, table: str | None, column: str | None, operator: str | None
+        self,
+        table: str | None,
+        column: str | None,
+        operator: str | None,
+        constrained: frozenset[str] = frozenset(),
     ) -> tuple[bool | None, str | None, str]:
         """Decide whether a filter can use an index.
 
@@ -258,6 +310,9 @@ class IndexLookup:
             table: Table the filter applies to, or None if unresolved.
             column: Column the filter applies to, or None if unresolved.
             operator: Normalised operator name, or None if unresolved.
+            constrained: Other columns of ``table`` pinned by the same query,
+                which decide whether a composite index applies -- see
+                :meth:`covering`.
 
         Returns:
             A tuple of (covered, index name, note). ``covered`` is None when the
@@ -269,7 +324,7 @@ class IndexLookup:
         if operator is None:
             return None, None, "comparison operator could not be resolved"
 
-        index = self.covering(table, column)
+        index = self.covering(table, column, constrained)
 
         if operator in _UNINDEXABLE:
             if operator in {"ilike_contains", "like_contains", "ilike_suffix", "like_suffix"}:
@@ -305,6 +360,14 @@ class IndexLookup:
 
         if operator in _BTREE_OPERATORS:
             if index is not None:
+                if index.columns and index.columns[0] != column:
+                    leading = ", ".join(index.columns[: index.columns.index(column)])
+                    return (
+                        True,
+                        index.name,
+                        f"served by {index.name}; the same query pins {leading}, "
+                        "so the composite index applies from its leading column",
+                    )
                 return True, index.name, f"served by {index.name}"
             return False, None, f"no index on {table}.{column}; requires a sequential scan"
 
