@@ -234,31 +234,44 @@ probes:
     path: /api/transform_requests/{request_id}
 
   # -- streaming ---------------------------------------------------------
+  # A 404 from any of these means the probed instance has no file for the asset
+  # that `asset_id` resolved to -- almost always a run pointed at a real database
+  # with the media root not mounted alongside it. It is not evidence that ranges
+  # are broken: the 200, 206, suffix-206, 416, 400 and traversal cases are all
+  # asserted in tests/unit/api/test_file_stream_router.py and
+  # tests/integration/api/test_file_stream_api.py, the latter against a real row
+  # and a real file. What these probes add is timing at production scale, which
+  # only a mounted media root can provide.
   - name: fetch-asset-stream
     path: /api/fetch/{asset_id}
     stream: true
-    note: time-to-first-byte measured separately from total transfer
+    note: >-
+      time-to-first-byte measured separately from total transfer; a 404 here means
+      no file on this instance, not a broken endpoint -- see the note above
 
   - name: fetch-asset-range
     path: /api/fetch/{asset_id}
     stream: true
     headers: {Range: "bytes=0-1048575"}
     expect_status: [206]
-    note: first mebibyte only; verifies Content-Range and Accept-Ranges
+    note: >-
+      first mebibyte only; verifies Content-Range and Accept-Ranges; a 404 means no file on this instance
 
   - name: fetch-asset-range-suffix
     path: /api/fetch/{asset_id}
     stream: true
     headers: {Range: "bytes=-65536"}
     expect_status: [206]
-    note: suffix range, the form a seek-to-end scrub issues
+    note: >-
+      suffix range, the form a seek-to-end scrub issues; a 404 means no file on this instance
 
   - name: fetch-asset-range-unsatisfiable
     path: /api/fetch/{asset_id}
     stream: true
     headers: {Range: "bytes=99999999999999-"}
     expect_status: [416]
-    note: verifies the unsatisfiable case returns 416 with a Content-Range header
+    note: >-
+      verifies the unsatisfiable case returns 416 with a Content-Range header; a 404 means no file on this instance
 
   # -- unauthenticated surface ------------------------------------------
   - name: health
