@@ -25,10 +25,10 @@ def _all_streams(bundle, **params):
     ``list_paged`` caps a response at ``limit``, so a test that wants "all of them"
     has to walk the cursors rather than read one page.
 
-    sqlakeyset still hands back a ``next`` marker on the final page, so "next is None"
-    alone never terminates — it just refetches the tail forever. Stop on an empty page
-    or a cursor that stops advancing, and cap the walk so a regression in the cursor
-    fails the test rather than hanging the suite.
+    Terminates on a null cursor. When this was written sqlakeyset's marker was
+    serialised unconditionally, so ``next`` was never null and the walk also had to
+    stop on an empty page or a cursor that stopped advancing; #66 made ``next`` null
+    exactly when there is no further page, so those conditions are unreachable.
 
     Args:
         bundle: The repository bundle under test.
@@ -38,22 +38,20 @@ def _all_streams(bundle, **params):
         list[StreamRead]: Every row across every page, in cursor order.
 
     Raises:
-        AssertionError: If the cursor does not terminate within the safety cap.
+        AssertionError: If the walk does not terminate within the cap. That guards
+            against a regression in the #66 contract rather than against expected
+            behaviour -- without it such a regression hangs the suite.
     """
     items = []
     cursor = None
-    last_cursor = None
 
-    for _ in range(1000):  # safety cap
+    for _ in range(1000):
         page = bundle.streams.list_paged(StreamListParams(after=cursor, **params))
-        if not page.items:
-            return items
         items.extend(page.items)
 
         cursor = page.page.next
-        if not cursor or cursor == last_cursor:
+        if cursor is None:
             return items
-        last_cursor = cursor
 
     raise AssertionError("Exceeded max pagination steps; cursor likely not advancing.")
 
