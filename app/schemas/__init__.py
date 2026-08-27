@@ -12,6 +12,7 @@ from .metadata import *
 from .run_summary import *
 from .runner_state import *
 from .stream import *
+from .stream_filters import *
 from .tag import *
 from .tag_filters import *
 from .title import *
@@ -84,6 +85,8 @@ __all__ = [
     "ScannerRunSummaryRead",
     "StreamCreateInternal",
     "StreamCreatePublic",
+    "StreamFilters",
+    "StreamListParams",
     "StreamPatchPublic",
     "StreamRead",
     "StreamUpdateInternal",

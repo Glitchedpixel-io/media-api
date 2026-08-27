@@ -7,7 +7,7 @@ import pytest
 from http import HTTPStatus
 from fastapi.testclient import TestClient
 
-from app.schemas import StreamPatchPublic
+from app.schemas import PageInfo, PaginatedResponse, StreamPatchPublic, StreamRead
 from tests.factories import StreamReadFactory
 
 
@@ -17,27 +17,55 @@ class TestListStreams:
     @pytest.mark.unit
     @pytest.mark.api
     def test_list_streams_success(self, client: TestClient, stream_service_mock) -> None:
-        """GET /api/streams returns list of streams."""
+        """GET /api/streams returns a page of streams."""
         expected_streams = [StreamReadFactory() for _ in range(3)]
-        stream_service_mock.get_streams.return_value = expected_streams
+        stream_service_mock.get_streams.return_value = PaginatedResponse[StreamRead](
+            items=expected_streams, page=PageInfo(next="cursor", prev=None)
+        )
 
         response = client.get("/api/streams")
 
         assert response.status_code == HTTPStatus.OK
         response_data = response.json()
-        assert len(response_data) == 3
+        assert len(response_data["items"]) == 3
+        assert response_data["page"]["next"] == "cursor"
         stream_service_mock.get_streams.assert_called_once()
 
     @pytest.mark.unit
     @pytest.mark.api
     def test_list_streams_empty(self, client: TestClient, stream_service_mock) -> None:
-        """GET /api/streams returns empty list when no streams exist."""
-        stream_service_mock.get_streams.return_value = []
+        """GET /api/streams returns an empty page when no streams exist."""
+        stream_service_mock.get_streams.return_value = PaginatedResponse[StreamRead](
+            items=[], page=PageInfo(next=None, prev=None)
+        )
 
         response = client.get("/api/streams")
 
         assert response.status_code == HTTPStatus.OK
-        assert response.json() == []
+        assert response.json()["items"] == []
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_list_streams_rejects_limit_above_cap(self, client: TestClient) -> None:
+        """The page size cap is enforced by validation, not left to the caller."""
+        response = client.get("/api/streams?limit=501")
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+    @pytest.mark.unit
+    @pytest.mark.api
+    def test_list_streams_forwards_params(self, client: TestClient, stream_service_mock) -> None:
+        """Query params reach the service rather than being silently dropped."""
+        stream_service_mock.get_streams.return_value = PaginatedResponse[StreamRead](
+            items=[], page=PageInfo(next=None, prev=None)
+        )
+
+        response = client.get("/api/streams?asset_id=42&limit=5")
+
+        assert response.status_code == HTTPStatus.OK
+        params = stream_service_mock.get_streams.call_args.args[0]
+        assert params.asset_id == 42
+        assert params.limit == 5
 
 
 class TestGetStream:

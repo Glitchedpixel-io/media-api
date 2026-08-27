@@ -1,5 +1,12 @@
 # app/models/sort_configs.py
-from app.models import AssetORM, TagORM, TitleORM, TitleTypeORM, TransformRequestORM
+from app.models import (
+    AssetORM,
+    StreamORM,
+    TagORM,
+    TitleORM,
+    TitleTypeORM,
+    TransformRequestORM,
+)
 from app.utils.sorting import DT_MAX, DT_MIN, SortConfig
 
 TITLE_SORT = SortConfig(
@@ -59,6 +66,17 @@ ASSET_SORT = SortConfig(
             "desc": DT_MIN,
         },
     },
+)
+
+STREAM_SORT = SortConfig(
+    model=StreamORM,
+    allowed_fields={
+        "id",
+        "asset_id",
+        "stream_index",
+        "codec_type",
+    },
+    id_field="id",
 )
 
 TRANSFORM_REQUEST_SORT = SortConfig(

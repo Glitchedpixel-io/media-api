@@ -38,7 +38,7 @@ class TestStreamsAPI:
 
         # Assert
         assert response.status_code == 200
-        streams = response.json()
+        streams = response.json()["items"]
         assert isinstance(streams, list)
         assert len(streams) == 0
 
@@ -66,7 +66,7 @@ class TestStreamsAPI:
 
         # Assert
         assert response.status_code == 200
-        streams = response.json()
+        streams = response.json()["items"]
 
         assert isinstance(streams, list)
         assert len(streams) == 2
@@ -281,7 +281,7 @@ class TestStreamsAPIFiltering:
 
         # Assert
         assert response.status_code == 200
-        streams = response.json()
+        streams = response.json()["items"]
 
         assert len(streams) == 3
 
@@ -345,7 +345,7 @@ class TestStreamsAPIFiltering:
 
         # Assert
         assert response.status_code == 200
-        streams = response.json()
+        streams = response.json()["items"]
 
         assert len(streams) == 3
 
@@ -559,9 +559,118 @@ class TestStreamsAPIPerformance:
 
         # Assert
         assert response.status_code == 200
-        streams = response.json()
+        streams = response.json()["items"]
         assert len(streams) == 50
 
         # Performance assertion (adjust threshold as needed)
         duration = end_time - start_time
         assert duration < 5.0, f"Query took {duration}s, expected < 5s"
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestStreamsPagination:
+    """Cover the cap and the cursor on GET /api/streams.
+
+    Before #51 this endpoint returned the whole table in one response — 65,739 rows
+    and 15MB against the production dataset. The cap is the point of the change, so
+    it is asserted here rather than left to the shape of the test fixtures.
+    """
+
+    def _seed(
+        self,
+        media_repository: MediaRepository,
+        stream_repository: StreamRepository,
+        count: int,
+    ) -> int:
+        """Create one asset carrying `count` streams, and return its id."""
+        asset = AssetReadFactory()
+        created = media_repository.create(
+            AssetCreateInternal(**asset.model_dump(exclude={"id", "created_at", "master_asset_id"}))
+        )
+        for i in range(count):
+            stream = StreamReadFactory(asset_id=created.id, stream_index=i)
+            stream_repository.create(StreamCreateInternal(**stream.model_dump(exclude={"id"})))
+        return created.id
+
+    def test_response_is_capped_at_the_requested_limit(
+        self,
+        client: TestClient,
+        media_repository: MediaRepository,
+        stream_repository: StreamRepository,
+    ) -> None:
+        """No request returns more rows than it asked for."""
+        self._seed(media_repository, stream_repository, 12)
+
+        response = client.get("/api/streams?limit=5")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["items"]) == 5
+        assert body["page"]["next"] is not None
+
+    def test_limit_above_the_cap_is_rejected(self, client: TestClient) -> None:
+        """The 500 cap is enforced by validation — a caller cannot opt out of it."""
+        assert client.get("/api/streams?limit=501").status_code == 422
+
+    def test_cursor_walks_every_row_without_repeating(
+        self,
+        client: TestClient,
+        media_repository: MediaRepository,
+        stream_repository: StreamRepository,
+    ) -> None:
+        """Following page.next reaches all rows exactly once.
+
+        sqlakeyset still returns a `next` marker on the final page, so the walk ends on
+        an empty page or a cursor that stops advancing — not on `next` being null.
+        """
+        self._seed(media_repository, stream_repository, 12)
+
+        seen: list[int] = []
+        cursor: str | None = None
+        last_cursor: str | None = None
+
+        for _ in range(100):  # safety cap: a stuck cursor must fail, not hang
+            query = "/api/streams?limit=5"
+            if cursor:
+                query = f"{query}&after={cursor}"
+            body = client.get(query).json()
+
+            if not body["items"]:
+                break
+            seen.extend(item["id"] for item in body["items"])
+
+            cursor = body["page"]["next"]
+            if not cursor or cursor == last_cursor:
+                break
+            last_cursor = cursor
+        else:
+            raise AssertionError("Exceeded max pagination steps; cursor not advancing.")
+
+        assert len(seen) == 12
+        assert len(set(seen)) == 12, "cursor returned the same row on more than one page"
+
+    def test_asset_id_filters_the_listing(
+        self,
+        client: TestClient,
+        media_repository: MediaRepository,
+        stream_repository: StreamRepository,
+    ) -> None:
+        """asset_id scopes the response to one asset's streams."""
+        asset_1 = self._seed(media_repository, stream_repository, 3)
+        asset_2 = self._seed(media_repository, stream_repository, 4)
+
+        body = client.get(f"/api/streams?asset_id={asset_1}").json()
+
+        assert len(body["items"]) == 3
+        assert {item["asset_id"] for item in body["items"]} == {asset_1}
+
+        body = client.get(f"/api/streams?asset_id={asset_2}").json()
+        assert len(body["items"]) == 4
+
+    def test_unknown_asset_id_returns_an_empty_page(self, client: TestClient) -> None:
+        """A filter matching nothing is an empty page, not a 404."""
+        response = client.get("/api/streams?asset_id=0")
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []

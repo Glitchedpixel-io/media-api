@@ -18,7 +18,15 @@ from app.repositories.errors import (
     UniqueViolation,
 )
 from app.repositories.protocols import MediaRepository, StreamRepository
-from app.schemas import StreamCreateInternal, StreamCreatePublic, StreamPatchPublic
+from app.schemas import (
+    PageInfo,
+    PaginatedResponse,
+    StreamCreateInternal,
+    StreamCreatePublic,
+    StreamListParams,
+    StreamPatchPublic,
+    StreamRead,
+)
 from app.services import StreamService
 from tests.factories import AssetReadFactory, StreamReadFactory
 
@@ -79,32 +87,51 @@ class TestGetStreams:
 
     @pytest.mark.unit
     def test_get_streams_success(self) -> None:
-        """get_streams returns list of all streams."""
+        """get_streams returns a page of streams."""
         s_repo = create_autospec(StreamRepository, instance=True, spec_set=True)
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         streams = [StreamReadFactory() for _ in range(5)]
-        s_repo.list_all.return_value = streams
+        s_repo.list_paged.return_value = PaginatedResponse[StreamRead](
+            items=streams, page=PageInfo(next=None, prev=None)
+        )
         svc = StreamService(s_repo, m_repo)
+        params = StreamListParams()
 
-        result = svc.get_streams()
+        result = svc.get_streams(params)
 
-        assert isinstance(result, list)
-        assert len(result) == 5
-        s_repo.list_all.assert_called_once()
+        assert len(result.items) == 5
+        s_repo.list_paged.assert_called_once_with(params)
 
     @pytest.mark.unit
-    def test_get_streams_empty_list(self) -> None:
-        """get_streams returns empty list when no streams exist."""
+    def test_get_streams_empty_page(self) -> None:
+        """get_streams returns an empty page when no streams exist."""
         s_repo = create_autospec(StreamRepository, instance=True, spec_set=True)
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
-        s_repo.list_all.return_value = []
+        s_repo.list_paged.return_value = PaginatedResponse[StreamRead](
+            items=[], page=PageInfo(next=None, prev=None)
+        )
         svc = StreamService(s_repo, m_repo)
 
-        result = svc.get_streams()
+        result = svc.get_streams(StreamListParams())
 
-        assert isinstance(result, list)
-        assert len(result) == 0
-        s_repo.list_all.assert_called_once()
+        assert result.items == []
+        s_repo.list_paged.assert_called_once()
+
+    @pytest.mark.unit
+    def test_get_streams_passes_filters_through(self) -> None:
+        """The service is a pass-through: filtering belongs to the repository."""
+        s_repo = create_autospec(StreamRepository, instance=True, spec_set=True)
+        m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
+        s_repo.list_paged.return_value = PaginatedResponse[StreamRead](
+            items=[], page=PageInfo(next=None, prev=None)
+        )
+        svc = StreamService(s_repo, m_repo)
+        params = StreamListParams(asset_id=7, limit=10)
+
+        svc.get_streams(params)
+
+        assert s_repo.list_paged.call_args.args[0].asset_id == 7
+        assert s_repo.list_paged.call_args.args[0].limit == 10
 
 
 class TestCreateStream:
