@@ -186,6 +186,55 @@ def _include_routers(api: FastAPI) -> None:
     )
 
 
+def _alias_unslashed_paths(api: FastAPI) -> None:
+    """Answer `/api/assets` as well as `/api/assets/`, without a redirect.
+
+    Four routes are declared with a trailing slash -- the assets and titles
+    collections -- while the other fourteen are not. Starlette answers the unslashed
+    form with a 307, and a preflighted cross-origin request does not reliably carry
+    its Authorization header across that hop, so a hand-written client that omits the
+    slash can fail for reasons that look nothing like a missing slash.
+
+    The slashed form stays canonical and is the only one in the OpenAPI document, so
+    every generated client keeps the path it already has. Both the front end and the
+    runner client call `/api/assets/` today because that is what the spec publishes;
+    republishing the unslashed form would regenerate them and leave every deployed
+    caller taking a redirect.
+
+    Each alias is *copied* from its canonical route rather than declared by hand:
+    response model, status code, dependencies and declared responses all come from
+    it, so the pair cannot drift. The dependencies matter most -- router-level
+    ``Depends(get_current_user)`` lands on ``route.dependencies``, and an alias that
+    dropped it would be an unauthenticated copy of an authenticated endpoint.
+
+    Args:
+        api: The application, with its routers already included.
+    """
+    from fastapi.routing import APIRoute  # noqa: PLC0415 -- avoids a circular import
+
+    routes = [route for route in api.routes if isinstance(route, APIRoute)]
+    existing = {(route.path, frozenset(route.methods)) for route in routes}
+
+    for route in routes:
+        if not route.path.endswith("/") or route.path == "/":
+            continue
+        unslashed = route.path.rstrip("/")
+        if (unslashed, frozenset(route.methods)) in existing:
+            continue
+        api.router.add_api_route(
+            unslashed,
+            route.endpoint,
+            methods=sorted(route.methods),
+            response_model=route.response_model,
+            status_code=route.status_code,
+            dependencies=route.dependencies,
+            responses=route.responses,
+            name=f"{route.name}_unslashed",
+            include_in_schema=False,
+            route_class_override=type(route),
+        )
+
+
 def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) -> FastAPI:
     """Application factory returning a configured FastAPI instance."""
 
@@ -268,6 +317,7 @@ def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) ->
         return health_status
 
     _include_routers(api)
+    _alias_unslashed_paths(api)
 
     # ensure the app is instrumented for logging
     logfire.instrument_fastapi(api)
