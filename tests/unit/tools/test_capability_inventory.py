@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -298,6 +299,25 @@ def _write(tmp_path: Path, body: str) -> Path:
     return path
 
 
+def _spec(**overrides: Any) -> probes.ProbeSpec:
+    """A minimal GET probe against /api/streams, for exercising `run` directly."""
+    fields: dict[str, Any] = {
+        "name": "by-asset",
+        "method": "GET",
+        "path": "/api/streams",
+        "query": {},
+        "headers": {},
+        "expect_status": (200,),
+        "stream": False,
+        "paginate": None,
+        "note": None,
+        "runs": 1,
+        "warmup": 0,
+        "timeout": 1.0,
+    }
+    return probes.ProbeSpec(**{**fields, **overrides})
+
+
 def test_shipped_probe_definitions_are_valid() -> None:
     config = probes.load_config(Path(probes.__file__).with_name("probes.yaml"))
     assert config.probes
@@ -335,6 +355,57 @@ def test_duplicate_probe_names_are_refused(tmp_path: Path) -> None:
 def test_an_empty_probe_file_is_an_error_not_an_empty_run(tmp_path: Path) -> None:
     with pytest.raises(probes.ProbeConfigError, match="no probes"):
         probes.load_config(_write(tmp_path, "probes: []\n"))
+
+
+def test_a_query_string_in_the_path_is_refused(tmp_path: Path) -> None:
+    """A probe whose path carries ``?`` matches no route.
+
+    It still runs and times successfully, so the failure is invisible: the
+    endpoint reports UNKNOWN while the file looks correct. Three /api/streams
+    probes shipped that way and went unmeasured, so it is refused at load.
+    """
+    path = _write(
+        tmp_path,
+        "probes:\n  - name: streams\n    path: /api/streams?limit=50\n",
+    )
+    with pytest.raises(probes.ProbeConfigError, match="query string in `path`"):
+        probes.load_config(path)
+
+
+def test_no_shipped_probe_hides_a_query_string_in_its_path() -> None:
+    config = probes.load_config(Path(probes.__file__).with_name("probes.yaml"))
+    assert all("?" not in spec.path for spec in config.probes)
+
+
+def test_variables_are_substituted_into_query_values() -> None:
+    """``{name}`` resolves in a query value, not only in the path.
+
+    Without this a filter probe has to smuggle its variable into the path as a
+    query string, which is precisely what the loader now refuses.
+    """
+    spec = _spec(query={"asset_id": "{asset_id}", "limit": 50})
+    captured: dict[str, Any] = {}
+
+    def _fake_simple(_spec: probes.ProbeSpec, path: str, query: dict[str, Any], _n: list[str]):
+        captured.update({"path": path, "query": query})
+        return None
+
+    runner = probes.ProbeRunner.__new__(probes.ProbeRunner)
+    runner._run_simple = _fake_simple  # type: ignore[method-assign]
+    probes.ProbeRunner.run(runner, spec, {"asset_id": 4213})
+
+    assert captured["path"] == "/api/streams"
+    assert captured["query"] == {"asset_id": "4213", "limit": 50}
+
+
+def test_an_unresolved_query_variable_reports_unavailable_not_a_crash() -> None:
+    """An unknown variable in a query value degrades the way a path one does."""
+    runner = probes.ProbeRunner.__new__(probes.ProbeRunner)
+    result = probes.ProbeRunner.run(runner, _spec(query={"asset_id": "{nope}"}), {})
+
+    assert result.status == "unavailable"
+    assert "nope" in (result.reason or "")
+    assert result.endpoint_key == "GET /api/streams"
 
 
 def test_percentiles_are_nearest_rank_over_the_sample() -> None:

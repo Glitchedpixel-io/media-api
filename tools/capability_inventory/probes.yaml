@@ -11,11 +11,17 @@
 #   this harness will do by accident.
 #
 # VARIABLES
-#   `{name}` placeholders in a probe's `path` are filled from `variables`.
+#   `{name}` placeholders in a probe's `path`, and in any string value under its
+#   `query`, are filled from `variables`.
 #   A variable is resolved against the API itself, so probes stay valid as the
 #   library changes and the file needs no ids hard-coded into it. If resolution
 #   fails, every probe depending on that variable is reported as `unavailable`
 #   with the reason -- never silently skipped.
+#
+#   Never put a query string in `path`. A path carrying `?` matches no route, so
+#   the probe would time successfully but its result could not be attached to an
+#   endpoint, which reports UNKNOWN while this file still looks correct. The
+#   loader rejects it.
 
 version: 1
 
@@ -172,7 +178,8 @@ probes:
     note: largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
 
   - name: streams-by-asset
-    path: /api/streams?asset_id={asset_id}&limit=50
+    path: /api/streams
+    query: {asset_id: "{asset_id}", limit: 50}
     note: >-
       the filtered read a client actually wants; streams.asset_id is unindexed until #53
       lands, so a slow result here is that index, not the paging
