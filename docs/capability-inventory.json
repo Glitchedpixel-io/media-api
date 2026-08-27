@@ -2064,7 +2064,7 @@
         "one extra SELECT per row: AssetORM.external_ids (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of 500 rows costs up to 500 additional queries against `external_identifiers`; at the 26ms round trip measured against the probed database that is about 13s of pure latency at the cap",
         "unindexed sort keys (`created_at`, `duration`, `filename`, `mtime`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,321 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
         "filters that cannot use an index (`created_since`, `duration_max`, `duration_min`, `filename_ext`, `path_part`, `path_prefix`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,321 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 14604ms on `assets-max-page-unindexed-sort` is a page-load-scale wait",
+        "measured p95 of 14.6s on `assets-max-page-unindexed-sort` is a page-load-scale wait",
         "the trailing slash is required; requesting it without one gets a 307, which a cross-origin fetch with credentials will not always follow",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
@@ -2356,7 +2356,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Not safe as a first-screen query: worst-case p95 is 14604ms, and the cause is the per-row lazy load, not the paging. Cursor paging itself holds up — page 400 costs what page 1 does — so infinite scroll is sound once the per-page cost is fixed.",
+      "verdict": "worst-case p95 is 14.6s, and the cause is the per-row lazy load, not the paging. Cursor paging itself holds up: page 400 costs what page 1 does, so infinite scroll is sound once the per-page cost is fixed.",
       "verdict_class": "unsafe"
     },
     {
@@ -2577,7 +2577,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -2784,7 +2784,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "UNKNOWN — the read is not index-covered, but was not timed; see Gaps.",
+      "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -2925,7 +2925,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -3188,7 +3188,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 133ms).",
+      "verdict": "p95 133ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -3490,8 +3490,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Write path that touches the filesystem as well as the database. Not safe for optimistic UI: it can fail after the database row exists, so the UI must wait for the response before showing success.",
-      "verdict_class": "write"
+      "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -3652,7 +3652,7 @@
           "tests/unit/api/assets/test_files.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -3873,7 +3873,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 4 rows (assets.master_asset_id -> assets). The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 4 rows (assets.master_asset_id -> assets), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -4119,7 +4119,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -4345,7 +4345,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 105ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -4566,7 +4566,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -4733,7 +4733,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -4947,7 +4947,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -5149,7 +5149,7 @@
           "tests/integration/api/test_assets_api.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 153ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 153ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -5355,7 +5355,7 @@
           "tests/integration/api/test_assets_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -5535,7 +5535,7 @@
           "tests/integration/api/test_assets_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -5711,7 +5711,7 @@
           "tests/unit/services/test_metadata_service.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -5938,7 +5938,7 @@
           "tests/integration/api/test_assets_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -6102,7 +6102,7 @@
           "tests/unit/services/test_stream_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -6363,7 +6363,7 @@
           "tests/unit/api/assets/test_streams.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 190ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 190ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6605,7 +6605,7 @@
           "tests/unit/api/assets/test_streams.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -6829,7 +6829,7 @@
           "tests/unit/api/assets/test_tags.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7188,8 +7188,8 @@
           "tests/unit/api/assets/test_tags.py"
         ]
       },
-      "verdict": "Write path. Safe to call from a form submit, but the work is proportional to the size of the payload rather than constant — send small batches and show a determinate progress state rather than a spinner.",
-      "verdict_class": "write"
+      "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -7452,8 +7452,8 @@
           "tests/unit/api/assets/test_tags.py"
         ]
       },
-      "verdict": "Write path. Safe to call from a form submit, but the work is proportional to the size of the payload rather than constant — send small batches and show a determinate progress state rather than a spinner.",
-      "verdict_class": "write"
+      "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -7632,7 +7632,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -7849,7 +7849,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -8106,7 +8106,7 @@
           "tests/unit/api/assets/test_transform_requests.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets). The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -8368,7 +8368,7 @@
           "tests/unit/services/test_transform_request_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -8541,7 +8541,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "UNKNOWN — the read is not index-covered, but was not timed; see Gaps.",
+      "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -8745,8 +8745,8 @@
           "tests/unit/api/test_file_stream_router.py"
         ]
       },
-      "verdict": "UNKNOWN — streaming behaviour was not measured. Range support is implemented in the service, but whether it works end to end against a real file has not been verified; see Gaps.",
-      "verdict_class": "unsafe"
+      "verdict": "streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404). Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.",
+      "verdict_class": "unknown"
     },
     {
       "annotation": {
@@ -8845,7 +8845,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 141ms).",
+      "verdict": "p95 141ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -8980,7 +8980,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 115ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 115ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -9147,7 +9147,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -9289,7 +9289,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -9471,7 +9471,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -9579,8 +9579,8 @@
           "tests/unit/api/test_inbox.py"
         ]
       },
-      "verdict": "Write path that touches the filesystem as well as the database. Not safe for optimistic UI: it can fail after the database row exists, so the UI must wait for the response before showing success.",
-      "verdict_class": "write"
+      "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -9688,7 +9688,7 @@
           "tests/unit/services/test_inbox_service.py"
         ]
       },
-      "verdict": "UNKNOWN — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
+      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -9936,8 +9936,8 @@
           "tests/unit/api/test_inbox.py"
         ]
       },
-      "verdict": "Write path that touches the filesystem as well as the database. Not safe for optimistic UI: it can fail after the database row exists, so the UI must wait for the response before showing success.",
-      "verdict_class": "write"
+      "verdict": "Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -10097,7 +10097,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -10258,7 +10258,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -10419,7 +10419,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -10488,7 +10488,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -10577,7 +10577,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 2ms).",
+      "verdict": "p95 2ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -10783,7 +10783,7 @@
           "tests/unit/services/test_run_summary_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -10943,7 +10943,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -11081,7 +11081,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -11267,7 +11267,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -11521,7 +11521,7 @@
           "tests/unit/services/test_run_summary_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -11887,7 +11887,7 @@
           "tests/unit/api/test_search_transcripts_router.py"
         ]
       },
-      "verdict": "Safe for a search-results panel showing the first few pages (worst-case p95 3ms), and not safe for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
+      "verdict": "fine for a search-results panel showing the first few pages (worst-case p95 3ms), and not for anything that scrolls indefinitely: the offset window is finite and the ordering is by relevance, so a row can move between pages while the user is reading. Cap the result set in the UI at a few hundred and offer refinement rather than more pages.",
       "verdict_class": "caution"
     },
     {
@@ -11957,7 +11957,7 @@
       ],
       "risks": [
         "no pagination and no page-size cap; the largest collection measured is 65,739 rows (measured directly from a probe response)",
-        "measured p95 of 1856ms on `streams-all` is a page-load-scale wait",
+        "measured p95 of 1.9s on `streams-all` is a page-load-scale wait",
         "largest measured payload is 15.2MB (`streams-all`)"
       ],
       "surface": {
@@ -12083,7 +12083,7 @@
           "tests/unit/api/test_streams.py"
         ]
       },
-      "verdict": "Not safe to render directly: the largest collection is 65,739 rows (measured directly from a probe response), measured p95 1856ms, returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
+      "verdict": "the largest collection is 65,739 rows (measured directly from a probe response), measured p95 1856ms, returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
       "verdict_class": "unsafe"
     },
     {
@@ -12285,7 +12285,7 @@
           "tests/unit/services/test_stream_service.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -12527,7 +12527,7 @@
           "tests/unit/services/test_stream_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -12810,7 +12810,7 @@
           "tests/unit/api/test_tags.py"
         ]
       },
-      "verdict": "Safe for first-screen browse and for virtualised infinite scroll — the cursor holds up at depth and the cap is 500. Caveats: expect the sort control to be the expensive part.",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
     },
     {
@@ -13005,7 +13005,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -13187,7 +13187,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 103ms).",
+      "verdict": "p95 103ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -13396,7 +13396,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -13604,7 +13604,7 @@
           "tests/unit/api/test_tags.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -13881,7 +13881,7 @@
           "tests/unit/api/test_tags.py"
         ]
       },
-      "verdict": "UNKNOWN — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
+      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -14092,7 +14092,7 @@
           "tests/unit/api/test_tags.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -14202,7 +14202,7 @@
           "tests/integration/api/test_title_types_api.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 8 rows (all 8 rows of `title_types`). The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 8 rows (all 8 rows of `title_types`), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -14367,7 +14367,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -14550,7 +14550,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -14692,7 +14692,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "Likely safe for a detail view — the read is index-covered — but it was not timed; see Gaps.",
+      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -14874,7 +14874,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -15201,7 +15201,7 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "Safe for first-screen browse and for virtualised infinite scroll — the cursor holds up at depth and the cap is 500. Caveats: expect the sort control to be the expensive part.",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
     },
     {
@@ -15407,7 +15407,7 @@
           "tests/unit/services/test_title_type_resolution.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -15573,7 +15573,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "UNKNOWN — the read is not index-covered, but was not timed; see Gaps.",
+      "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
       "verdict_class": "unknown"
     },
     {
@@ -15835,7 +15835,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 186ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 186ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -16187,7 +16187,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -16565,7 +16565,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -16735,7 +16735,7 @@
           "tests/unit/services/test_title_content_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -16944,7 +16944,7 @@
           "tests/unit/services/test_title_content_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -17321,7 +17321,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -17499,7 +17499,7 @@
           "tests/unit/services/test_title_service.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 110ms).",
+      "verdict": "p95 110ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -17728,7 +17728,7 @@
           "tests/unit/services/test_title_type_resolution.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -17955,7 +17955,7 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -18156,7 +18156,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "Not safe to render directly: the largest collection is 701 rows (external_identifiers.scheme_id -> id_schemes), returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
+      "verdict": "the largest collection is 701 rows (external_identifiers.scheme_id -> id_schemes), returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
       "verdict_class": "unsafe"
     },
     {
@@ -18374,7 +18374,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -18540,7 +18540,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -18753,7 +18753,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -18928,7 +18928,7 @@
           "tests/unit/services/test_title_reference_service.py"
         ]
       },
-      "verdict": "Not safe to render directly: the largest collection is 727 rows (titles.title_type_id -> title_types), returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
+      "verdict": "the largest collection is 727 rows (titles.title_type_id -> title_types), returned in a single uncapped response. Usable for a count or a preview of the first few, but a screen that lists these needs either a paginated endpoint or client-side virtualisation plus the acceptance that the whole payload crosses the wire first.",
       "verdict_class": "unsafe"
     },
     {
@@ -19114,7 +19114,7 @@
           "tests/unit/api/titles/test_references.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -19310,7 +19310,7 @@
           "tests/unit/services/test_title_reference_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -19533,7 +19533,7 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 141ms. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 141ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -19891,8 +19891,8 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "Write path. Safe to call from a form submit, but the work is proportional to the size of the payload rather than constant — send small batches and show a determinate progress state rather than a spinner.",
-      "verdict_class": "write"
+      "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -20154,8 +20154,8 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "Write path. Safe to call from a form submit, but the work is proportional to the size of the payload rather than constant — send small batches and show a determinate progress state rather than a spinner.",
-      "verdict_class": "write"
+      "verdict": "Work is proportional to the size of the payload, not constant: this endpoint issues queries per item. Safe from a form submit with a bounded selection, but send small batches and show determinate progress rather than a spinner.",
+      "verdict_class": "caution"
     },
     {
       "annotation": {
@@ -20333,7 +20333,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -20720,7 +20720,7 @@
           "tests/unit/api/test_transform_requests.py"
         ]
       },
-      "verdict": "Safe for first-screen browse and for virtualised infinite scroll — the cursor holds up at depth and the cap is 500. Caveats: expect the sort control to be the expensive part.",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
       "verdict_class": "caution"
     },
     {
@@ -21007,7 +21007,7 @@
           "tests/unit/api/test_transform_requests.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -21250,7 +21250,7 @@
           "tests/unit/services/test_transform_request_service.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 111ms).",
+      "verdict": "p95 111ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -21520,7 +21520,7 @@
           "tests/unit/services/test_transform_request_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -21673,7 +21673,7 @@
           "tests/unit/api/test_transform_requests.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -21944,7 +21944,7 @@
           "tests/unit/api/test_transform_requests.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -22093,7 +22093,7 @@
           "tests/unit/services/test_transform_request_service.py"
         ]
       },
-      "verdict": "Safe to render directly: the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets). The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 17 rows (media_transform_requests.asset_id -> assets), so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -22356,7 +22356,7 @@
           "tests/unit/services/test_transform_request_service.py"
         ]
       },
-      "verdict": "Write path. Single-row work with no loops; safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
+      "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
       "verdict_class": "write"
     },
     {
@@ -22445,7 +22445,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "Safe for a detail view and fast enough to prefetch on hover (p95 8ms).",
+      "verdict": "p95 8ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     }
   ],
@@ -23091,7 +23091,8 @@
   ],
   "notes": [
     "Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.",
-    "Probed `http://127.0.0.1:8077` with 37 probe(s)."
+    "Probed `http://127.0.0.1:8077` with 37 probe(s).",
+    "Re-rendered from `docs/capability-inventory.json` with no phase re-run; timings are those of the recorded run."
   ],
   "phases_run": [
     "1 (static surface)",

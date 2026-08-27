@@ -13,6 +13,7 @@ the Gaps section.
 from __future__ import annotations
 
 from .models import DataShape, EndpointRecord, ProbeResult, RouteAnnotation, RouteSurface
+from .render import _duration
 
 # A collection this size cannot be rendered without virtualisation, whatever the
 # latency, so an unpaginated endpoint that can return it is a design problem
@@ -138,7 +139,7 @@ def assess(
     if annotation is None:
         return (
             ("the handler could not be resolved, so nothing about its cost is known",),
-            "UNKNOWN — the handler could not be analysed; see Gaps.",
+            "the handler could not be analysed; see Gaps.",
             "unknown",
         )
 
@@ -247,13 +248,13 @@ def assess(
     if worst and worst.timing:
         if worst.timing.p95_ms >= SLOW_P95_MS:
             risks.append(
-                f"measured p95 of {worst.timing.p95_ms:.0f}ms on `{worst.name}` is a "
-                "page-load-scale wait"
+                f"measured p95 of {_duration(worst.timing.p95_ms)} on `{worst.name}` is "
+                "a page-load-scale wait"
             )
         elif worst.timing.p95_ms >= INTERACTIVE_P95_MS:
             risks.append(
-                f"measured p95 of {worst.timing.p95_ms:.0f}ms on `{worst.name}` is too "
-                "slow to drive from a keystroke"
+                f"measured p95 of {_duration(worst.timing.p95_ms)} on `{worst.name}` is "
+                "too slow to drive from a keystroke"
             )
     largest = max((p.bytes_ or 0 for p in probes if p.status == "ok"), default=0)
     if largest >= LARGE_PAYLOAD_BYTES:
@@ -298,11 +299,10 @@ def assess(
     # -- verdict -----------------------------------------------------------
 
     if surface.method != "GET":
-        verdict = _write_verdict(surface, annotation, explicit_loops)
-        return tuple(risks), verdict, "write"
+        return tuple(risks), *_write_verdict(surface, annotation, explicit_loops)
 
     if surface.is_streaming:
-        return tuple(risks), _stream_verdict(probes), _stream_class(probes)
+        return tuple(risks), *_stream_assessment(probes)
 
     if pagination.style == "keyset":
         return tuple(risks), *_keyset_verdict(
@@ -318,54 +318,90 @@ def assess(
     return tuple(risks), *_single_verdict(annotation, worst, measured)
 
 
-def _write_verdict(surface: RouteSurface, annotation: RouteAnnotation, loops: list) -> str:
-    """Verdict text for a mutating endpoint."""
+def _write_verdict(
+    surface: RouteSurface, annotation: RouteAnnotation, loops: list
+) -> tuple[str, str]:
+    """Verdict text and class for a mutating endpoint.
+
+    The class distinguishes the two kinds of write, because the report treats
+    them very differently. A single-row write with no loops and no filesystem
+    work has nothing a UI can get wrong beyond ordinary error handling, and gets
+    class ``write`` -- the renderer collapses those into one table rather than
+    giving each a section that says the same thing. A write that loops, or that
+    touches the filesystem as well as the database, has a real failure mode a
+    designer has to account for, so it earns a full section and a severity of
+    its own.
+    """
     if loops:
         return (
-            "Write path. Safe to call from a form submit, but the work is proportional "
-            "to the size of the payload rather than constant — send small batches and "
-            "show a determinate progress state rather than a spinner."
+            "Work is proportional to the size of the payload, not constant: this "
+            "endpoint issues queries per item. Safe from a form submit with a bounded "
+            "selection, but send small batches and show determinate progress rather "
+            "than a spinner.",
+            "caution",
         )
     if annotation.filesystem_access:
         return (
-            "Write path that touches the filesystem as well as the database. Not safe "
-            "for optimistic UI: it can fail after the database row exists, so the UI "
-            "must wait for the response before showing success."
+            "Touches the filesystem as well as the database, so it can fail after the "
+            "database row already exists. Not safe for optimistic UI — the interface "
+            "must wait for the response before showing success, and must be able to "
+            "represent a partially-applied result.",
+            "caution",
         )
     return (
-        "Write path. Single-row work with no loops; safe to drive from a form submit "
-        "and to treat optimistically, provided the UI reconciles against the response."
+        "Single-row write with no loops. Safe to drive from a form submit and to treat "
+        "optimistically, provided the UI reconciles against the response.",
+        "write",
     )
 
 
-def _stream_class(probes: tuple[ProbeResult, ...]) -> str:
-    """Verdict class for a streaming endpoint, from its Range probes."""
-    range_probes = [p for p in probes if "Range" in " ".join(p.notes)]
-    if not range_probes:
-        return "unknown"
-    return "safe" if all(p.status == "ok" for p in range_probes) else "unsafe"
+def _stream_assessment(probes: tuple[ProbeResult, ...]) -> tuple[str, str]:
+    """Verdict text and class for a streaming endpoint.
 
+    Text and class are produced together on purpose. Deriving them separately
+    let them disagree: a run where every probe failed to reach a file produced
+    the prose "streaming behaviour was not measured" under a ``NOT SAFE`` tag,
+    which reads as a proven defect rather than an absent measurement.
 
-def _stream_verdict(probes: tuple[ProbeResult, ...]) -> str:
-    """Verdict text for a streaming endpoint."""
-    ranged = [p for p in probes if p.status == "ok" and "206 Partial Content" in " ".join(p.notes)]
-    ttfb = next((p.timing.ttfb_p50_ms for p in probes if p.status == "ok" and p.timing), None)
-    if not probes or all(p.status != "ok" for p in probes):
+    The distinction that matters is *why* a Range probe did not return 206. If
+    no probe reached the endpoint at all -- no media root mounted, no such asset
+    -- nothing has been established and the answer is UNKNOWN. Only when the
+    endpoint answered and still did not honour a range is it a real finding.
+    """
+    succeeded = [p for p in probes if p.status == "ok"]
+    if not succeeded:
+        reason = probes[0].reason if probes else None
+        detail = f" ({reason})" if reason else ""
         return (
-            "UNKNOWN — streaming behaviour was not measured. Range support is "
-            "implemented in the service, but whether it works end to end against a "
-            "real file has not been verified; see Gaps."
+            "streaming behaviour was not measured — no probe reached a file on this "
+            f"instance{detail}. Range support is implemented in the service, but "
+            "whether it works end to end has not been verified; see Gaps.",
+            "unknown",
         )
+
+    ranged = [p for p in succeeded if "206 Partial Content" in " ".join(p.notes)]
+    attempted = [p for p in probes if "Range" in " ".join(p.notes)]
+    ttfb = next((p.timing.ttfb_p50_ms for p in succeeded if p.timing), None)
+
     if ranged:
-        first = f"{ttfb:.0f}ms" if ttfb is not None else "UNKNOWN"
+        first = _duration(ttfb) if ttfb is not None else "UNKNOWN"
         return (
-            f"Safe to drive a `<video>` element directly: byte ranges are honoured with "
-            f"206 and a correct Content-Range, and time-to-first-byte is {first}, so "
-            "seeking works without buffering the whole file."
+            "byte ranges are honoured with 206 and a correct Content-Range, and "
+            f"time-to-first-byte is {first}. Safe to point a `<video>` element at "
+            "directly — seeking works without buffering the whole file.",
+            "safe",
+        )
+    if attempted:
+        return (
+            "the endpoint answered, but no Range request returned 206 in this run, so "
+            "a scrubber would have to download from the start every time. Not usable "
+            "behind a seekable player.",
+            "unsafe",
         )
     return (
-        "Not safe for a seekable player: Range requests did not return 206 in this "
-        "run, so a scrubber would have to download from the start every time."
+        "the endpoint streams successfully, but no Range request was probed, so "
+        "seeking is unverified; see Gaps.",
+        "unknown",
     )
 
 
@@ -380,9 +416,8 @@ def _keyset_verdict(
     """Verdict text and class for a cursor-paginated list."""
     if not measured:
         return (
-            "UNKNOWN — cursor pagination means deep pages do not degrade the way "
-            "offset does, but no timings were taken, so first-screen cost is "
-            "unmeasured; see Gaps.",
+            "cursor pagination means deep pages do not degrade the way offset does, "
+            "but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
             "unknown",
         )
     p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
@@ -393,9 +428,9 @@ def _keyset_verdict(
             "the per-row lazy load, not the paging" if lazy_loads else "the cost of a single page"
         )
         return (
-            f"Not safe as a first-screen query: worst-case p95 is {p95:.0f}ms, and the "
-            f"cause is {cause}. Cursor paging itself holds up — page 400 costs what "
-            "page 1 does — so infinite scroll is sound once the per-page cost is fixed.",
+            f"worst-case p95 is {_duration(p95)}, and the cause is {cause}. Cursor "
+            "paging itself holds up: page 400 costs what page 1 does, so infinite "
+            "scroll is sound once the per-page cost is fixed.",
             "unsafe",
         )
     if uncovered_sorts or lazy_loads:
@@ -410,14 +445,16 @@ def _keyset_verdict(
         if lazy_loads:
             detail.append("keep page size well under the cap because of the per-row lazy load")
         return (
-            f"Safe for first-screen browse and for virtualised infinite scroll — the "
-            f"cursor holds up at depth and the cap is {cap}. Caveats: " + "; ".join(detail) + ".",
+            f"the cursor holds up at depth and the cap is {cap}, so this is fine for "
+            "first-screen browse and for virtualised infinite scroll. Caveats: "
+            + "; ".join(detail)
+            + ".",
             "caution",
         )
     return (
-        f"Safe as the backing query for a virtualised full-library scroll: cursor "
-        f"paging does not degrade with depth, the page size is capped at {cap}, and "
-        f"worst-case p95 is {p95:.0f}ms.",
+        f"cursor paging does not degrade with depth, the page size is capped at {cap}, "
+        f"and worst-case p95 is {_duration(p95)}. Suitable as the backing query for a "
+        "virtualised full-library scroll.",
         "safe",
     )
 
@@ -426,18 +463,17 @@ def _offset_verdict(pagination, worst: ProbeResult | None, measured: bool) -> tu
     """Verdict text and class for an offset-paginated list."""
     if not measured:
         return (
-            "UNKNOWN — offset paging over Elasticsearch has a hard result-window "
-            "ceiling, but where it actually falls on this index was not measured; "
-            "see Gaps.",
+            "offset paging over Elasticsearch has a hard result-window ceiling, but "
+            "where it falls on this index was not measured; see Gaps.",
             "unknown",
         )
     p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
     return (
-        f"Safe for a search-results panel showing the first few pages (worst-case p95 "
-        f"{p95:.0f}ms), and not safe for anything that scrolls indefinitely: the "
-        "offset window is finite and the ordering is by relevance, so a row can move "
-        "between pages while the user is reading. Cap the result set in the UI at a "
-        "few hundred and offer refinement rather than more pages.",
+        f"fine for a search-results panel showing the first few pages (worst-case p95 "
+        f"{_duration(p95)}), and not for anything that scrolls indefinitely: the offset "
+        "window is finite and the ordering is by relevance, so a row can move between "
+        "pages while the user is reading. Cap the result set in the UI at a few hundred "
+        "and offer refinement rather than more pages.",
         "caution",
     )
 
@@ -451,26 +487,26 @@ def _unbounded_verdict(
     """Verdict text and class for an unpaginated collection."""
     if ceiling is None:
         return (
-            "UNKNOWN — this endpoint returns an entire collection with no cap, and "
-            "the largest collection in the data was not measured. Do not build a "
-            "screen on it until Phase 3 has run; see Gaps.",
+            "this endpoint returns an entire collection with no cap, and the largest "
+            "collection in the data was not measured. Do not build a screen on it until "
+            "Phase 3 has run; see Gaps.",
             "unknown",
         )
     p95 = worst.timing.p95_ms if worst and worst.timing else None
     timing = f", measured p95 {p95:.0f}ms" if p95 is not None else ""
     if ceiling >= LARGE_COLLECTION:
         return (
-            f"Not safe to render directly: the largest collection is {ceiling:,} rows "
-            f"({source}){timing}, returned in a single uncapped response. Usable for a "
-            "count or a preview of the first few, but a screen that lists these needs "
-            "either a paginated endpoint or client-side virtualisation plus the "
-            "acceptance that the whole payload crosses the wire first.",
+            f"the largest collection is {ceiling:,} rows ({source}){timing}, returned in "
+            "a single uncapped response. Usable for a count or a preview of the first "
+            "few, but a screen that lists these needs either a paginated endpoint or "
+            "client-side virtualisation plus the acceptance that the whole payload "
+            "crosses the wire first.",
             "unsafe",
         )
     return (
-        f"Safe to render directly: the collection is bounded in practice at "
-        f"{ceiling:,} rows ({source}){timing}. The absence of a cap is latent rather "
-        "than live — worth a page size before the data grows, not before the UI ships.",
+        f"the collection is bounded in practice at {ceiling:,} rows ({source}){timing}, "
+        "so it is fine to render directly. The absence of a cap is latent rather than "
+        "live — worth a page size before the data grows, not before the UI ships.",
         "safe",
     )
 
@@ -483,30 +519,31 @@ def _single_verdict(
     if not measured:
         if uncovered:
             return (
-                "UNKNOWN — the read is not index-covered, but was not timed; see Gaps.",
+                "the read is not index-covered, and it was not timed; see Gaps.",
                 "unknown",
             )
         return (
-            "Likely safe for a detail view — the read is index-covered — but it was "
-            "not timed; see Gaps.",
+            "the read is index-covered, so it is likely fine for a detail view, but it "
+            "was not timed; see Gaps.",
             "unknown",
         )
     p95 = worst.timing.p95_ms if worst and worst.timing else 0.0
     if uncovered:
         return (
-            f"Usable for a deliberate navigation but not for type-ahead: the lookup is "
-            f"not index-covered and measures p95 {p95:.0f}ms, which will grow with the "
-            "table.",
+            f"the lookup is not index-covered and measures p95 {_duration(p95)}, which "
+            "will grow with the table. Usable for a deliberate navigation, not for "
+            "type-ahead.",
             "caution",
         )
     if p95 >= INTERACTIVE_P95_MS:
         return (
-            f"Safe for a detail view (p95 {p95:.0f}ms), too slow to fire on every "
-            "keystroke — debounce or prefetch.",
+            f"p95 {_duration(p95)} — fine for a detail view, too slow to fire on every "
+            "keystroke. Debounce or prefetch.",
             "caution",
         )
     return (
-        f"Safe for a detail view and fast enough to prefetch on hover (p95 " f"{p95:.0f}ms).",
+        f"p95 {_duration(p95)}, index-covered. Fine for a detail view and fast enough to "
+        "prefetch on hover.",
         "safe",
     )
 
