@@ -162,11 +162,13 @@ probes:
 
   # -- unbounded collections --------------------------------------------
   - name: streams-page-1
-    path: /api/streams?limit=50
+    path: /api/streams
+    query: {limit: 50}
     note: default first page a browse screen would issue
 
   - name: streams-max-page
-    path: /api/streams?limit=500
+    path: /api/streams
+    query: {limit: 500}
     note: largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
 
   - name: streams-by-asset
