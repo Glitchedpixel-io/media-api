@@ -81,7 +81,20 @@ class MediaService:
         self,
         params: AssetListParams,
     ) -> PaginatedResponse[AssetReadExtended]:
-        return self.repo.list_paged(params)
+        """List assets.
+
+        Raises:
+            HTTPException: 422 if `sort` names a field the endpoint does not
+                support. `normalize_sort` raises `EnumViolation` for that, and
+                without translation it escaped as a 500 -- so a caller asking for an
+                unsupported sort was told the server had failed. The route class
+                cannot help: it only converts an `HTTPException` that already
+                carries the right status.
+        """
+        try:
+            return self.repo.list_paged(params)
+        except EnumViolation as e:
+            raise HTTPException(status_code=422, detail=domain_error_detail(str(e))) from e
 
     def mark_assets_seen(self, ids: list[int]) -> int:
         """

@@ -32,9 +32,16 @@ class TagService:
         self.media_repo = media_repository
         self.title_repo = title_repository
 
+    @translate_repository_errors
     def get_tags(
         self, params: TagListParams, parent_id: int | None = None
     ) -> PaginatedResponse[TagRead]:
+        """List tags, optionally scoped to a parent.
+
+        Decorated so an unsupported `sort` field becomes a 422 rather than a 500.
+        The 404 raised below is an HTTPException already and passes through
+        untouched.
+        """
         if parent_id is not None and not self.repo.exists(parent_id):
             raise HTTPException(status_code=404, detail="Parent tag not found")
 
