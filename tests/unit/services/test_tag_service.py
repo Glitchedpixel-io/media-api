@@ -611,7 +611,7 @@ class TestTagTitleWithTagNames:
         # Existing tags
         tag1 = TagReadFactory(id=1, name="action")
         tag2 = TagReadFactory(id=2, name="scifi")
-        tag_repo.get_by_name.side_effect = lambda name: tag1 if name == "action" else tag2
+        tag_repo.get_by_names.return_value = [tag1, tag2]
 
         # Added tags
         tag_repo.add_title_tags.return_value = [tag1, tag2]
@@ -634,11 +634,8 @@ class TestTagTitleWithTagNames:
 
         # First tag exists, second doesn't
         tag1 = TagReadFactory(id=1, name="action")
-        tag_repo.get_by_name.side_effect = lambda name: tag1 if name == "action" else None
-
-        # New tag created
         new_tag = TagReadFactory(id=3, name="drama")
-        tag_repo.create.return_value = new_tag
+        tag_repo.get_or_create_by_names.return_value = [tag1, new_tag]
 
         # Both tags added
         tag_repo.add_title_tags.return_value = [tag1, new_tag]
@@ -649,7 +646,7 @@ class TestTagTitleWithTagNames:
 
         assert len(result.added_tags) == 2
         assert len(result.tagging_errors) == 0
-        tag_repo.create.assert_called_once()
+        tag_repo.get_or_create_by_names.assert_called_once_with(["action", "drama"])
 
     @pytest.mark.unit
     def test_tag_title_with_tag_names_reports_missing_tags(self) -> None:
@@ -658,7 +655,7 @@ class TestTagTitleWithTagNames:
         media_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         title_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         title_repo.exists.return_value = True
-        tag_repo.get_by_name.return_value = None
+        tag_repo.get_by_names.return_value = []
         tag_repo.add_title_tags.return_value = []
         svc = TagService(tag_repo, media_repo, title_repo)
 
@@ -699,7 +696,7 @@ class TestTagAssetWithTagNames:
         media_repo.exists.return_value = True
 
         tag1 = TagReadFactory(id=1, name="hd")
-        tag_repo.get_by_name.return_value = tag1
+        tag_repo.get_by_names.return_value = [tag1]
         tag_repo.add_asset_tags.return_value = [tag1]
         svc = TagService(tag_repo, media_repo, title_repo)
 

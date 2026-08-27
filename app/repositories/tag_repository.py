@@ -3,6 +3,7 @@ from typing import cast
 
 from sqlakeyset import select_page
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
 from app.models import AssetTagORM, TagORM, TitleTagORM
@@ -20,6 +21,26 @@ from ..utils.sorting import apply_ordering
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import TagRepository
+
+# Applied to tags brought into existence by tagging something with a name that had
+# no tag yet, so they are distinguishable from ones a person deliberately created.
+AUTO_CREATED_DESCRIPTION = "<<auto created>>"
+AUTO_CREATED_COLOR = "#000000"
+
+
+def _normalise(names: list[str]) -> list[str]:
+    """Lower-case and de-duplicate names, preserving first-seen order.
+
+    Tag names are stored lower-case (see the validator on ``TagAttrs.name``), so
+    matching has to be done on the same form.
+
+    Args:
+        names: Raw names as supplied by the caller.
+
+    Returns:
+        list[str]: Normalised names, without duplicates.
+    """
+    return list(dict.fromkeys(name.lower() for name in names))
 
 
 class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
@@ -54,6 +75,67 @@ class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
         stmt = select(TagORM).where(TagORM.name == name.lower()).limit(1)
         orm = self.db.scalar(stmt)
         return TagRead.model_validate(orm, from_attributes=True) if orm else None
+
+    def get_by_names(self, names: list[str]) -> list[TagRead]:
+        """Resolve many names at once.
+
+        Args:
+            names: Tag names. Case is normalised; duplicates are collapsed.
+
+        Returns:
+            list[TagRead]: The tags that exist, in no particular order. Names with
+            no tag are simply absent -- the caller decides whether that is an error.
+        """
+        unique = _normalise(names)
+        if not unique:
+            return []
+        rows = self.db.scalars(select(TagORM).where(TagORM.name.in_(unique))).all()
+        return [TagRead.model_validate(row, from_attributes=True) for row in rows]
+
+    def get_or_create_by_names(self, names: list[str]) -> list[TagRead]:
+        """Resolve many names at once, creating whatever is missing.
+
+        One ``INSERT ... ON CONFLICT DO NOTHING`` creates every missing tag, which
+        makes this safe against a concurrent request creating the same name: the
+        conflict is absorbed rather than raised, and the row the other request
+        created is picked up by the read below. Checking for each name and then
+        inserting it left a window where the loser of that race was told the tag
+        could not be created while it demonstrably existed.
+
+        **This flushes; it does not commit.** The created tags become visible to
+        the rest of this transaction and are persisted only when the caller
+        commits, so a failure later in the same request rolls them back with
+        everything else. ``add_asset_tags``/``add_title_tags`` are that commit.
+
+        Args:
+            names: Tag names. Case is normalised; duplicates are collapsed.
+
+        Returns:
+            list[TagRead]: Every tag for the requested names, pre-existing or
+            newly created.
+        """
+        unique = _normalise(names)
+        if not unique:
+            return []
+
+        stmt = (
+            pg_insert(TagORM)
+            .values(
+                [
+                    {
+                        "name": name,
+                        "description": AUTO_CREATED_DESCRIPTION,
+                        "color": AUTO_CREATED_COLOR,
+                        "parent_id": None,
+                    }
+                    for name in unique
+                ]
+            )
+            .on_conflict_do_nothing(index_elements=["name"])
+        )
+        self.db.execute(stmt)
+        self.db.flush()
+        return self.get_by_names(unique)
 
     def update(self, tag_id: int, update: TagUpdateInternal) -> TagRead:  # type: ignore
         stmt = select(TagORM).where(TagORM.id == tag_id)
@@ -118,24 +200,81 @@ class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
             page=self._page_info(page),
         )
 
+    def _link_tags(
+        self,
+        association: type[AssetTagORM] | type[TitleTagORM],
+        owner_column: str,
+        owner_id: int,
+        tag_ids: list[int],
+    ) -> list[TagRead]:
+        """Link tag ids to one owner row, in a fixed number of queries.
+
+        Does not commit: the caller owns the transaction boundary.
+
+        ``ON CONFLICT DO NOTHING ... RETURNING`` gives exactly the rows this call
+        inserted, so "already tagged" needs no separate read and cannot race with a
+        concurrent request tagging the same pair.
+
+        Args:
+            association: The association model (``AssetTagORM`` / ``TitleTagORM``).
+            owner_column: Name of the owning foreign key on that model.
+            owner_id: Value for that foreign key.
+            tag_ids: Tag ids to link. Unknown ids and duplicates are ignored.
+
+        Returns:
+            list[TagRead]: The tags newly linked by this call.
+        """
+        wanted = list(dict.fromkeys(tag_ids))
+        if not wanted:
+            return []
+
+        # Unknown ids have always been skipped rather than rejected. Filtering them
+        # here keeps that behaviour without a query per id, and without letting a
+        # bad id turn into a foreign-key violation that fails the whole request.
+        known = set(self.db.scalars(select(TagORM.id).where(TagORM.id.in_(wanted))).all())
+        insertable = [tag_id for tag_id in wanted if tag_id in known]
+        if not insertable:
+            return []
+
+        stmt = (
+            pg_insert(association)
+            .values([{owner_column: owner_id, "tag_id": tag_id} for tag_id in insertable])
+            .on_conflict_do_nothing()
+            .returning(association.tag_id)
+        )
+        inserted = set(self.db.scalars(stmt).all())
+        if not inserted:
+            return []
+
+        rows = self.db.scalars(select(TagORM).where(TagORM.id.in_(inserted))).all()
+        return [TagRead.model_validate(row, from_attributes=True) for row in rows]
+
     # ============ Asset Tagging ============
 
     def add_asset_tags(self, asset_id: int, tag_ids: list[int]) -> list[TagRead]:
-        """Adds multiple tags to an asset, returns the number tags added (i.e. zero if the asset already has all the supplied tags)"""
-        existing_stmt = select(AssetTagORM.tag_id).where(AssetTagORM.asset_id == asset_id)
-        existing_tag_ids = set(self.db.scalars(existing_stmt).all())
+        """Link tags to an asset, and commit the request's work.
 
-        tags = []
-        for tag_id in tag_ids:
-            if tag_id not in existing_tag_ids:
-                tag = self.get(tag_id)
-                if tag:
-                    asset_tag = AssetTagORM(asset_id=asset_id, tag_id=tag_id)
-                    self.db.add(asset_tag)
-                    tags.append(tag)
+        Returns only the tags this call actually linked, so a repeat request
+        reports nothing added rather than claiming to have re-tagged.
 
+        Unknown tag ids are ignored rather than raising, which is the behaviour
+        this has always had; they are filtered in one query rather than fetched
+        one at a time.
+
+        This is the commit for the whole tagging operation -- including any tags
+        ``get_or_create_by_names`` flushed earlier in the same transaction -- so it
+        commits even when it links nothing.
+
+        Args:
+            asset_id: Asset to tag.
+            tag_ids: Tag ids to link. Unknown ids and duplicates are ignored.
+
+        Returns:
+            list[TagRead]: The tags newly linked by this call.
+        """
+        linked = self._link_tags(AssetTagORM, "asset_id", asset_id, tag_ids)
         self._safe_commit()
-        return [TagRead.model_validate(orm, from_attributes=True) for orm in tags]
+        return linked
 
     def remove_asset_tag(self, asset_id: int, tag_id: int) -> bool:
         """Remove a specific tag from an asset"""
@@ -169,21 +308,21 @@ class SQLAlchemyTagRepository(SQLAlchemyBaseRepository, TagRepository):
     # ============ Title Tagging ============
 
     def add_title_tags(self, title_id: int, tag_ids: list[int]) -> list[TagRead]:
-        """Adds multiple tags to a title, returns the number tags added (i.e. zero if the title already has all the supplied tags)"""
-        existing_stmt = select(TitleTagORM.tag_id).where(TitleTagORM.title_id == title_id)
-        existing_tag_ids = set(self.db.scalars(existing_stmt).all())
+        """Link tags to a title, and commit the request's work.
 
-        tags = []
-        for tag_id in tag_ids:
-            if tag_id not in existing_tag_ids:
-                tag = self.get(tag_id)
-                if tag:
-                    title_tag = TitleTagORM(title_id=title_id, tag_id=tag_id)
-                    self.db.add(title_tag)
-                    tags.append(tag)
+        The asset counterpart carries the full note; this is the same operation
+        against ``title_tags``.
 
+        Args:
+            title_id: Title to tag.
+            tag_ids: Tag ids to link. Unknown ids and duplicates are ignored.
+
+        Returns:
+            list[TagRead]: The tags newly linked by this call.
+        """
+        linked = self._link_tags(TitleTagORM, "title_id", title_id, tag_ids)
         self._safe_commit()
-        return [TagRead.model_validate(orm, from_attributes=True) for orm in tags]
+        return linked
 
     def remove_title_tag(self, title_id: int, tag_id: int) -> bool:
         """Remove a specific tag from a title"""
