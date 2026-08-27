@@ -54,23 +54,36 @@ class TestAssetsAPI:
     """Test the /assets API endpoints with full-stack integration."""
 
     @staticmethod
-    # Helper: iterate forward with `after` until exhausted
     def _collect_all_pages(client: TestClient, base_query: str) -> tuple[list[dict], set[int]]:
-        """
-        Walk forward using cursor pagination.
-        Stops when page.items == [] OR next cursor stalls.
-        Returns (all_items, seen_ids).
+        """Walk forward through every page, following `page.next`.
+
+        Terminates on a null cursor, which is the documented contract and, since #66,
+        the actual behaviour: `page.next` is null exactly when there is no further
+        page. This used to stop on an empty page or a cursor that stopped advancing
+        as well, because sqlakeyset's marker was serialised unconditionally and the
+        cursor was never null -- those conditions are unreachable now and described a
+        contract that no longer exists.
+
+        Args:
+            client: Test client.
+            base_query: Endpoint and query string, without a cursor.
+
+        Returns:
+            A tuple of (every item across all pages, the set of ids seen).
+
+        Raises:
+            AssertionError: If the walk does not terminate within the cap. That
+                guards against a regression in the #66 contract, not against
+                expected behaviour -- without it such a regression hangs the suite
+                instead of failing it.
         """
         all_items: list[dict] = []
         seen_ids: set[int] = set()
-
         after: str | None = None
-        last_cursor: str | None = None
 
-        for _ in range(1000):  # safety cap
+        for _ in range(1000):
             query = base_query
             if after:
-                # keep sort/limit stable and add &after=...
                 joiner = "&" if "?" in query else "?"
                 query = f"{query}{joiner}after={after}"
 
@@ -78,23 +91,12 @@ class TestAssetsAPI:
             assert resp.status_code == HTTPStatus.OK
             payload = resp.json()
 
-            # new response shape: {"items": [...], "page": {"next": "...", "prev": "..."}}
-            items = payload["items"]
-            page = payload["page"]
+            all_items.extend(payload["items"])
+            seen_ids.update(item["id"] for item in payload["items"])
 
-            # end condition 1: empty page
-            if not items:
+            after = payload["page"]["next"]
+            if after is None:
                 break
-
-            all_items.extend(items)
-            seen_ids.update(i["id"] for i in items)
-
-            nxt = page.get("next")
-            # end condition 2: no next or stalled cursor
-            if not nxt or nxt == last_cursor:
-                break
-
-            last_cursor = after = nxt
         else:
             raise AssertionError("Exceeded max pagination steps; cursor likely not advancing.")
 

@@ -621,29 +621,29 @@ class TestStreamsPagination:
     ) -> None:
         """Following page.next reaches all rows exactly once.
 
-        sqlakeyset still returns a `next` marker on the final page, so the walk ends on
-        an empty page or a cursor that stops advancing — not on `next` being null.
+        The walk ends on a null cursor. It previously also stopped on an empty page
+        or a stalled cursor, because sqlakeyset's marker was serialised
+        unconditionally; #66 made `next` null exactly when there is no further page.
+
+        The cap stays: it turns a regression in that contract into a failed test
+        rather than a hung suite.
         """
         self._seed(media_repository, stream_repository, 12)
 
         seen: list[int] = []
         cursor: str | None = None
-        last_cursor: str | None = None
 
-        for _ in range(100):  # safety cap: a stuck cursor must fail, not hang
+        for _ in range(100):
             query = "/api/streams?limit=5"
             if cursor:
                 query = f"{query}&after={cursor}"
             body = client.get(query).json()
 
-            if not body["items"]:
-                break
             seen.extend(item["id"] for item in body["items"])
 
             cursor = body["page"]["next"]
-            if not cursor or cursor == last_cursor:
+            if cursor is None:
                 break
-            last_cursor = cursor
         else:
             raise AssertionError("Exceeded max pagination steps; cursor not advancing.")
 
