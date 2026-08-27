@@ -13,8 +13,14 @@ from unittest.mock import create_autospec
 import pytest
 from fastapi import HTTPException
 
-from app.repositories.protocols import TitleRepository, TitleTypeRepository
+from app.repositories.protocols import (
+    ArtworkKindRepository,
+    ArtworkRepository,
+    TitleRepository,
+    TitleTypeRepository,
+)
 from app.schemas import (
+    ArtworkKindRead,
     TitleCreateInternal,
     TitleCreatePublic,
     TitlePatchPublic,
@@ -23,6 +29,19 @@ from app.schemas import (
 )
 from app.services import TitleService
 from tests.factories import TitleReadFactory
+
+
+def _artwork_repo():
+    """Resolves no posters; these tests are about type resolution, not artwork."""
+    repo = create_autospec(ArtworkRepository, instance=True, spec_set=True)
+    repo.resolve_for_titles.return_value = {}
+    return repo
+
+
+def _kind_repo():
+    repo = create_autospec(ArtworkKindRepository, instance=True, spec_set=True)
+    repo.get_by_code.return_value = ArtworkKindRead(id=7, code="poster", label="Poster")
+    return repo
 
 
 def _type_repo(known: dict[str, int] | None = None):
@@ -55,7 +74,9 @@ class TestCreateResolution:
     def test_create_resolves_code_to_foreign_key(self) -> None:
         repo = _title_repo()
         repo.create.return_value = TitleReadFactory(id=1, title_type="season")
-        svc = TitleService(repo, _type_repo({"movie": 1, "season": 7}))
+        svc = TitleService(
+            repo, _type_repo({"movie": 1, "season": 7}), _artwork_repo(), _kind_repo()
+        )
 
         svc.create_title(TitleCreatePublic(name="Season 1", title_type="season"))
 
@@ -71,7 +92,7 @@ class TestCreateResolution:
         thing standing between a bad code and a foreign key error.
         """
         repo = _title_repo()
-        svc = TitleService(repo, _type_repo({"movie": 1}))
+        svc = TitleService(repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo())
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_title(TitleCreatePublic(name="X", title_type="not_a_type"))
@@ -87,7 +108,7 @@ class TestCreateResolution:
 class TestUpdateResolution:
     def test_update_with_unknown_code_is_422(self) -> None:
         repo = _title_repo()
-        svc = TitleService(repo, _type_repo({"movie": 1}))
+        svc = TitleService(repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo())
 
         with pytest.raises(HTTPException) as exc_info:
             svc.update_title(5, TitlePatchPublic(title_type="not_a_type"), exclude_none=True)
@@ -104,7 +125,7 @@ class TestUpdateResolution:
         """
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo, _type_repo())
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo())
 
         svc.update_title(5, TitlePatchPublic(name="Renamed"), exclude_none=True)
 
@@ -116,7 +137,9 @@ class TestUpdateResolution:
     def test_patch_that_supplies_title_type_translates_it(self) -> None:
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5, title_type="season")
-        svc = TitleService(repo, _type_repo({"movie": 1, "season": 7}))
+        svc = TitleService(
+            repo, _type_repo({"movie": 1, "season": 7}), _artwork_repo(), _kind_repo()
+        )
 
         svc.update_title(5, TitlePatchPublic(title_type="season"), exclude_none=True)
 
@@ -132,7 +155,7 @@ class TestUpdateResolution:
         """
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo, _type_repo())
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo())
 
         svc.update_title(5, TitlePatchPublic(name="Replaced"), exclude_none=False)
 

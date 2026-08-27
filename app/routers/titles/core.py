@@ -31,14 +31,21 @@ def read_titles(
 
 @router.get(
     "/{title_id}",
-    response_model=TitleRead,
+    response_model=TitleReadExtended,
     operation_id="get_title",
     responses={
         **COMMON_READ_RESPONSES,
         200: {"description": "Title retrieved successfully"},
     },
 )
-def read_title(title_id: int, service: TitleService = Depends(get_title_service)) -> TitleRead:
+def read_title(
+    title_id: int, service: TitleService = Depends(get_title_service)
+) -> TitleReadExtended:
+    """One title, including the poster resolved from it or its contents.
+
+    The response model widened from `TitleRead` to `TitleReadExtended`, which is a
+    superset -- every field a caller already read is still there, with `poster` added.
+    """
     return service.get_title(title_id)
 
 
