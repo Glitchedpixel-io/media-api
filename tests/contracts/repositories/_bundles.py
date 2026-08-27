@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Only imported for type checking; no runtime import cycles
     from app.repositories.protocols import (
+        ArtworkKindRepository,
+        ArtworkRepository,
         InboxRepository,
         JobRepository,
         MediaRepository,
@@ -115,6 +117,15 @@ class JobRepoBundle(BaseBundle):
 @dataclass
 class ExternalIdentifierRepoBundle(BaseBundle):
     external_identifiers: ExternalIdentifierRepository
+    id_schemes: IdSchemeRepository
+    assets: MediaRepository
+    titles: TitleRepository
+
+
+@dataclass
+class ArtworkRepoBundle(BaseBundle):
+    artwork: ArtworkRepository
+    artwork_kinds: ArtworkKindRepository
     id_schemes: IdSchemeRepository
     assets: MediaRepository
     titles: TitleRepository

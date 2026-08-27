@@ -4,6 +4,7 @@ from app.database import Base
 
 # Import event listeners to register them with SQLAlchemy
 from . import events  # noqa: F401
+from .artwork import DEFAULT_ARTWORK_KINDS, ArtworkKindORM, ArtworkORM
 from .asset import AssetORM
 from .job import JobORM
 from .metadata import MetadataORM
@@ -19,6 +20,9 @@ from .transform_request import TransformRequestORM
 from .id_scheme import IdSchemeORM, AssetIdORM, ExternalIdentifierORM
 
 __all__ = [
+    "ArtworkKindORM",
+    "ArtworkORM",
+    "DEFAULT_ARTWORK_KINDS",
     "AssetORM",
     "AssetTagORM",
     "Base",

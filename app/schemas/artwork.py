@@ -1,0 +1,183 @@
+# app/schemas/artwork.py
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from ._dynamic import make_partial_model
+from .enums import EntityTypeEnum
+from .mixins import IDMixin
+
+
+class ArtworkKindAttrs(BaseModel):
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    code: str = Field(
+        ...,
+        title="Code",
+        description="Short unique code for the artwork kind, e.g. poster",
+        max_length=32,
+    )
+    label: str = Field(..., title="Label", description="Human readable label for the kind")
+    description: str | None = Field(
+        None, title="Description", description="Helpful information about when to use this kind"
+    )
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        """Normalise the code to lowercase and reject blank values.
+
+        Args:
+            v: The submitted code.
+
+        Returns:
+            str: The lowercased, stripped code.
+
+        Raises:
+            ValueError: If the code is empty or only whitespace.
+        """
+        if not v or not v.strip():
+            raise ValueError("Artwork kind code cannot be empty")
+        return v.strip().lower()
+
+
+class ArtworkKindCreatePublic(ArtworkKindAttrs):
+    pass
+
+
+class ArtworkKindCreateInternal(ArtworkKindCreatePublic):
+    pass
+
+
+class ArtworkKindRead(ArtworkKindCreateInternal, IDMixin):
+    pass
+
+
+ArtworkKindPatchPublic = make_partial_model(ArtworkKindCreatePublic, name="ArtworkKindPatchPublic")
+ArtworkKindUpdateInternal = make_partial_model(
+    ArtworkKindCreateInternal, name="ArtworkKindUpdateInternal"
+)
+
+
+class ArtworkAttrs(BaseModel):
+    """The public shape of an artwork, where the kind is identified by its code."""
+
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    artwork_kind: str = Field(
+        ...,
+        title="Artwork Kind",
+        description=(
+            "Code of the artwork's kind, e.g. poster, backdrop or thumbnail. Must match "
+            "the code of an existing artwork kind."
+        ),
+        max_length=32,
+    )
+    storage_path: str = Field(
+        ...,
+        title="Storage Path",
+        description="Path to the file relative to ARTWORK_ROOT, in the content-addressed layout",
+    )
+    mime: str = Field(..., title="MIME type", description="Media type of the file, e.g. image/jpeg")
+    width: int | None = Field(None, title="Width", description="Pixel width, when known", gt=0)
+    height: int | None = Field(None, title="Height", description="Pixel height, when known", gt=0)
+    is_primary: bool = Field(
+        False,
+        title="Is Primary",
+        description="Whether this is the artwork to use for its entity and kind",
+    )
+    source_scheme_id: int | None = Field(
+        None,
+        title="Source Scheme ID",
+        description="ID scheme this artwork was sourced from; paired with source_external_id",
+    )
+    source_external_id: str | None = Field(
+        None,
+        title="Source External ID",
+        description="Identifier within source_scheme_id; paired with source_scheme_id",
+    )
+    source_url: str | None = Field(
+        None, title="Source URL", description="Where this artwork was fetched from, if anywhere"
+    )
+
+    @model_validator(mode="after")
+    def source_scheme_and_id_travel_together(self) -> ArtworkAttrs:
+        """Reject half a provenance pair.
+
+        A scheme without an identifier cannot be resolved and an identifier without a
+        scheme cannot be interpreted, so the database refuses the pair via
+        ``ck_artwork_source_pair``. Catching it here turns what would surface as a
+        ``CheckViolation`` into an ordinary validation error naming the fields --
+        which matters because a 422 raised from the service reaches the client through
+        ``domain_error_detail`` with an empty ``loc``.
+
+        Returns:
+            ArtworkAttrs: This model, unchanged.
+
+        Raises:
+            ValueError: If exactly one of the pair is set.
+        """
+        if (self.source_scheme_id is None) != (self.source_external_id is None):
+            raise ValueError(
+                "source_scheme_id and source_external_id must be provided together, or not at all"
+            )
+        return self
+
+
+class ArtworkCreatePublic(ArtworkAttrs):
+    pass
+
+
+class ArtworkCreateInternal(BaseModel):
+    """The persistence shape of an artwork, where the kind is a foreign key.
+
+    ``extra="forbid"`` is load-bearing rather than decorative, for the same reason it
+    is on ``TitleCreateInternal``: the public model carries ``artwork_kind`` (a code)
+    and this one carries ``artwork_kind_id``, so a caller that forgets to translate
+    between them gets a loud validation error instead of Pydantic silently dropping
+    the field.
+    """
+
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    entity_type: EntityTypeEnum = Field(
+        ..., title="Entity Type", description="Whether this artwork belongs to a title or an asset"
+    )
+    entity_id: int = Field(
+        ..., title="Entity ID", description="ID of the title or asset this artwork belongs to"
+    )
+    artwork_kind_id: int = Field(
+        ..., title="Artwork Kind ID", description="ID of the artwork's kind in artwork_kinds"
+    )
+    storage_path: str = Field(
+        ..., title="Storage Path", description="Path relative to ARTWORK_ROOT"
+    )
+    mime: str = Field(..., title="MIME type", description="Media type of the file")
+    width: int | None = Field(None, title="Width", description="Pixel width, when known")
+    height: int | None = Field(None, title="Height", description="Pixel height, when known")
+    is_primary: bool = Field(False, title="Is Primary", description="Whether this is the primary")
+    source_scheme_id: int | None = Field(
+        None, title="Source Scheme ID", description="Source scheme"
+    )
+    source_external_id: str | None = Field(
+        None, title="Source External ID", description="Identifier within the source scheme"
+    )
+    source_url: str | None = Field(None, title="Source URL", description="Where it came from")
+
+
+class ArtworkRead(ArtworkAttrs, IDMixin):
+    entity_type: EntityTypeEnum = Field(
+        ..., title="Entity Type", description="Whether this artwork belongs to a title or an asset"
+    )
+    entity_id: int = Field(
+        ..., title="Entity ID", description="ID of the title or asset this artwork belongs to"
+    )
+    created_at: datetime = Field(
+        ..., title="Created At", description="When this artwork was registered"
+    )
+
+
+ArtworkPatchPublic = make_partial_model(ArtworkCreatePublic, name="ArtworkPatchPublic")
+ArtworkUpdateInternal = make_partial_model(ArtworkCreateInternal, name="ArtworkUpdateInternal")

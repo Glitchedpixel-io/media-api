@@ -17,6 +17,8 @@ from app.database import get_session_factory
 from app.elasticsearch_client import get_es_manager
 from app.orchestration.registry import ProviderRegistry, get_provider_registry
 from app.repositories import (
+    SQLAlchemyArtworkKindRepository,
+    SQLAlchemyArtworkRepository,
     FileInboxRepository,
     InboxRepository,
     JobRepository,
@@ -42,6 +44,8 @@ from app.repositories import (
     TitleRepository,
 )
 from app.services import (
+    ArtworkKindService,
+    ArtworkService,
     ExternalIdentifierService,
     FileStreamService,
     IdSchemeService,
@@ -197,6 +201,25 @@ def get_title_service(db: Session = Depends(get_db_session)) -> TitleService:
 
 def get_title_type_service(db: Session = Depends(get_db_session)) -> TitleTypeService:
     return TitleTypeService(SQLAlchemyTitleTypeRepository(db))
+
+
+def get_artwork_kind_service(db: Session = Depends(get_db_session)) -> ArtworkKindService:
+    return ArtworkKindService(SQLAlchemyArtworkKindRepository(db))
+
+
+def get_artwork_service(db: Session = Depends(get_db_session)) -> ArtworkService:
+    """Artwork, constructed from one session across four repositories.
+
+    The session is injected directly rather than chaining Depends(get_*_repository):
+    FastAPI treats each of those as a distinct dependency and opens a separate session
+    per repository, which silently splits the transaction. See CLAUDE.md.
+    """
+    return ArtworkService(
+        SQLAlchemyArtworkRepository(db),
+        SQLAlchemyArtworkKindRepository(db),
+        SQLAlchemyTitleRepository(db),
+        SQLAlchemyMediaRepository(db),
+    )
 
 
 def get_title_reference_service(db: Session = Depends(get_db_session)) -> TitleReferenceService:

@@ -19,6 +19,10 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     # Import eagerly for type checkers and IDEs only; never at runtime.
+    from .artwork_repository import (
+        SQLAlchemyArtworkKindRepository,
+        SQLAlchemyArtworkRepository,
+    )
     from .external_identifier_repository import SQLAlchemyExternalIdentifierRepository
     from .id_scheme_repository import SQLAlchemyIdSchemeRepository
     from .inbox_repository import FileInboxRepository
@@ -26,6 +30,8 @@ if TYPE_CHECKING:
     from .media_repository import SQLAlchemyMediaRepository
     from .metadata_repository import SQLAlchemyMetadataRepository
     from .protocols import (
+        ArtworkKindRepository,
+        ArtworkRepository,
         ExternalIdentifierRepository,
         IdSchemeRepository,
         InboxRepository,
@@ -58,12 +64,16 @@ if TYPE_CHECKING:
 
 # Exported name -> the submodule that defines it.
 _EXPORTS: dict[str, str] = {
+    "SQLAlchemyArtworkKindRepository": ".artwork_repository",
+    "SQLAlchemyArtworkRepository": ".artwork_repository",
     "SQLAlchemyExternalIdentifierRepository": ".external_identifier_repository",
     "SQLAlchemyIdSchemeRepository": ".id_scheme_repository",
     "FileInboxRepository": ".inbox_repository",
     "SQLAlchemyJobRepository": ".job_repository",
     "SQLAlchemyMediaRepository": ".media_repository",
     "SQLAlchemyMetadataRepository": ".metadata_repository",
+    "ArtworkKindRepository": ".protocols",
+    "ArtworkRepository": ".protocols",
     "ExternalIdentifierRepository": ".protocols",
     "IdSchemeRepository": ".protocols",
     "InboxRepository": ".protocols",
@@ -113,6 +123,8 @@ if not TYPE_CHECKING:
 
 
 __all__ = [
+    "ArtworkKindRepository",
+    "ArtworkRepository",
     "ExternalIdentifierRepository",
     "FileInboxRepository",
     "IdSchemeRepository",
@@ -122,6 +134,8 @@ __all__ = [
     "MetadataRepository",
     "RunSummaryRepository",
     "RunnerStateRepository",
+    "SQLAlchemyArtworkKindRepository",
+    "SQLAlchemyArtworkRepository",
     "SQLAlchemyExternalIdentifierRepository",
     "SQLAlchemyIdSchemeRepository",
     "SQLAlchemyJobRepository",

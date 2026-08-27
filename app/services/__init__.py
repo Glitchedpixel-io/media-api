@@ -1,4 +1,5 @@
 # app/services/__init__.py
+from .artwork_service import ArtworkKindService, ArtworkService
 from .external_identifier_service import ExternalIdentifierService
 from .file_stream_service import FileStreamResult, FileStreamService
 from .id_scheme_service import IdSchemeService
@@ -18,6 +19,8 @@ from .title_type_service import TitleTypeService
 from .transform_request_service import TransformRequestService
 
 __all__ = [
+    "ArtworkKindService",
+    "ArtworkService",
     "ExternalIdentifierService",
     "FileStreamResult",
     "FileStreamService",
