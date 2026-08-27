@@ -114,8 +114,11 @@ def from_metadata() -> tuple[IndexInfo, ...]:
                     source="unique constraint",
                 )
             )
-        # A column-level unique=True yields a unique index Postgres can use even
-        # though it is not in table.indexes.
+        # A column-level unique=True yields a unique index Postgres can use, which
+        # may not appear in table.indexes -- `unique=True` on its own renders as a
+        # UniqueConstraint. When `index=True` is also set it *does* appear there,
+        # already carrying the name Postgres will use, and synthesising a second
+        # entry here invents an index that does not exist. See _deduplicate.
         for column in table.columns:
             if column.unique and not column.primary_key:
                 out.append(
@@ -127,7 +130,40 @@ def from_metadata() -> tuple[IndexInfo, ...]:
                         source="column unique=True",
                     )
                 )
-    return tuple(sorted(out, key=lambda i: (i.table, i.name)))
+    return _deduplicate(out)
+
+
+# Which source names the index Postgres actually creates, best first. A real Index
+# object always does. A column-level `unique=True` renders as `<table>_<col>_key`,
+# which is also what Postgres names an *unnamed* UniqueConstraint -- so where both
+# describe the same column the constraint entry is the invented one.
+_SOURCE_PRECEDENCE = ("models", "column unique=True", "unique constraint", "primary key")
+
+
+def _deduplicate(entries: list[IndexInfo]) -> tuple[IndexInfo, ...]:
+    """Collapse entries that describe one index reached by several routes.
+
+    The three passes above read the same declaration in different ways, so a
+    column written ``unique=True, index=True`` produced both ``ix_tags_name`` and a
+    synthesised ``tags_name_key``. Only the first exists. Reported side by side
+    they read as a duplicated index -- which is how #59 came to propose a migration
+    dropping four indexes that were never there.
+
+    Args:
+        entries: Everything the metadata passes collected.
+
+    Returns:
+        One entry per distinct index, named as Postgres names it.
+    """
+    best: dict[tuple[str, tuple[str, ...], str | None, str | None, bool], IndexInfo] = {}
+    for entry in entries:
+        key = (entry.table, entry.columns, entry.expression, entry.where, entry.unique)
+        current = best.get(key)
+        if current is None or _SOURCE_PRECEDENCE.index(entry.source) < _SOURCE_PRECEDENCE.index(
+            current.source
+        ):
+            best[key] = entry
+    return tuple(sorted(best.values(), key=lambda i: (i.table, i.name)))
 
 
 def from_migrations(alembic_dir: Path) -> tuple[IndexInfo, ...]:

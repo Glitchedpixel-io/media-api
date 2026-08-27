@@ -66,7 +66,12 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
 
         # Filters
         if params.path_prefix:
-            stmt = stmt.where(AssetORM.path.ilike(f"{params.path_prefix}%"))
+            # Written against lower(path) rather than as ILIKE so it matches
+            # ix_assets_path_lower. The behaviour is the same -- both are a
+            # case-insensitive prefix match -- but ILIKE cannot use any index here,
+            # and this form uses one. Changing it back without dropping that index
+            # would silently reinstate a sequential scan.
+            stmt = stmt.where(func.lower(AssetORM.path).like(f"{params.path_prefix.lower()}%"))
         if params.path_part:
             like_val = f"%{params.path_part}%"
             stmt = stmt.where(AssetORM.path.ilike(like_val))
