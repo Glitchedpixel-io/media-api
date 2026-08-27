@@ -5,7 +5,9 @@ import pytest
 
 from app.utils.paths import (
     accessory_relative_path,
+    artwork_relative_path,
     fix_path,
+    resolve_artwork_path,
     resolve_under_root,
     to_linux_path,
     abs_path_from_env,
@@ -302,3 +304,105 @@ class TestAbsPathFromEnv:
         default = Path("/default/path")
         result = abs_path_from_env("TEST_PATH_VAR", default)
         assert result == default.resolve()
+
+
+#: A valid lowercase hex SHA-256, spelled out so the fan-out is readable in assertions.
+DIGEST = "ab12cd34" + "0" * 56
+
+
+@pytest.mark.unit
+class TestArtworkRelativePath:
+    """The content-addressed layout under ARTWORK_ROOT.
+
+    Unlike `accessory_relative_path`, which derives its path from an asset id the
+    caller already trusts, this one takes a digest that may have come from a request
+    body. Validating it is what keeps the layout safe -- see the traversal tests below.
+    """
+
+    def test_fans_out_on_the_first_two_pairs(self) -> None:
+        assert artwork_relative_path(DIGEST, ".jpg") == str(Path("ab", "12", f"{DIGEST}.jpg"))
+
+    def test_full_digest_is_kept_in_the_filename(self) -> None:
+        """The fan-out prefix is repeated in the filename, so a file is identifiable
+        from its name alone once it has been moved or copied out of the tree."""
+        assert artwork_relative_path(DIGEST, ".png").endswith(f"{DIGEST}.png")
+
+    def test_honours_chunk_size(self) -> None:
+        assert artwork_relative_path(DIGEST, ".jpg", chunk_size=3) == str(
+            Path("ab1", "2cd", f"{DIGEST}.jpg")
+        )
+
+    @pytest.mark.parametrize("suffix", [".jpg", ".jpeg", ".png", ".webp", ".avif"])
+    def test_accepts_the_extensions_producers_write(self, suffix: str) -> None:
+        """A shape check rather than an allow-list, so a new image format does not
+        need a code change here."""
+        assert artwork_relative_path(DIGEST, suffix).endswith(suffix)
+
+    @pytest.mark.parametrize(
+        "digest",
+        [
+            "../../etc/passwd",
+            "../" + "0" * 61,
+            "ab/12" + "0" * 59,
+            DIGEST.upper(),  # uppercase hex would collide on a case-insensitive store
+            "0" * 63,  # too short
+            "0" * 65,  # too long
+            "zz" + "0" * 62,  # not hex
+            "",
+        ],
+    )
+    def test_rejects_a_digest_that_is_not_a_sha256(self, digest: str) -> None:
+        with pytest.raises(ValueError):
+            artwork_relative_path(digest, ".jpg")
+
+    @pytest.mark.parametrize(
+        "suffix",
+        [
+            ".jp/g",
+            "../jpg",
+            ".jpg/../..",
+            "..jpg",  # a second dot would let a suffix carry its own path segment
+            ".jpg.exe",
+            "jpg",  # no leading dot
+            ".JPG",
+            "",
+            "." + "a" * 9,  # unbounded length
+        ],
+    )
+    def test_rejects_a_suffix_that_is_not_a_bare_extension(self, suffix: str) -> None:
+        with pytest.raises(ValueError):
+            artwork_relative_path(DIGEST, suffix)
+
+    @pytest.mark.parametrize("chunk_size", [0, -1, 33])
+    def test_rejects_a_chunk_size_that_leaves_no_fan_out(self, chunk_size: int) -> None:
+        with pytest.raises(ValueError):
+            artwork_relative_path(DIGEST, ".jpg", chunk_size=chunk_size)
+
+
+@pytest.mark.unit
+class TestResolveArtworkPath:
+
+    def test_resolves_under_the_root(self, tmp_path: Path) -> None:
+        result = resolve_artwork_path(DIGEST, ".jpg", tmp_path)
+        assert result == tmp_path.resolve() / "ab" / "12" / f"{DIGEST}.jpg"
+
+    def test_stays_inside_the_root(self, tmp_path: Path) -> None:
+        """The containment guarantee the accessory listing route relies on."""
+        result = resolve_artwork_path(DIGEST, ".jpg", tmp_path)
+        assert result.is_relative_to(tmp_path.resolve())
+
+    def test_does_not_create_anything(self, tmp_path: Path) -> None:
+        """Path computation only. Writing is the registration path's job (#103)."""
+        resolve_artwork_path(DIGEST, ".jpg", tmp_path)
+        assert list(tmp_path.iterdir()) == []
+
+    def test_a_rejected_digest_never_reaches_the_filesystem(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError):
+            resolve_artwork_path("../../etc/passwd", ".jpg", tmp_path)
+
+    def test_the_same_contents_resolve_to_the_same_path(self, tmp_path: Path) -> None:
+        """Content addressing is the whole reason for this layout: one poster shared
+        by a season and its episodes is stored once, not once per entity."""
+        assert resolve_artwork_path(DIGEST, ".jpg", tmp_path) == resolve_artwork_path(
+            DIGEST, ".jpg", tmp_path
+        )

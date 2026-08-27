@@ -13,9 +13,18 @@ class DatabaseConfig:
 
 @dataclass(frozen=True)
 class MediaConfig:
+    """The filesystem roots this service reads from and writes to.
+
+    ``artwork_root`` is content-addressed rather than keyed by entity: a season
+    and its episodes routinely share one poster, and there is no title-side
+    equivalent of ``accessory_relative_path`` to key it by. See
+    ``app.utils.paths.artwork_relative_path``.
+    """
+
     media_root: str
     accessory_root: str
     inbox_root: str
+    artwork_root: str
 
 
 @dataclass(frozen=True)

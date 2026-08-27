@@ -81,7 +81,11 @@ groups:
 - **Auth** — `OIDC_ISSUER` / `OIDC_AUDIENCE` / `OIDC_JWKS_URL` for your
   provider, or `AUTH_DISABLED=true` for local development (refused at
   startup if `APP_ENV=production`).
-- **Filesystem roots** — `MEDIA_ROOT`, `ACCESSORY_ROOT`, `INBOX_ROOT`.
+- **Filesystem roots** — `MEDIA_ROOT`, `ACCESSORY_ROOT`, `INBOX_ROOT`,
+  `ARTWORK_ROOT`. Artwork is laid out content-addressed
+  (`<ab>/<cd>/<sha256>.<ext>`) rather than keyed by the title or asset it
+  belongs to, so a poster shared across a season and its episodes is stored
+  once. Nothing serves these files over HTTP yet.
 - **Job execution** — `ENABLED_ORCHESTRATION_PROVIDERS` (empty by default —
   no orchestration framework required to boot), plus
   `ORCHESTRATION_PROVIDER_OPTIONS` for provider-scoped config such as the
