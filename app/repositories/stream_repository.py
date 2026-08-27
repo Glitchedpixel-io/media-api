@@ -5,7 +5,6 @@ from sqlalchemy import delete, select
 from app.models import StreamORM
 from app.models.sort_configs import STREAM_SORT
 from app.schemas import (
-    PageInfo,
     PaginatedResponse,
     StreamCreateInternal,
     StreamListParams,
@@ -52,10 +51,7 @@ class SQLAlchemyStreamRepository(SQLAlchemyBaseRepository, StreamRepository):
 
         return PaginatedResponse[StreamRead](
             items=items,
-            page=PageInfo(
-                next=self._to_cursor(page.paging.next),
-                prev=self._to_cursor(page.paging.previous),
-            ),
+            page=self._page_info(page),
         )
 
     def update(self, stream_id: int, update: StreamUpdateInternal) -> StreamRead:  # type: ignore
