@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_stream_service
 from app.routers.base import QuietClientErrorRoute
-from app.schemas import StreamPatchPublic, StreamRead
+from app.schemas import (
+    PaginatedResponse,
+    StreamListParams,
+    StreamPatchPublic,
+    StreamRead,
+)
 from app.services import StreamService
 
 router = APIRouter(route_class=QuietClientErrorRoute)
@@ -12,13 +17,14 @@ router = APIRouter(route_class=QuietClientErrorRoute)
 
 @router.get(
     "",
-    response_model=list[StreamRead],
+    response_model=PaginatedResponse[StreamRead],
     operation_id="list_streams",
 )
 def read_streams(
+    params: StreamListParams = Depends(),
     service: StreamService = Depends(get_stream_service),
-) -> list[StreamRead]:
-    return service.get_streams()
+) -> PaginatedResponse[StreamRead]:
+    return service.get_streams(params)
 
 
 @router.get(

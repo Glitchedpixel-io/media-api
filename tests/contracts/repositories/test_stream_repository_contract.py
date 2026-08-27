@@ -5,7 +5,7 @@ from app.repositories.errors import (
     ForeignKeyViolation,
     NotNullViolation,
 )
-from app.schemas import StreamUpdateInternal
+from app.schemas import StreamListParams, StreamUpdateInternal
 from tests.contracts.repositories.bundles_impl import make_bundle, stream_bundler
 from tests.factories import AssetCreateFactory, StreamCreateFactory
 
@@ -17,6 +17,45 @@ def bundle(db_session, _test_engine):
         yield b
     finally:
         b.close()
+
+
+def _all_streams(bundle, **params):
+    """Every stream the repository will hand back, followed across pages.
+
+    ``list_paged`` caps a response at ``limit``, so a test that wants "all of them"
+    has to walk the cursors rather than read one page.
+
+    sqlakeyset still hands back a ``next`` marker on the final page, so "next is None"
+    alone never terminates — it just refetches the tail forever. Stop on an empty page
+    or a cursor that stops advancing, and cap the walk so a regression in the cursor
+    fails the test rather than hanging the suite.
+
+    Args:
+        bundle: The repository bundle under test.
+        **params: Overrides for ``StreamListParams`` (e.g. ``asset_id``, ``limit``).
+
+    Returns:
+        list[StreamRead]: Every row across every page, in cursor order.
+
+    Raises:
+        AssertionError: If the cursor does not terminate within the safety cap.
+    """
+    items = []
+    cursor = None
+    last_cursor = None
+
+    for _ in range(1000):  # safety cap
+        page = bundle.streams.list_paged(StreamListParams(after=cursor, **params))
+        if not page.items:
+            return items
+        items.extend(page.items)
+
+        cursor = page.page.next
+        if not cursor or cursor == last_cursor:
+            return items
+        last_cursor = cursor
+
+    raise AssertionError("Exceeded max pagination steps; cursor likely not advancing.")
 
 
 # --- Contract tests ----------------------------------------------------------
@@ -44,12 +83,43 @@ def test_create_with_invalid_asset_id(bundle):
 
 
 @pytest.mark.contract
-def test_list_all(bundle):
+def test_list_paged(bundle):
 
     asset = bundle.assets.create(AssetCreateFactory())
     for i in range(10):
         bundle.streams.create(StreamCreateFactory(asset_id=asset.id))
-    assert len(bundle.streams.list_all()) == 10
+    assert len(_all_streams(bundle)) == 10
+
+
+@pytest.mark.contract
+def test_list_paged_caps_the_response(bundle):
+    """A page never exceeds `limit`, however many rows exist."""
+    asset = bundle.assets.create(AssetCreateFactory())
+    for _ in range(10):
+        bundle.streams.create(StreamCreateFactory(asset_id=asset.id))
+
+    page = bundle.streams.list_paged(StreamListParams(limit=4))
+
+    assert len(page.items) == 4
+    assert page.page.next is not None
+    # and the cursor still reaches every row
+    assert len(_all_streams(bundle, limit=4)) == 10
+
+
+@pytest.mark.contract
+def test_list_paged_filters_by_asset(bundle):
+    """asset_id scopes the listing to one asset without needing a separate route."""
+    asset_1 = bundle.assets.create(AssetCreateFactory())
+    asset_2 = bundle.assets.create(AssetCreateFactory())
+    for _ in range(5):
+        bundle.streams.create(StreamCreateFactory(asset_id=asset_1.id))
+    for _ in range(7):
+        bundle.streams.create(StreamCreateFactory(asset_id=asset_2.id))
+
+    assert len(_all_streams(bundle, asset_id=asset_1.id)) == 5
+    assert len(_all_streams(bundle, asset_id=asset_2.id)) == 7
+    assert len(_all_streams(bundle, asset_id=0)) == 0
+    assert {s.asset_id for s in _all_streams(bundle, asset_id=asset_1.id)} == {asset_1.id}
 
 
 @pytest.mark.contract
@@ -64,7 +134,7 @@ def test_list_by_asset(bundle):
     assert len(bundle.streams.get_asset_streams(asset_1.id)) == 5
     assert len(bundle.streams.get_asset_streams(asset_2.id)) == 7
     assert len(bundle.streams.get_asset_streams(0)) == 0
-    assert len(bundle.streams.list_all()) == 5 + 7
+    assert len(_all_streams(bundle)) == 5 + 7
 
 
 @pytest.mark.contract
@@ -83,9 +153,9 @@ def test_delete(bundle):
         bundle.streams.create(StreamCreateFactory(asset_id=asset_1.id))
         bundle.streams.create(StreamCreateFactory(asset_id=asset_2.id))
 
-    assert len(bundle.streams.list_all()) == 10
+    assert len(_all_streams(bundle)) == 10
     bundle.streams.delete_asset_streams(asset_1.id)
-    assert len(bundle.streams.list_all()) == 5
+    assert len(_all_streams(bundle)) == 5
 
 
 @pytest.mark.contract

@@ -6,8 +6,10 @@ from app.repositories.protocols import (
     StreamRepository,
 )
 from app.schemas import (
+    PaginatedResponse,
     StreamCreateInternal,
     StreamCreatePublic,
+    StreamListParams,
     StreamPatchPublic,
     StreamRead,
     StreamUpdateInternal,
@@ -28,8 +30,8 @@ class StreamService:
             raise HTTPException(status_code=404, detail="Stream not found")
         return stream
 
-    def get_streams(self) -> list[StreamRead]:
-        return self.repo.list_all()
+    def get_streams(self, params: StreamListParams) -> PaginatedResponse[StreamRead]:
+        return self.repo.list_paged(params)
 
     @translate_repository_errors
     def create_stream(self, asset_id: int, stream: StreamCreatePublic) -> StreamRead:

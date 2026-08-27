@@ -1,9 +1,19 @@
 # app/repositories/stream_repository.py
+from sqlakeyset import select_page
 from sqlalchemy import delete, select
 
 from app.models import StreamORM
-from app.schemas import StreamCreateInternal, StreamRead, StreamUpdateInternal
+from app.models.sort_configs import STREAM_SORT
+from app.schemas import (
+    PageInfo,
+    PaginatedResponse,
+    StreamCreateInternal,
+    StreamListParams,
+    StreamRead,
+    StreamUpdateInternal,
+)
 
+from ..utils.sorting import apply_ordering
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import StreamRepository
@@ -24,9 +34,29 @@ class SQLAlchemyStreamRepository(SQLAlchemyBaseRepository, StreamRepository):
     def exists(self, stream_id: int) -> bool:
         return self.db.get(StreamORM, stream_id) is not None
 
-    def list_all(self) -> list[StreamRead]:
-        rows = self.db.scalars(select(StreamORM)).all()
-        return [StreamRead.model_validate(row) for row in rows]
+    def list_paged(self, params: StreamListParams) -> PaginatedResponse[StreamRead]:
+        stmt = select(StreamORM)
+
+        if params.asset_id is not None:
+            stmt = stmt.where(StreamORM.asset_id == params.asset_id)
+
+        # Apply sorting
+        stmt = apply_ordering(stmt, STREAM_SORT, params.sort)
+
+        # Use the cursor to fetch the required page
+        cursor = params.after or params.before
+        page = select_page(self.db, stmt, per_page=params.limit, page=cursor)
+        # Read out the results
+        rows = [row[0] for row in list(page)]
+        items = [StreamRead.model_validate(item) for item in rows]
+
+        return PaginatedResponse[StreamRead](
+            items=items,
+            page=PageInfo(
+                next=self._to_cursor(page.paging.next),
+                prev=self._to_cursor(page.paging.previous),
+            ),
+        )
 
     def update(self, stream_id: int, update: StreamUpdateInternal) -> StreamRead:  # type: ignore
         orm = self.db.get(StreamORM, stream_id)

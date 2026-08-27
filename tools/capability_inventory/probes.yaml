@@ -161,9 +161,19 @@ probes:
     note: deliberately past max_result_window; records how the failure surfaces
 
   # -- unbounded collections --------------------------------------------
-  - name: streams-all
-    path: /api/streams
-    note: no pagination at all; the response is every stream row in the database
+  - name: streams-page-1
+    path: /api/streams?limit=50
+    note: default first page a browse screen would issue
+
+  - name: streams-max-page
+    path: /api/streams?limit=500
+    note: largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
+
+  - name: streams-by-asset
+    path: /api/streams?asset_id={asset_id}&limit=50
+    note: >-
+      the filtered read a client actually wants; streams.asset_id is unindexed until #53
+      lands, so a slow result here is that index, not the paging
 
   - name: id-schemes-all
     path: /api/id_schemes
