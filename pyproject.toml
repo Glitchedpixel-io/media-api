@@ -43,6 +43,9 @@ prefect = [
 # project rather than a separate one so it can import the app object directly and
 # generate the OpenAPI document in process, with no server running.
 capability-inventory = "tools.capability_inventory.cli:main"
+# The artwork backfill (tools/artwork_backfill). Registers the cover files that
+# predate the artwork table. One-shot, dry-run by default; see its module docstring.
+artwork-backfill = "tools.artwork_backfill.cli:main"
 
 [project.entry-points."media_api.orchestration_providers"]
 prefect = "app.orchestration.prefect:PrefectProvider"

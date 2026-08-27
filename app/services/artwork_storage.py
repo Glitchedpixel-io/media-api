@@ -6,7 +6,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Protocol
 
 from fastapi import HTTPException
 
@@ -41,6 +41,19 @@ _SIGNATURES: tuple[tuple[bytes, int, str, str], ...] = (
 #: How many bytes the sniffer needs before it can decide. The longest fixed signature
 #: is 8 bytes; the container formats below need 16.
 _SNIFF_BYTES = 16
+
+_NOT_AN_IMAGE = "Artwork must be a JPEG, PNG, WebP, GIF or AVIF image"
+
+
+class _Sink(Protocol):
+    """Whatever ``_consume`` copies bytes into.
+
+    Narrower than ``BinaryIO`` on purpose: the only thing needed is ``write``, and
+    ``tempfile.NamedTemporaryFile`` returns a wrapper that satisfies that without
+    declaring itself a ``BinaryIO``.
+    """
+
+    def write(self, data: bytes, /) -> int: ...
 
 
 @dataclass(frozen=True)
@@ -93,8 +106,93 @@ class ArtworkStore:
     def __init__(self, config: MediaConfig) -> None:
         self.root = Path(config.artwork_root)
 
+    def _consume(self, stream: BinaryIO, sink: _Sink | None) -> tuple[str, str, str, int]:
+        """Read a stream once, identifying and digesting it as it goes.
+
+        Shared by :meth:`store` and :meth:`inspect` so that the size cap, the format
+        sniffing and the digest have exactly one implementation. A dry run that
+        validated by a second, looser set of rules than the real write would report a
+        scope the real run does not deliver.
+
+        Args:
+            stream: The bytes to read.
+            sink: Where to copy them, or None to discard as they are consumed.
+
+        Returns:
+            tuple[str, str, str, int]: digest, mime, suffix, size.
+
+        Raises:
+            HTTPException: 400 if empty, 413 if over ``MAX_ARTWORK_BYTES``, 415 if the
+                bytes are not an image format artwork may be stored in.
+        """
+        hasher = hashlib.sha256()
+        size = 0
+        head = b""
+        sniffed: tuple[str, str] | None = None
+
+        while chunk := stream.read(_CHUNK_BYTES):
+            size += len(chunk)
+            if size > MAX_ARTWORK_BYTES:
+                # Refuse mid-stream rather than after buffering the whole upload --
+                # the point of a cap is not to hold the bytes.
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        f"Artwork exceeds the maximum size of "
+                        f"{MAX_ARTWORK_BYTES // (1024 * 1024)}MB"
+                    ),
+                )
+            if sniffed is None:
+                head += chunk[: _SNIFF_BYTES - len(head)]
+                if len(head) >= _SNIFF_BYTES:
+                    sniffed = _sniff(head)
+                    if sniffed is None:
+                        raise HTTPException(status_code=415, detail=_NOT_AN_IMAGE)
+            hasher.update(chunk)
+            if sink is not None:
+                sink.write(chunk)
+
+        if size == 0:
+            raise HTTPException(status_code=400, detail="Artwork file is empty")
+        if sniffed is None:
+            # Shorter than _SNIFF_BYTES, so the loop never got enough to decide. Too
+            # short to be any of these formats, which is the same refusal.
+            raise HTTPException(status_code=415, detail=_NOT_AN_IMAGE)
+
+        mime, suffix = sniffed
+        return hasher.hexdigest(), mime, suffix, size
+
+    def inspect(self, stream: BinaryIO) -> StoredArtwork:
+        """Identify and digest a stream without writing anything.
+
+        Answers "what would storing this produce, and would it be accepted?" -- which
+        is what a dry run needs in order to report a scope the real run will actually
+        deliver.
+
+        Args:
+            stream: The bytes to examine.
+
+        Returns:
+            StoredArtwork: What :meth:`store` would produce. ``already_present``
+                reports whether that file is on disk already; nothing is written
+                either way.
+
+        Raises:
+            HTTPException: The same refusals :meth:`store` raises.
+        """
+        digest, mime, suffix, size = self._consume(stream, None)
+        relative = artwork_relative_path(digest, suffix)
+        return StoredArtwork(
+            digest=digest,
+            suffix=suffix,
+            mime=mime,
+            size=size,
+            storage_path=relative,
+            already_present=(self.root / relative).exists(),
+        )
+
     def store(self, stream: BinaryIO) -> StoredArtwork:
-        """Digest an uploaded stream and write it under ARTWORK_ROOT.
+        """Digest a stream and write it under ARTWORK_ROOT.
 
         The file is written to a temporary name first and moved into place with
         ``os.replace`` once the digest is known -- the final path is *derived* from
@@ -103,28 +201,23 @@ class ArtworkStore:
         content-addressed path.
 
         Writing is idempotent by construction: identical bytes always produce the same
-        path, so re-uploading a file already present is a no-op rather than a
-        conflict. That is what makes "write the file, then insert the row" the safe
-        order -- unlike ``MediaService``'s rename, a repeated write destroys nothing,
-        and a file left behind by a failed insert is inert rather than corrupting.
+        path, so storing a file already present is a no-op rather than a conflict.
+        That is what makes "write the file, then insert the row" the safe order --
+        unlike ``MediaService``'s rename, a repeated write destroys nothing, and a
+        file left behind by a failed insert is inert rather than corrupting.
 
         Args:
-            stream: The uploaded bytes.
+            stream: The bytes to store.
 
         Returns:
             StoredArtwork: The digest, canonical type and relative path of the file.
 
         Raises:
-            HTTPException: 400 if the upload is empty, 413 if it exceeds
+            HTTPException: 400 if the file is empty, 413 if it exceeds
                 ``MAX_ARTWORK_BYTES``, or 415 if the bytes are not an image format
                 artwork may be stored in.
         """
         self.root.mkdir(parents=True, exist_ok=True)
-
-        hasher = hashlib.sha256()
-        size = 0
-        head = b""
-        sniffed: tuple[str, str] | None = None
 
         # delete=False because the file outlives the context manager on the success
         # path, where os.replace moves it rather than the cleanup removing it.
@@ -132,44 +225,8 @@ class ArtworkStore:
         tmp_path = Path(tmp.name)
         try:
             with tmp:
-                while chunk := stream.read(_CHUNK_BYTES):
-                    size += len(chunk)
-                    if size > MAX_ARTWORK_BYTES:
-                        # Refuse mid-stream rather than after buffering the whole
-                        # upload -- the point of a cap is not to hold the bytes.
-                        raise HTTPException(
-                            status_code=413,
-                            detail=(
-                                f"Artwork exceeds the maximum size of "
-                                f"{MAX_ARTWORK_BYTES // (1024 * 1024)}MB"
-                            ),
-                        )
-                    if sniffed is None:
-                        head += chunk[: _SNIFF_BYTES - len(head)]
-                        if len(head) >= _SNIFF_BYTES:
-                            sniffed = _sniff(head)
-                            if sniffed is None:
-                                raise HTTPException(
-                                    status_code=415,
-                                    detail=(
-                                        "Artwork must be a JPEG, PNG, WebP, GIF or " "AVIF image"
-                                    ),
-                                )
-                    hasher.update(chunk)
-                    tmp.write(chunk)
+                digest, mime, suffix, size = self._consume(stream, tmp)
 
-            if size == 0:
-                raise HTTPException(status_code=400, detail="Artwork file is empty")
-            if sniffed is None:
-                # Shorter than _SNIFF_BYTES, so the loop never got enough to decide.
-                # Too short to be any of these formats, which is the same refusal.
-                raise HTTPException(
-                    status_code=415,
-                    detail="Artwork must be a JPEG, PNG, WebP, GIF or AVIF image",
-                )
-
-            mime, suffix = sniffed
-            digest = hasher.hexdigest()
             relative = artwork_relative_path(digest, suffix)
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
