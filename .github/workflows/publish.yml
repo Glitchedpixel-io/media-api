@@ -14,16 +14,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # "Version Bump succeeded" does not mean "a release happened". A PR titled
+  # [no-release] lands on main deliberately untagged so a batch of changes can ship as
+  # one version — see the Versioning & Releases section in CLAUDE.md. This workflow
+  # chains off that workflow's *completion* rather than the tag push (a tag pushed with
+  # GITHUB_TOKEN cannot trigger `on: push: tags:`), so whether to publish has to be
+  # answered here, by looking for a tag on the exact commit.
+  #
+  # Resolving "the highest tag in the repo" instead is actively unsafe: on an untagged
+  # commit it finds the PREVIOUS release and republishes it — clobbering that release's
+  # openapi.json, overwriting its immutable image tag with newer code, and dispatching a
+  # deploy of a version number whose contents just silently changed.
+  gate:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
 
     outputs:
-      version: ${{ steps.tag.outputs.version }}
-      tag: ${{ steps.tag.outputs.tag }}
+      released: ${{ steps.check.outputs.released }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v5
@@ -31,13 +40,34 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Get version tag
-        id: tag
+      - name: Find the version tag for this commit
+        id: check
         run: |
-          git fetch --tags
-          TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -1)
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          git fetch --tags --force
+          TAG=$(git tag --points-at HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
+          if [ -z "$TAG" ]; then
+            echo "No version tag on $GITHUB_SHA — nothing to publish."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Publishing $TAG"
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
 
@@ -57,7 +87,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
+          TAG="${{ needs.gate.outputs.tag }}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" openapi.json --repo "$GITHUB_REPOSITORY" --clobber
           else
@@ -78,9 +108,9 @@ jobs:
         with:
           context: .
           push: true
-          build-args: VERSION=${{ steps.tag.outputs.version }}
+          build-args: VERSION=${{ needs.gate.outputs.version }}
           tags: |
-            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}
+            ghcr.io/glitchedpixel-io/media-api:${{ needs.gate.outputs.version }}
             ghcr.io/glitchedpixel-io/media-api:latest
           cache-from: type=registry,ref=ghcr.io/glitchedpixel-io/media-api:latest
           cache-to: type=inline
@@ -93,10 +123,10 @@ jobs:
           context: .
           push: true
           build-args: |
-            VERSION=${{ steps.tag.outputs.version }}
+            VERSION=${{ needs.gate.outputs.version }}
             EXTRAS=prefect
           tags: |
-            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}-prefect
+            ghcr.io/glitchedpixel-io/media-api:${{ needs.gate.outputs.version }}-prefect
             ghcr.io/glitchedpixel-io/media-api:latest-prefect
           cache-from: type=registry,ref=ghcr.io/glitchedpixel-io/media-api:latest-prefect
           cache-to: type=inline
@@ -110,7 +140,7 @@ jobs:
       - name: Core image carries no orchestration framework
         run: |
           docker run --rm \
-            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }} \
+            ghcr.io/glitchedpixel-io/media-api:${{ needs.gate.outputs.version }} \
             uv run --no-sync python -c '
           import importlib.util, sys
           if importlib.util.find_spec("prefect") is not None:
@@ -126,7 +156,7 @@ jobs:
             -e ORCHESTRATION_PROVIDER_OPTIONS='{"webhook":{"url":"https://example.invalid/hook"}}' \
             -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
             -e LOGFIRE_IGNORE_NO_CONFIG=1 \
-            ghcr.io/glitchedpixel-io/media-api:${{ steps.tag.outputs.version }}-prefect \
+            ghcr.io/glitchedpixel-io/media-api:${{ needs.gate.outputs.version }}-prefect \
             uv run --no-sync python -c '
           from app.config.settings import _Settings, _build_orchestration_config
           from app.orchestration.loader import build_provider_registry
@@ -136,15 +166,15 @@ jobs:
           '
 
   dispatch:
-    needs: build
+    needs: [gate, build]
     runs-on: ubuntu-latest
     permissions: {}   # no checkout, no GITHUB_TOKEN use — only the explicit DEPLOY_DISPATCH_TOKEN below
     steps:
-      - name: Notify media-api-deploy
+      - name: Notify the deploy pipeline
         env:
           GH_TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
         run: |
           gh api repos/Glitchedpixel-io/media-api-deploy/dispatches \
             -f event_type=media-api-released \
-            -F "client_payload[tag]=${{ needs.build.outputs.tag }}" \
-            -F "client_payload[version]=${{ needs.build.outputs.version }}"
+            -F "client_payload[tag]=${{ needs.gate.outputs.tag }}" \
+            -F "client_payload[version]=${{ needs.gate.outputs.version }}"
