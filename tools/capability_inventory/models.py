@@ -327,6 +327,35 @@ class ProbeResult:
     item_count: int | None = None
     reason: str | None = None
     notes: tuple[str, ...] = ()
+    records_failure_mode: bool = False
+    """Set when the probe exists to record *how* something fails.
+
+    Such a probe accepts a status that means the endpoint did not do its work, so
+    what it times is the failure path. It is reported like any other probe and
+    contributes nothing to a verdict."""
+
+    @property
+    def measured(self) -> bool:
+        """Whether this probe actually exercised the endpoint.
+
+        ``status == "ok"`` only means the response carried a status the probe was
+        willing to accept, which is not the same as the endpoint having worked.
+        ``search-transcripts-past-window`` accepts 503 in order to record how the
+        ``max_result_window`` ceiling surfaces; treating that as a measurement put
+        "worst-case p95 3ms" in the summary for an endpoint that had never once
+        returned a result.
+
+        A non-2xx status is not disqualifying on its own. A by-scheme lookup that
+        misses runs the same query as one that hits, and an unsatisfiable range is
+        the endpoint behaving correctly -- both are real measurements. What
+        disqualifies a probe is a server error, or its own declaration that it is
+        recording a failure mode.
+        """
+        if self.status != "ok" or self.http_status is None:
+            return False
+        if self.records_failure_mode:
+            return False
+        return self.http_status < 500
 
 
 # --------------------------------------------------------------------------

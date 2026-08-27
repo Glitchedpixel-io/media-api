@@ -63,6 +63,12 @@ class ProbeSpec:
     runs: int
     warmup: int
     timeout: float
+    records_failure_mode: bool = False
+    """Set when the probe exists to record *how* something fails.
+
+    Such a probe accepts a status meaning the endpoint did not do its work, so
+    what it times is the failure path rather than the endpoint. It is reported
+    like any other probe and contributes nothing to a verdict."""
 
 
 @dataclass(frozen=True)
@@ -170,6 +176,7 @@ def load_config(path: Path) -> ProbeConfig:
                 stream=bool(entry.get("stream", False)),
                 paginate=entry.get("paginate"),
                 note=entry.get("note"),
+                records_failure_mode=bool(entry.get("records_failure_mode", False)),
                 runs=int(entry.get("runs", defaults.get("runs", _DEFAULT_RUNS))),
                 warmup=int(entry.get("warmup", defaults.get("warmup", _DEFAULT_WARMUP))),
                 timeout=float(
@@ -386,6 +393,7 @@ class ProbeRunner:
                     "instance, so this probe was not run"
                 ),
                 notes=(spec.note,) if spec.note else (),
+                records_failure_mode=spec.records_failure_mode,
             )
 
         notes: list[str] = [spec.note] if spec.note else []
@@ -430,6 +438,7 @@ class ProbeRunner:
                     status="error",
                     reason=f"{type(exc).__name__}: {exc}",
                     notes=tuple(notes),
+                    records_failure_mode=spec.records_failure_mode,
                 )
             if attempt >= spec.warmup:
                 samples.append(elapsed)
@@ -444,6 +453,7 @@ class ProbeRunner:
                 http_status=status_code,
                 reason=(f"expected status {list(spec.expect_status)}, got {status_code}"),
                 notes=tuple(notes),
+                records_failure_mode=spec.records_failure_mode,
             )
 
         if len(spec.expect_status) > 1 and status_code is not None:
@@ -463,6 +473,7 @@ class ProbeRunner:
             bytes_=size,
             item_count=items,
             notes=tuple(notes),
+            records_failure_mode=spec.records_failure_mode,
         )
 
     def _run_paginated(
@@ -506,6 +517,7 @@ class ProbeRunner:
                 status="error",
                 reason=f"walking to a deep page failed after {walked} pages: {exc}",
                 notes=tuple(notes),
+                records_failure_mode=spec.records_failure_mode,
             )
 
         if cursor is None:
@@ -521,6 +533,7 @@ class ProbeRunner:
                     f"{pages + 1} to measure on this instance"
                 ),
                 notes=tuple(notes),
+                records_failure_mode=spec.records_failure_mode,
             )
 
         notes.append(

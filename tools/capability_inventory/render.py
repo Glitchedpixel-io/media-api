@@ -347,7 +347,7 @@ def _data_shape_block(
     # The size this endpoint's own responses actually reached. The per-probe
     # detail is in **Measured** directly below; what belongs here is the bound,
     # because that is what a layout has to survive.
-    observed = [p for p in record.probes if p.status == "ok" and p.item_count is not None]
+    observed = [p for p in record.probes if p.measured and p.item_count is not None]
     if observed:
         largest = max(observed, key=lambda p: (p.item_count or 0, p.bytes_ or 0))
         smallest = min(observed, key=lambda p: (p.item_count or 0, p.bytes_ or 0))
@@ -443,7 +443,7 @@ def _summary_table(records: tuple[EndpointRecord, ...]) -> list[str]:
             paging = "**none**"
         else:
             paging = annotation.pagination.style
-        timed = [p for p in record.probes if p.status == "ok" and p.timing]
+        timed = [p for p in record.probes if p.measured and p.timing]
         p95 = _duration(max(p.timing.p95_ms for p in timed if p.timing)) if timed else "UNKNOWN"
         auth = "**none**" if surface.auth.startswith("none") else "bearer"
         rows.append(

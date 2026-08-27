@@ -48,7 +48,7 @@ def _bytes(value: int) -> str:
 
 def _worst_probe(probes: tuple[ProbeResult, ...]) -> ProbeResult | None:
     """The slowest successful probe for an endpoint."""
-    timed = [p for p in probes if p.status == "ok" and p.timing is not None]
+    timed = [p for p in probes if p.measured and p.timing is not None]
     if not timed:
         return None
     return max(timed, key=lambda p: p.timing.p95_ms if p.timing else 0.0)
@@ -80,7 +80,7 @@ def _collection_ceiling(
         A tuple of (largest collection, where the number came from), or
         (None, None) when nothing establishes it.
     """
-    observed = [p.item_count for p in probes if p.status == "ok" and p.item_count is not None]
+    observed = [p.item_count for p in probes if p.measured and p.item_count is not None]
     if observed:
         return max(observed), "measured directly from a probe response"
 
@@ -273,10 +273,10 @@ def assess(
                 f"measured p95 of {_duration(worst.timing.p95_ms)} on `{worst.name}` is "
                 "too slow to drive from a keystroke"
             )
-    largest = max((p.bytes_ or 0 for p in probes if p.status == "ok"), default=0)
+    largest = max((p.bytes_ or 0 for p in probes if p.measured), default=0)
     if largest >= LARGE_PAYLOAD_BYTES:
         biggest = max(
-            (p for p in probes if p.status == "ok" and (p.bytes_ or 0) == largest),
+            (p for p in probes if p.measured and (p.bytes_ or 0) == largest),
             key=lambda p: p.name,
         )
         risks.append(f"largest measured payload is {_bytes(largest)} (`{biggest.name}`)")
@@ -385,7 +385,7 @@ def _stream_assessment(probes: tuple[ProbeResult, ...]) -> tuple[str, str]:
     -- nothing has been established and the answer is UNKNOWN. Only when the
     endpoint answered and still did not honour a range is it a real finding.
     """
-    succeeded = [p for p in probes if p.status == "ok"]
+    succeeded = [p for p in probes if p.measured]
     if not succeeded:
         reason = probes[0].reason if probes else None
         detail = f" ({reason})" if reason else ""

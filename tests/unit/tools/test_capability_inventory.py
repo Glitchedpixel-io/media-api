@@ -1096,3 +1096,92 @@ def test_a_probe_still_outranks_every_inference() -> None:
 
     assert ceiling == 65_739
     assert source == "measured directly from a probe response"
+
+
+# --------------------------------------------------------------------------
+# What counts as a measurement
+# --------------------------------------------------------------------------
+
+
+def _result(**overrides) -> ProbeResult:
+    base = dict(
+        name="probe",
+        endpoint_key="GET /api/x",
+        method="GET",
+        url="/api/x",
+        status="ok",
+        http_status=200,
+        timing=Timing(runs=7, p50_ms=1.0, p95_ms=3.0, min_ms=1.0, max_ms=3.0),
+    )
+    return ProbeResult(**{**base, **overrides})
+
+
+def test_a_probe_recording_a_failure_mode_is_not_a_measurement() -> None:
+    """The defect behind #57.
+
+    `search-transcripts-past-window` accepts 503 so the report can say how the
+    max_result_window ceiling surfaces. Counting that as a measurement put
+    "worst-case p95 3ms" in the summary for an endpoint that never returned a result.
+    """
+    probe = _result(http_status=503, records_failure_mode=True)
+
+    assert probe.measured is False
+
+
+def test_a_server_error_is_never_a_measurement_even_unflagged() -> None:
+    """A 5xx is never the endpoint doing its work, flag or not."""
+    assert _result(http_status=503).measured is False
+    assert _result(http_status=500).measured is False
+
+
+def test_a_deliberate_client_error_is_still_a_measurement() -> None:
+    """The distinction is not the status code.
+
+    A by-scheme lookup that misses runs the same query as one that hits, and an
+    unsatisfiable range is the endpoint behaving correctly. Discarding these would
+    send several endpoints back to UNKNOWN for no reason.
+    """
+    assert _result(http_status=404).measured is True
+    assert _result(http_status=416).measured is True
+
+
+def test_a_probe_that_did_not_run_is_not_a_measurement() -> None:
+    assert _result(status="unavailable", http_status=None).measured is False
+    assert _result(status="error", http_status=404).measured is False
+
+
+def test_a_verdict_ignores_a_failure_mode_probe_when_choosing_the_worst() -> None:
+    """End of the chain: the summary p95 must not come from the failure probe."""
+    real = _result(
+        name="page-1",
+        http_status=200,
+        timing=Timing(runs=7, p50_ms=80.0, p95_ms=120.0, min_ms=70.0, max_ms=130.0),
+    )
+    failure = _result(
+        name="past-window",
+        http_status=503,
+        records_failure_mode=True,
+        timing=Timing(runs=7, p50_ms=2.0, p95_ms=3.0, min_ms=2.0, max_ms=3.0),
+    )
+
+    worst = verdict._worst_probe((failure, real))
+
+    assert worst is not None and worst.name == "page-1"
+
+
+def test_a_verdict_is_unmeasured_when_only_failure_probes_ran() -> None:
+    """Elasticsearch unreachable: every probe 503s, so nothing was measured."""
+    failure = _result(http_status=503, records_failure_mode=True)
+
+    assert verdict._worst_probe((failure,)) is None
+
+
+def test_the_shipped_failure_probe_is_flagged() -> None:
+    """The one probe in the file that accepts a status meaning the endpoint failed."""
+    config = probes.load_config(Path(probes.__file__).with_name("probes.yaml"))
+    by_name = {spec.name: spec for spec in config.probes}
+
+    assert by_name["search-transcripts-past-window"].records_failure_mode is True
+    # and a deliberate client error is not flagged, because it does measure: an
+    # unsatisfiable range is the endpoint behaving correctly.
+    assert by_name["fetch-asset-range-unsatisfiable"].records_failure_mode is False

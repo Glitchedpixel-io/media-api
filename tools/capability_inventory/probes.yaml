@@ -18,6 +18,17 @@
 #   fails, every probe depending on that variable is reported as `unavailable`
 #   with the reason -- never silently skipped.
 #
+# FAILURE-MODE PROBES
+#   `records_failure_mode: true` marks a probe that exists to record *how* something
+#   fails rather than what it costs. Such a probe is reported like any other and
+#   contributes nothing to a verdict: its timing describes the failure path, not the
+#   endpoint doing its work.
+#
+#   Set it whenever `expect_status` accepts a status meaning the endpoint did not do
+#   its job. Do not set it merely because a status is not 2xx -- a by-scheme lookup
+#   that misses runs the same query as one that hits, and an unsatisfiable range is
+#   the endpoint behaving correctly. Both are real measurements.
+#
 #   Never put a query string in `path`. A path carrying `?` matches no route, so
 #   the probe would time successfully but its result could not be attached to an
 #   endpoint, which reports UNKNOWN while this file still looks correct. The
@@ -164,6 +175,7 @@ probes:
     query: {q: "the", size: 25}
     paginate: {style: offset, offset: 10000}
     expect_status: [200, 500, 503]
+    records_failure_mode: true
     note: deliberately past max_result_window; records how the failure surfaces
 
   # -- unbounded collections --------------------------------------------
