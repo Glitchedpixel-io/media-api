@@ -21,6 +21,15 @@ class InboxItem(BaseModel):
     type: InboxItemTypeEnum = Field(..., description="Item type")
     size: int | None = Field(None, description="Size in bytes (files only)")
     children: list[InboxItem] | None = Field(None, description="Children for directories")
+    children_truncated: bool = Field(
+        False,
+        description=(
+            "True when this directory's children were not walked, because the depth "
+            "limit or the item cap was reached or because it is a symlink. `children` "
+            "is then null and says nothing about whether the directory is empty; ask "
+            "for a greater depth to see inside it. Always false for files."
+        ),
+    )
 
     @field_validator("path", mode="before")
     @classmethod
