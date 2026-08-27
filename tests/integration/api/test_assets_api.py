@@ -13,11 +13,15 @@ These tests verify:
 - Full data flow through all application layers
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from http import HTTPStatus
 
@@ -1760,3 +1764,90 @@ class TestAssetsAPIPerformRename:
         assert r["bitrate"] == 2000
         assert r["path"] == file_rel_path  # Path unchanged
         assert file_abs_path.exists()  # File not moved
+
+
+@contextmanager
+def _statements_touching(engine: Engine, table: str) -> Iterator[list[str]]:
+    """Collect every SQL statement issued against ``table`` inside the block.
+
+    Args:
+        engine: The engine the request's session is bound to.
+        table: Table name to match, case-insensitively, against each statement.
+
+    Yields:
+        list[str]: The matching statements, appended as they are executed.
+    """
+    seen: list[str] = []
+
+    def _record(
+        conn: object,
+        cursor: object,
+        statement: str,
+        parameters: object,
+        context: object,
+        executemany: bool,
+    ) -> None:
+        if table in statement.lower():
+            seen.append(statement)
+
+    event.listen(engine, "after_cursor_execute", _record)
+    try:
+        yield seen
+    finally:
+        event.remove(engine, "after_cursor_execute", _record)
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestAssetsListQueryCount:
+    """Guard the cost of listing assets against the N+1 regression in #49.
+
+    ``AssetReadExtended`` serialises ``external_ids`` unconditionally, so if the
+    relationship ever goes back to a lazy load the endpoint issues one extra SELECT
+    per row returned. That is invisible to a correctness test -- the response body is
+    identical either way -- so it is asserted here as a query count instead.
+    """
+
+    def _create_scheme(self, client: TestClient) -> dict:
+        payload = {"code": "imdb", "label": "IMDb", "validator": None}
+        res = client.post("/api/id_schemes", json=payload)
+        assert res.status_code == HTTPStatus.CREATED, res.text
+        return res.json()
+
+    def _create_asset_with_external_id(self, client: TestClient, scheme_id: int, n: int) -> None:
+        asset = AssetReadFactory()
+        res = client.post("/api/assets", json=get_asset_creation_json(asset))  # type: ignore[arg-type]
+        assert res.status_code == HTTPStatus.CREATED, res.text
+        res = client.post(
+            f"/api/assets/{res.json()['id']}/ids",
+            json={"scheme_id": scheme_id, "external_id": f"tt{n:07d}"},
+        )
+        assert res.status_code == HTTPStatus.CREATED, res.text
+
+    def test_external_id_queries_do_not_scale_with_rows_returned(
+        self, client: TestClient, _test_engine: Engine
+    ) -> None:
+        """A larger page must not cost more queries against external_identifiers."""
+        # Arrange - six assets, each carrying an external identifier to load
+        scheme = self._create_scheme(client)
+        for n in range(6):
+            self._create_asset_with_external_id(client, scheme["id"], n)
+
+        # Act - the same endpoint at two page sizes
+        counts: dict[int, int] = {}
+        for limit in (2, 6):
+            with _statements_touching(_test_engine, "external_identifiers") as statements:
+                response = client.get(f"/api/assets?limit={limit}")
+            assert response.status_code == HTTPStatus.OK
+            items = response.json()["items"]
+            assert len(items) == limit
+            # The field must actually be populated, or the count below proves nothing
+            assert all(item["external_ids"] for item in items)
+            counts[limit] = len(statements)
+
+        # Assert - cost is a property of the request, not of the row count
+        assert counts[2] == counts[6], (
+            f"external_identifiers queries scaled with page size: "
+            f"{counts[2]} for 2 rows, {counts[6]} for 6 rows"
+        )
+        assert counts[6] < 6, f"expected a bounded number of queries, got {counts[6]} for 6 rows"
