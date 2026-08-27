@@ -181,3 +181,70 @@ class ArtworkRead(ArtworkAttrs, IDMixin):
 
 ArtworkPatchPublic = make_partial_model(ArtworkCreatePublic, name="ArtworkPatchPublic")
 ArtworkUpdateInternal = make_partial_model(ArtworkCreateInternal, name="ArtworkUpdateInternal")
+
+
+class ArtworkUploadForm(BaseModel):
+    """The metadata accompanying an uploaded artwork file.
+
+    Carries no ``storage_path`` or ``mime``: both are derived from the bytes rather
+    than taken from the caller. A client-supplied MIME type is a claim about a file
+    the client also controls, so trusting it would let an HTML document be recorded --
+    and later served -- as an image. ``ArtworkStore`` sniffs the real format.
+
+    ``width`` and ``height`` stay caller-supplied and optional. Reading them out of
+    the file needs either an image library this project does not depend on or
+    per-format header parsing, and neither is in scope for the registration path; a
+    producer that has just rendered or downloaded the image usually knows them
+    already, and the column is nullable for the case where nobody does.
+    """
+
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    artwork_kind: str = Field(
+        ...,
+        title="Artwork Kind",
+        description=(
+            "Code of the artwork's kind, e.g. poster, backdrop or thumbnail. Must match "
+            "the code of an existing artwork kind."
+        ),
+        max_length=32,
+    )
+    is_primary: bool = Field(
+        False,
+        title="Is Primary",
+        description=(
+            "Make this the artwork used for its entity and kind, demoting whichever "
+            "artwork currently holds that position."
+        ),
+    )
+    width: int | None = Field(None, title="Width", description="Pixel width, when known", gt=0)
+    height: int | None = Field(None, title="Height", description="Pixel height, when known", gt=0)
+    source_scheme_id: int | None = Field(
+        None,
+        title="Source Scheme ID",
+        description="ID scheme this artwork was sourced from; paired with source_external_id",
+    )
+    source_external_id: str | None = Field(
+        None,
+        title="Source External ID",
+        description="Identifier within source_scheme_id; paired with source_scheme_id",
+    )
+    source_url: str | None = Field(
+        None, title="Source URL", description="Where this artwork was fetched from, if anywhere"
+    )
+
+    @model_validator(mode="after")
+    def source_scheme_and_id_travel_together(self) -> ArtworkUploadForm:
+        """Reject half a provenance pair, as ``ArtworkAttrs`` does.
+
+        Returns:
+            ArtworkUploadForm: This model, unchanged.
+
+        Raises:
+            ValueError: If exactly one of the pair is set.
+        """
+        if (self.source_scheme_id is None) != (self.source_external_id is None):
+            raise ValueError(
+                "source_scheme_id and source_external_id must be provided together, or not at all"
+            )
+        return self

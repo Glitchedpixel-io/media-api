@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from .core import router as core_router
+from .artwork import router as artwork_router
 from .tags import router as tags_router
 from .streams import router as streams_router
 from .transform_requests import router as transform_requests_router
@@ -21,3 +22,4 @@ router.include_router(metadata_router)
 router.include_router(external_ids_router)
 router.include_router(relationships_router)
 router.include_router(files_router)
+router.include_router(artwork_router)

@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from dataclasses import replace
 
 from app.config import AppConfig, ElasticsearchConfig, MediaConfig, get_config
-from app.models import Base, DEFAULT_TITLE_TYPES, TitleTypeORM
+from app.models import (
+    Base,
+    DEFAULT_ARTWORK_KINDS,
+    DEFAULT_TITLE_TYPES,
+    ArtworkKindORM,
+    TitleTypeORM,
+)
 
 
 def pytest_sessionstart(session):
@@ -129,6 +135,7 @@ def db_session(
 
     session = _session_factory()
     seed_title_types(session)
+    seed_artwork_kinds(session)
     try:
         yield session
     finally:
@@ -152,6 +159,26 @@ def seed_title_types(session: Session) -> None:
     """
     session.add_all(TitleTypeORM(code=code, label=label) for code, label in DEFAULT_TITLE_TYPES)
     session.commit()
+
+
+def seed_artwork_kinds(session: Session) -> None:
+    """Seed the reference artwork kinds that artwork holds a foreign key onto.
+
+    Exists for the same reason as ``seed_title_types``: the schema here comes from
+    ``create_all`` rather than from the migrations, so the seed the migration performs
+    never happens in tests, and ``db_session`` recreates every table before each one.
+
+    Args:
+        session: The session to seed through.
+    """
+    session.add_all(ArtworkKindORM(code=code, label=label) for code, label in DEFAULT_ARTWORK_KINDS)
+    session.commit()
+
+
+@pytest.fixture
+def artwork_kind_ids(db_session: Session) -> dict[str, int]:
+    """Map seeded artwork kind codes to their IDs, for tests that need the FK."""
+    return {k.code: k.id for k in db_session.query(ArtworkKindORM).all()}
 
 
 @pytest.fixture

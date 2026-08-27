@@ -1,6 +1,8 @@
 # app/services/artwork_service.py
 from __future__ import annotations
 
+from typing import BinaryIO
+
 from fastapi import HTTPException
 
 from app.repositories import (
@@ -20,8 +22,10 @@ from app.schemas import (
     ArtworkPatchPublic,
     ArtworkRead,
     ArtworkUpdateInternal,
+    ArtworkUploadForm,
 )
 from app.schemas.enums import EntityTypeEnum
+from app.services.artwork_storage import ArtworkStore
 from app.services.errors import translate_repository_errors
 
 
@@ -111,11 +115,13 @@ class ArtworkService:
         kinds: ArtworkKindRepository,
         titles: TitleRepository,
         assets: MediaRepository,
+        store: ArtworkStore,
     ) -> None:
         self.repo = repository
         self.kinds = kinds
         self.titles = titles
         self.assets = assets
+        self.store = store
 
     def _resolve_kind_id(self, code: str) -> int:
         """Resolve an artwork kind code to its ID.
@@ -188,6 +194,73 @@ class ArtworkService:
         )
         return self.repo.create(internal)
 
+    @translate_repository_errors
+    def register_upload(
+        self,
+        entity_type: EntityTypeEnum,
+        entity_id: int,
+        upload: ArtworkUploadForm,
+        stream: BinaryIO,
+    ) -> ArtworkRead:
+        """Store an uploaded file and register it against an entity.
+
+        **Everything that can be checked without the bytes is checked first.** An
+        unknown entity or an unknown kind code is settled before a single byte is
+        written, so an ordinary client mistake never leaves a file behind. Only after
+        both pass does the upload reach disk.
+
+        The remaining window -- file written, row rejected -- is deliberate and is why
+        this order is safe rather than merely convenient. The file is content
+        addressed, so a leftover is a correct, immutable, unreferenced blob that a
+        later sweep can reclaim; the reverse order would leave a row pointing at
+        nothing, which renders as a broken image forever. This is the ordering
+        question ``MediaService.update`` raises, answered the other way round because
+        writing here is idempotent where a rename is destructive.
+
+        Args:
+            entity_type: Whether this artwork belongs to a title or an asset.
+            entity_id: ID of that entity.
+            upload: The submitted metadata.
+            stream: The uploaded bytes.
+
+        Returns:
+            ArtworkRead: The registered artwork.
+
+        Raises:
+            HTTPException: 404 for an unknown entity, 422 for an unknown kind, 400 for
+                an empty file, 413 for one over the size cap, 415 for one that is not
+                an image, and 409 if this entity already has this exact file.
+        """
+        self._require_entity(entity_type, entity_id)
+        kind_id = self._resolve_kind_id(upload.artwork_kind)
+
+        stored = self.store.store(stream)
+
+        created = self.repo.create(
+            ArtworkCreateInternal(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                artwork_kind_id=kind_id,
+                storage_path=stored.storage_path,
+                mime=stored.mime,
+                width=upload.width,
+                height=upload.height,
+                # Never set on the insert. A second primary would collide with
+                # uq_artwork_one_primary_per_kind and surface as a 409 for what the
+                # caller reasonably means: "make this the poster". Promoting after the
+                # insert runs the demote-then-promote path instead, which is what they
+                # asked for and is already covered by the repository's contract tests.
+                is_primary=False,
+                source_scheme_id=upload.source_scheme_id,
+                source_external_id=upload.source_external_id,
+                source_url=upload.source_url,
+            )
+        )
+
+        if upload.is_primary:
+            return self.repo.set_primary(created.id)
+        return created
+
     @translate_repository_errors(not_found_message="Artwork not found")
     def update_artwork(
         self,
@@ -199,8 +272,28 @@ class ArtworkService:
         kind_code = payload.pop("artwork_kind", None)
         if kind_code is not None:
             payload["artwork_kind_id"] = self._resolve_kind_id(kind_code)
-        internal = ArtworkUpdateInternal(**payload)
-        return self.repo.update(artwork_id, internal)
+
+        # is_primary is pulled out and applied last. Writing it straight through would
+        # hit uq_artwork_one_primary_per_kind whenever the entity already had a primary
+        # of this kind -- turning "make this the poster" into a 409 the caller can do
+        # nothing useful about. Promotion has to demote the incumbent, which is
+        # set_primary's job.
+        wants_primary = payload.pop("is_primary", None)
+
+        # Called even with nothing left to write, so a missing ID is still a 404 rather
+        # than silently succeeding.
+        updated = self.repo.update(artwork_id, ArtworkUpdateInternal(**payload))
+
+        if wants_primary is True:
+            return self.repo.set_primary(artwork_id)
+        if wants_primary is False:
+            # Demotion needs no counterpart: an entity is allowed no primary at all,
+            # which is what a title whose poster was withdrawn should look like.
+            return self.repo.update(
+                artwork_id,
+                ArtworkUpdateInternal(is_primary=False),  # type: ignore[call-arg]
+            )
+        return updated
 
     @translate_repository_errors(not_found_message="Artwork not found")
     def set_primary_artwork(self, artwork_id: int) -> ArtworkRead:

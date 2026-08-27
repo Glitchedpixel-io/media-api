@@ -39,17 +39,21 @@ def bundle(db_session, _test_engine):
 
 @pytest.fixture
 def poster_kind(bundle) -> int:
-    kind = bundle.artwork_kinds.create(
-        ArtworkKindCreateInternal(code="poster", label="Poster", description=None)
-    )
+    """The seeded ``poster`` kind.
+
+    Looked up rather than created: `db_session` seeds `DEFAULT_ARTWORK_KINDS` the way
+    the migration does, so creating one here would collide on the unique code -- and
+    testing against the seed is what production actually runs on.
+    """
+    kind = bundle.artwork_kinds.get_by_code("poster")
+    assert kind is not None
     return kind.id
 
 
 @pytest.fixture
 def backdrop_kind(bundle) -> int:
-    kind = bundle.artwork_kinds.create(
-        ArtworkKindCreateInternal(code="backdrop", label="Backdrop", description=None)
-    )
+    kind = bundle.artwork_kinds.get_by_code("backdrop")
+    assert kind is not None
     return kind.id
 
 
