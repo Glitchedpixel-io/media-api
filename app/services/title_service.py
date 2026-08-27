@@ -26,10 +26,16 @@ class TitleService:
         self.repository = repository
         self.title_type_repo = title_type_repository
 
+    @translate_repository_errors
     def get_titles(
         self,
         params: TitleListParams,
     ) -> PaginatedResponse[TitleReadExtended]:
+        """List titles.
+
+        Decorated so an unsupported `sort` field becomes a 422 rather than escaping
+        as a 500: `normalize_sort` raises `EnumViolation`, which this maps.
+        """
         return self.repository.list_paged(params)
 
     def get_title(self, title_id: int) -> TitleRead:

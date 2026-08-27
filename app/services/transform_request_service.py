@@ -103,10 +103,15 @@ class TransformRequestService:
             )
         )
 
+    @translate_repository_errors
     def get_transform_requests(
         self,
         params: TransformRequestListParams,
     ) -> PaginatedResponse[TransformRequestReadExpanded]:
+        """List transform requests.
+
+        Decorated so an unsupported `sort` field becomes a 422 rather than a 500.
+        """
         return self.repo.list_paged(params)
 
     def mark_heartbeat(self, request_id: int) -> None:

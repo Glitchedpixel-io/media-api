@@ -30,7 +30,12 @@ class StreamService:
             raise HTTPException(status_code=404, detail="Stream not found")
         return stream
 
+    @translate_repository_errors
     def get_streams(self, params: StreamListParams) -> PaginatedResponse[StreamRead]:
+        """List streams.
+
+        Decorated so an unsupported `sort` field becomes a 422 rather than a 500.
+        """
         return self.repo.list_paged(params)
 
     @translate_repository_errors

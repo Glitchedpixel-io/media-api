@@ -1921,3 +1921,72 @@ class TestAssetsPathPrefixFilter:
         body = client.get("/api/assets?path_prefix=nothing/here&limit=50").json()
 
         assert body["items"] == []
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestAssetsSortKeys:
+    """The set of supported sort keys, decided in #62.
+
+    Six are supported and `mtime` is not: nothing sorted by it -- the front end
+    offers the other six, the runner client sorts by id -- and it was the only key
+    needing NULL sentinels. These tests pin the set, because "which sorts exist" is
+    a contract a client reads once and relies on.
+    """
+
+    SUPPORTED = ["id", "created_at", "size", "filename", "path", "duration"]
+
+    def _seed(self, media_repository: MediaRepository, count: int = 3) -> None:
+        for i in range(count):
+            asset = AssetReadFactory(path=f"sorted/clip{i}.mkv", filename=f"clip{i}.mkv")
+            media_repository.create(
+                AssetCreateInternal(
+                    **asset.model_dump(exclude={"id", "created_at", "master_asset_id"})  # type: ignore
+                )
+            )
+
+    @pytest.mark.parametrize("key", SUPPORTED)
+    def test_every_supported_sort_key_is_accepted(
+        self, client: TestClient, media_repository: MediaRepository, key: str
+    ) -> None:
+        self._seed(media_repository)
+
+        for direction in ("asc", "desc"):
+            response = client.get(f"/api/assets?limit=10&sort={key}:{direction}")
+            assert response.status_code == HTTPStatus.OK, f"{key}:{direction} rejected"
+            assert len(response.json()["items"]) == 3
+
+    def test_mtime_is_no_longer_a_sort_key(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        """Removed in #62: offered by the API, used by nothing.
+
+        A caller asking for it now gets a validation error rather than a whole-table
+        sort over a column with NULLs needing sentinel handling.
+        """
+        self._seed(media_repository)
+
+        response = client.get("/api/assets?limit=10&sort=mtime:desc")
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+    def test_an_unknown_sort_key_is_rejected_rather_than_ignored(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        """Silently ignoring it would return the default order as if it were sorted."""
+        self._seed(media_repository)
+
+        response = client.get("/api/assets?limit=10&sort=nonsense:desc")
+
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+    def test_the_default_sort_orders_by_created_at_descending(
+        self, client: TestClient, media_repository: MediaRepository
+    ) -> None:
+        """The front end's default, and the one this change indexes."""
+        self._seed(media_repository, count=3)
+
+        body = client.get("/api/assets?limit=10&sort=created_at:desc").json()
+        stamps = [item["created_at"] for item in body["items"]]
+
+        assert stamps == sorted(stamps, reverse=True)
