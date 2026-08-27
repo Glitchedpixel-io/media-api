@@ -367,11 +367,23 @@ def _measured_block(record: EndpointRecord) -> list[str]:
     """The probe results for this endpoint."""
     out = ["#### Measured", ""]
     if not record.probes:
-        out += [
-            "UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or "
-            "Phase 4 was skipped.",
-            "",
-        ]
+        if record.surface.method != "GET":
+            # Telling a reader to add a probe here is advice to allowlist a write
+            # against whatever instance the run is pointed at -- which for this
+            # report is production. The absence is a decision, so it reads as one.
+            out += [
+                "UNKNOWN — not probed, deliberately. Measuring a mutating endpoint "
+                "means issuing the mutation, and the harness refuses any non-GET "
+                "unless it is named in `allowlist`, which ships empty. Cost here is "
+                "established from the query shape above rather than by timing.",
+                "",
+            ]
+        else:
+            out += [
+                "UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or "
+                "Phase 4 was skipped.",
+                "",
+            ]
         return out
     for probe in record.probes:
         note = f" — {probe.notes[0]}" if probe.notes else ""

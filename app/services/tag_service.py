@@ -105,47 +105,35 @@ class TagService:
     def _get_or_create_tags(
         self, tag_names: list[str], create_missing_tags: bool = True
     ) -> tuple[list[TagRead], list[str]]:
-        # Filter out duplicate names
-        unique_names = list(dict.fromkeys(tag_names))
+        """Resolve names to tags, optionally creating the ones that do not exist.
 
-        tags: list[TagRead] = []
-        failures: list[str] = []
+        Resolution is a single repository call rather than a loop. The previous
+        shape -- check each name, then create the missing ones one at a time --
+        committed once per created tag, so a failure part-way left some tags
+        created and committed with no way to tell which from the response, and it
+        raced with a concurrent request creating the same name.
 
-        # Fetch existing tags
-        existing_tags = {
-            tag.name.lower(): tag
-            for tag in [self.repo.get_by_name(name.lower()) for name in unique_names]
-            if tag is not None
-        }
+        Args:
+            tag_names: Names to resolve. Case and duplicates are handled below.
+            create_missing_tags: Whether a name with no tag should create one.
 
-        for tag_name in unique_names:
-            if tag_name in existing_tags:
-                tags.append(existing_tags[tag_name])
-            elif create_missing_tags:
-                # Create the tag
-                creation_outcome = self._create_tag_from_name(tag_name)
-                if isinstance(creation_outcome, TagRead):
-                    tags.append(creation_outcome)
-                else:
-                    failures.append(creation_outcome)
-            else:
-                failures.append(f"Tag '{tag_name}' does not exist")
+        Returns:
+            A tuple of (resolved tags, one message per name that could not be
+            resolved). The second element is only ever non-empty when
+            ``create_missing_tags`` is False.
+        """
+        unique_names = list(dict.fromkeys(name.lower() for name in tag_names))
+        if not unique_names:
+            return [], []
 
+        if create_missing_tags:
+            tags = self.repo.get_or_create_by_names(unique_names)
+        else:
+            tags = self.repo.get_by_names(unique_names)
+
+        found = {tag.name for tag in tags}
+        failures = [f"Tag '{name}' does not exist" for name in unique_names if name not in found]
         return tags, failures
-
-    def _create_tag_from_name(self, name: str) -> TagRead | str:
-        # create the tag
-        try:
-            tag = self.create_tag(
-                TagCreatePublic(name=name, description="<<auto created>>", color="#000000"),
-                parent_id=None,
-            )
-            if tag:
-                return tag
-            else:
-                return f"Tag {name} could not be created"
-        except Exception as e:
-            return f"Failed to create tag {name} with {e}"
 
     @translate_repository_errors
     def create_tag(self, tag: TagCreatePublic, parent_id: int | None = None) -> TagRead:

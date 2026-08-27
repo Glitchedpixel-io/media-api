@@ -26,6 +26,7 @@ A probe that fails is never rendered as a fast probe.
 from __future__ import annotations
 
 import os
+import re
 import statistics
 import time
 from dataclasses import dataclass
@@ -211,6 +212,66 @@ def resolve_base_url() -> str:
     return base.rstrip("/")
 
 
+def _resolution_order(
+    variables: dict[str, dict[str, Any]], unknowns: list[Unknown]
+) -> list[tuple[str, dict[str, Any]]]:
+    """Order variables so each is resolved after whatever its path needs.
+
+    A variable can be read from an endpoint that is itself addressed by another
+    variable -- ``metadata_id`` comes from ``/api/assets/{asset_id}/metadata``,
+    which needs ``asset_id`` first. Resolving alphabetically happens to work for
+    that pair and silently fails for others (``external_id`` sorts before
+    ``title_id``, so the value it depends on would not exist yet), which is the
+    kind of order-dependent bug that only shows up as an unexplained UNKNOWN.
+
+    Args:
+        variables: The declared variables, name -> spec.
+        unknowns: Appended to for any variable whose dependencies cannot be met.
+
+    Returns:
+        The variables in an order where every dependency precedes its dependent.
+        Variables in a cycle, or depending on a name that was never declared, are
+        omitted and reported.
+    """
+    pending = dict(sorted(variables.items()))
+    ordered: list[tuple[str, dict[str, Any]]] = []
+    placed: set[str] = set()
+
+    while pending:
+        ready = [
+            (name, spec)
+            for name, spec in pending.items()
+            if _placeholders(str(spec.get("from_endpoint") or "")) <= placed
+        ]
+        if not ready:
+            # Either a cycle, or a dependency on a name that does not exist.
+            for name, spec in sorted(pending.items()):
+                needs = _placeholders(str(spec.get("from_endpoint") or "")) - placed
+                unknowns.append(
+                    Unknown(
+                        scope="Phase 4",
+                        question=f"value for probe variable `{name}`",
+                        resolution=(
+                            f"it is read from {spec.get('from_endpoint')}, which needs "
+                            f"{', '.join(sorted(needs))}; that is undeclared or part of "
+                            "a cycle, so no order resolves it"
+                        ),
+                    )
+                )
+            break
+        for name, spec in ready:
+            ordered.append((name, spec))
+            placed.add(name)
+            del pending[name]
+
+    return ordered
+
+
+def _placeholders(template: str) -> set[str]:
+    """The ``{name}`` placeholders in a path template."""
+    return set(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", template))
+
+
 def _pick(payload: Any, expression: str) -> Any:
     """Follow a dotted path into a decoded JSON payload.
 
@@ -313,11 +374,29 @@ class ProbeRunner:
         """
         resolved: dict[str, Any] = {}
         unknowns: list[Unknown] = []
-        for name, spec in sorted(variables.items()):
+
+        for name, spec in _resolution_order(variables, unknowns):
             if "literal" in spec:
                 resolved[name] = spec["literal"]
                 continue
             endpoint = spec.get("from_endpoint")
+            if endpoint:
+                try:
+                    endpoint = str(endpoint).format(**resolved)
+                except KeyError as exc:
+                    # A dependency failed to resolve earlier, so this one cannot be
+                    # attempted. Its own reason is already recorded against it.
+                    unknowns.append(
+                        Unknown(
+                            scope="Phase 4",
+                            question=f"value for probe variable `{name}`",
+                            resolution=(
+                                f"it is read from {spec.get('from_endpoint')}, and "
+                                f"variable {exc} in that path could not be resolved"
+                            ),
+                        )
+                    )
+                    continue
             if not endpoint:
                 unknowns.append(
                     Unknown(
