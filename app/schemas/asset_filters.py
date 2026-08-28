@@ -18,6 +18,12 @@ class AssetFilters(UTCBaseModel):
     duration_min: float | None = Field(None, ge=0, description="Minimum duration seconds")
     duration_max: float | None = Field(None, ge=0, description="Maximum duration seconds")
     tag_ids: str | None = Field(None, description="List of comma separated tag ids")
+    has_artwork: bool | None = Field(
+        None,
+        description=(
+            "Only assets that have artwork of any kind (true), or only those with " "none (false)"
+        ),
+    )
 
     @field_validator("size_max")
     @classmethod
