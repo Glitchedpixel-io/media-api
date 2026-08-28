@@ -158,6 +158,34 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         rows = self.db.scalars(stmt).all()
         return [TitleContentReadParent.model_validate(row) for row in rows]
 
+    def get_parents_of_title(self, title_id: int) -> list[TitleContentReadParent]:
+        """The containment rows naming this title as their child.
+
+        The upward counterpart of :meth:`get_titles_with_asset`, and deliberately the
+        same shape: the edge itself plus its parent, so a caller gets the ``label`` and
+        ``order_key`` this title carries *within* that parent rather than just the
+        parent's identity.
+
+        Immediate parents only. An ancestor walk is a different question, and a
+        different answer once a title can have several parents -- see #89.
+
+        Args:
+            title_id: The title whose parents to find.
+
+        Returns:
+            list[TitleContentReadParent]: Each containment row, with its parent title,
+                ordered by parent name.
+        """
+        stmt = (
+            select(TitleContentORM)
+            .join(TitleContentORM.parent_title)
+            .where(TitleContentORM.child_title_id == title_id)
+            .options(selectinload(TitleContentORM.parent_title))
+            .order_by(TitleORM.name.asc())
+        )
+        rows = self.db.scalars(stmt).all()
+        return [TitleContentReadParent.model_validate(row) for row in rows]
+
     # ---- Ordering helpers -------------------------------------------------
     def _get_order_key(self, content_id: int) -> str | None:
         row = self.db.get(TitleContentORM, content_id)
