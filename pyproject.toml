@@ -37,6 +37,14 @@ dependencies = [
 prefect = [
     "prefect>=3.6.2,<4.0.0",
 ]
+# Pillow is needed only by tools/artwork_dimensions, which measures stored artwork
+# during a one-off maintenance pass. Nothing the API serves decodes an image -- the
+# store identifies formats from magic bytes and never opens them -- so the production
+# image should not carry an image library by default:
+# `uv run --extra dimensions artwork-dimensions`.
+dimensions = [
+    "pillow>=11.0.0,<12.0.0",
+]
 
 [project.scripts]
 # The capability-inventory harness (tools/capability_inventory). It lives in this
@@ -46,6 +54,9 @@ capability-inventory = "tools.capability_inventory.cli:main"
 # The artwork backfill (tools/artwork_backfill). Registers the cover files that
 # predate the artwork table. One-shot, dry-run by default; see its module docstring.
 artwork-backfill = "tools.artwork_backfill.cli:main"
+# The artwork dimensions pass (tools/artwork_dimensions). Fills in width/height on
+# rows registered before anything measured them. Needs the `dimensions` extra.
+artwork-dimensions = "tools.artwork_dimensions.cli:main"
 
 [project.entry-points."media_api.orchestration_providers"]
 prefect = "app.orchestration.prefect:PrefectProvider"
@@ -76,6 +87,10 @@ dev = [
     "ruff>=0.14.2",
     # Reads tools/capability_inventory/probes.yaml.
     "pyyaml>=6.0.2",
+    # Not a production dependency (see [project.optional-dependencies]), but
+    # tests/integration/tools/test_artwork_dimensions.py measures real images, so
+    # the extra has to be importable when the suite runs.
+    "pillow>=11.0.0,<12.0.0",
 ]
 
 [build-system]

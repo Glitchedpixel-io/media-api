@@ -162,13 +162,26 @@ def run(
     of already-registered assets either: covered and uncovered assets are interleaved
     arbitrarily, so a stretch of one says nothing about the next.
 
+    **Continuing after a failed insert requires rolling the session back**, which is
+    why every failure path does. SQLAlchemy leaves a session in a failed state after a
+    failed flush, so without it the next statement raises ``PendingRollbackError``
+    rather than doing its work -- including the id iterator's next batch query, which
+    is issued outside the per-asset ``try``. The pass would then die on the batch
+    boundary with a traceback naming the rollback, having attributed every failure
+    after the first to the wrong cause. Counting a failure and carrying on is only
+    real if the session is usable afterwards.
+
     Args:
         session: A session to read assets and write artwork through.
         store: Where artwork files are written.
         accessory_root: ACCESSORY_ROOT, where the covers currently live.
         kind_id: ID of the artwork kind to register covers as.
         dry_run: Report what would happen without writing files or rows.
-        limit: Stop after this many registrations, or 0 for no limit.
+        limit: Stop after attempting this many candidates, or 0 for no limit. Counts
+            every asset whose cover was opened and acted on -- registered, failed, or
+            found already present -- not successful registrations alone. Assets with
+            no cover, and those the pre-load already knows are covered, are skipped
+            before any work happens and do not count against it.
         on_event: Optional ``callable(str)`` for per-asset progress lines.
 
     Returns:
@@ -177,6 +190,7 @@ def run(
     summary = Summary(dry_run=dry_run)
     already = _assets_with_artwork(session, kind_id)
     emit = on_event
+    attempted = 0
 
     for asset_id in _iter_asset_ids(session):
         summary.assets_scanned += 1
@@ -213,6 +227,12 @@ def run(
                 emit(f"asset {asset_id}: could not read {cover}: {e}")
             continue
 
+        # Counted before the attempt rather than after a successful one. `--limit` is
+        # what bounds a first run against real data, and a run whose writes are all
+        # failing is exactly when that bound matters -- so it cannot be spent only by
+        # successes, and a failure cannot `continue` past the check.
+        attempted += 1
+
         if dry_run:
             summary.registered += 1
             if emit:
@@ -224,18 +244,19 @@ def run(
                 # Another writer got there between the pre-load and now, or the same
                 # digest is already registered for this asset. Either way the row
                 # exists, which is the outcome this pass wanted.
+                session.rollback()
                 summary.already_registered += 1
-                continue
             except Exception as e:  # noqa: BLE001 - one bad row must not end the pass
+                session.rollback()
                 summary.failed += 1
                 if emit:
                     emit(f"asset {asset_id}: could not register {cover}: {e}")
-                continue
-            summary.registered += 1
-            if emit:
-                emit(f"asset {asset_id}: registered {cover.name} -> {stored.storage_path}")
+            else:
+                summary.registered += 1
+                if emit:
+                    emit(f"asset {asset_id}: registered {cover.name} -> {stored.storage_path}")
 
-        if limit and summary.registered >= limit:
+        if limit and attempted >= limit:
             summary.limit_reached = True
             break
 

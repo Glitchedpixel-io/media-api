@@ -8,6 +8,7 @@ from app.schemas import (
     ArtworkKindCreateInternal,
     ArtworkKindRead,
     ArtworkKindUpdateInternal,
+    ArtworkListParams,
     ArtworkRead,
     ArtworkUpdateInternal,
     AssetCreateInternal,
@@ -349,6 +350,9 @@ class ArtworkRepository(Protocol):
 
     def create(self, artwork: ArtworkCreateInternal) -> ArtworkRead: ...
     def get(self, artwork_id: int) -> ArtworkRead | None: ...
+    def list_paged(
+        self, params: ArtworkListParams, kind_id: int | None = None
+    ) -> PaginatedResponse[ArtworkRead]: ...
     def list_for_entity(
         self, entity_type: EntityTypeEnum, entity_id: int, kind_id: int | None = None
     ) -> list[ArtworkRead]: ...

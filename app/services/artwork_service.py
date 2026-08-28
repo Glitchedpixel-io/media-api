@@ -19,10 +19,12 @@ from app.schemas import (
     ArtworkKindPatchPublic,
     ArtworkKindRead,
     ArtworkKindUpdateInternal,
+    ArtworkListParams,
     ArtworkPatchPublic,
     ArtworkRead,
     ArtworkUpdateInternal,
     ArtworkUploadForm,
+    PaginatedResponse,
 )
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import ArtworkStore
@@ -159,6 +161,29 @@ class ArtworkService:
         self._require_entity(entity_type, entity_id)
         kind_id = self._resolve_kind_id(kind) if kind is not None else None
         return self.repo.list_for_entity(entity_type, entity_id, kind_id)
+
+    @translate_repository_errors
+    def list_all_artwork(self, params: ArtworkListParams) -> PaginatedResponse[ArtworkRead]:
+        """A page of artwork across every entity.
+
+        The one route that can answer "what artwork exists?". Everything else needs an
+        entity id in hand, which makes auditing or walking the collection impossible --
+        see #113.
+
+        Decorated so an unsupported `sort` field becomes a 422 rather than a 500, as on
+        the other listings.
+
+        Args:
+            params: Filters, sort and cursor.
+
+        Returns:
+            PaginatedResponse[ArtworkRead]: The page and its cursors.
+
+        Raises:
+            HTTPException: 422 if `kind` names no existing artwork kind.
+        """
+        kind_id = self._resolve_kind_id(params.kind) if params.kind is not None else None
+        return self.repo.list_paged(params, kind_id)
 
     def get_artwork(self, artwork_id: int) -> ArtworkRead:
         artwork = self.repo.get(artwork_id)

@@ -3,6 +3,7 @@
 from .accessory_file import *
 from .api_filters import *
 from .artwork import *
+from .artwork_filters import *
 from .asset import *
 from .asset_filters import *
 from .enums import *
