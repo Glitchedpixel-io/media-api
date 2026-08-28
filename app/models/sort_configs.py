@@ -1,5 +1,6 @@
 # app/models/sort_configs.py
 from app.models import (
+    ArtworkORM,
     AssetORM,
     StreamORM,
     TagORM,
@@ -72,6 +73,17 @@ STREAM_SORT = SortConfig(
         "asset_id",
         "stream_index",
         "codec_type",
+    },
+    id_field="id",
+)
+
+ARTWORK_SORT = SortConfig(
+    model=ArtworkORM,
+    allowed_fields={
+        "id",
+        "created_at",
+        "entity_id",
+        "is_primary",
     },
     id_field="id",
 )
