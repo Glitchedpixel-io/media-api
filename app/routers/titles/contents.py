@@ -9,10 +9,37 @@ from app.schemas import (
     TitleContentPatchPublic,
     TitleContentRead,
     TitleContentReadExtended,
+    TitleContentReadParent,
 )
 from app.services import TitleContentService
 
 router = APIRouter(route_class=QuietClientErrorRoute)
+
+
+@router.get(
+    "/{title_id}/parents",
+    response_model=list[TitleContentReadParent],
+    operation_id="list_title_parents",
+    responses={
+        **COMMON_READ_RESPONSES,
+        200: {"description": "List of parent titles retrieved successfully"},
+    },
+)
+def read_title_parents(
+    title_id: int,
+    service: TitleContentService = Depends(get_title_content_service),
+) -> list[TitleContentReadParent]:
+    """The titles that directly contain this one.
+
+    The upward counterpart of `GET /api/assets/{asset_id}/titles`, and the same shape:
+    each containment row with its parent, so a caller sees the label and order this
+    title carries within that parent rather than only the parent's identity.
+
+    Immediate parents only. Walking to the full ancestor set is a different question --
+    an ancestor *set* and a breadcrumb *path* diverge as soon as a title has more than
+    one parent, and what a breadcrumb should follow is #90's to settle.
+    """
+    return service.get_parents_of_title(title_id)
 
 
 @router.get(

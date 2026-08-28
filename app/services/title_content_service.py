@@ -39,6 +39,28 @@ class TitleContentService:
             raise HTTPException(status_code=404, detail="Asset not found")
         return self.title_content_repository.get_titles_with_asset(asset_id)
 
+    def get_parents_of_title(self, title_id: int) -> list[TitleContentReadParent]:
+        """The titles that directly contain this one.
+
+        The existence check is what separates "this title has no parents" from "there is
+        no such title": both would otherwise return an empty list, and a breadcrumb
+        built on the second would silently render a root instead of failing.
+
+        Args:
+            title_id: The title whose parents to list.
+
+        Returns:
+            list[TitleContentReadParent]: Immediate parents, empty if the title is a
+                root. Empty is an ordinary answer -- 504 of 1,585 titles have a parent,
+                so most are roots.
+
+        Raises:
+            HTTPException: 404 if the title does not exist.
+        """
+        if not self.title_repository.exists(title_id):
+            raise HTTPException(status_code=404, detail="Title not found")
+        return self.title_content_repository.get_parents_of_title(title_id)
+
     def _reject_cycle(self, parent_title_id: int, child_title_id: int | None) -> None:
         """Refuse an edge that would make a title contain itself, directly or not.
 
