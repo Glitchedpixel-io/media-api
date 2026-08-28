@@ -249,6 +249,46 @@ def _alias_unslashed_paths(api: FastAPI) -> None:
         )
 
 
+def _emit_binary_upload_format(api: FastAPI) -> None:
+    """Make multipart file fields carry ``format: binary`` in the emitted spec.
+
+    FastAPI emits OpenAPI 3.1, which describes an upload with
+    ``contentMediaType: application/octet-stream``. openapi-python-client -- what
+    media-runners generates its vendored client from -- keys file uploads off 3.0's
+    ``format: binary`` and does not read ``contentMediaType`` at all. Handed only the
+    3.1 spelling it types the field ``str`` and posts whatever it is given as a
+    ``text/plain`` form part, so `POST /api/{titles,assets}/{id}/artwork` were
+    uncallable from the generated client: what arrived was the *path string*, never
+    the image, and the store's magic-number sniffing refused it as 415.
+
+    Nothing caught this because these two are the only multipart endpoints in the
+    API, and the generator fails by producing plausible code rather than by erroring.
+
+    Both spellings are legal and 3.1 retains ``format`` as an annotation, so emitting
+    the pair costs a consumer that understands ``contentMediaType`` nothing and lets
+    every other one find the key it knows. Fixing it here rather than in
+    media-runners' codegen keeps the published spec correct for every consumer of it,
+    not just ours.
+
+    Args:
+        api (FastAPI): The application whose ``openapi()`` should be wrapped.
+    """
+    generate = api.openapi
+
+    def openapi() -> dict[str, Any]:
+        # FastAPI memoises into `api.openapi_schema` and hands back the same dict
+        # each time, so this annotates in place; `setdefault` keeps a second call
+        # from fighting an explicit `format` the first one already settled.
+        spec = generate()
+        for schema in spec.get("components", {}).get("schemas", {}).values():
+            for prop in (schema.get("properties") or {}).values():
+                if prop.get("contentMediaType") == "application/octet-stream":
+                    prop.setdefault("format", "binary")
+        return spec
+
+    api.openapi = openapi  # type: ignore[method-assign]
+
+
 def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) -> FastAPI:
     """Application factory returning a configured FastAPI instance."""
 
@@ -332,6 +372,7 @@ def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) ->
 
     _include_routers(api)
     _alias_unslashed_paths(api)
+    _emit_binary_upload_format(api)
 
     # ensure the app is instrumented for logging
     logfire.instrument_fastapi(api)
