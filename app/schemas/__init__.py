@@ -45,6 +45,7 @@ __all__ = [
     "AssetSeenBatch",
     "AssetUpdateInternal",
     "ContentKind",
+    "MembershipKind",
     "EntityTypeEnum",
     "ExternalIdResolution",
     "ExternalIdentifierAttrs",

@@ -13,6 +13,7 @@ from app.repositories.errors import (
     UniqueViolation,
 )
 from app.schemas import (
+    MembershipKind,
     TitleContentInsert,
     TitleContentPatchPublic,
     TitleContentRead,
@@ -102,6 +103,54 @@ class TitleContentService:
                 ),
             )
 
+    def _reject_second_intrinsic_parent(
+        self,
+        child_title_id: int | None,
+        membership: MembershipKind,
+        *,
+        excluding_edge_id: int | None = None,
+    ) -> None:
+        """Refuse an intrinsic edge for a title that already has one.
+
+        A title has one home, so that a breadcrumb has one path upward. Curated edges
+        are unlimited and skip this entirely -- appearing in many lists is the point of
+        the distinction -- and so do asset edges, which draw no breadcrumb.
+
+        ``uq_one_intrinsic_parent`` is the real enforcement, and has to be, because rows
+        arrive in this table from a producer that never goes near this service (#125).
+        This check exists so that a caller who *does* come through the API is told which
+        edge it collided with, instead of the bare "unique constraint violated" the
+        index alone would produce.
+
+        409 rather than 422, for the same reason ``_reject_cycle`` uses it: the payload
+        is well formed and both titles exist. What it conflicts with is the structure
+        already stored.
+
+        Args:
+            child_title_id: The title that would be contained, or None for an asset
+                entry, which has no home to be ambiguous about.
+            membership: Whether the proposed edge is the child's home or a curated
+                listing.
+            excluding_edge_id: A containment row to ignore when looking for a conflict,
+                so that patching a row does not collide with itself.
+
+        Raises:
+            HTTPException: 409 if the title already has an intrinsic parent.
+        """
+        if child_title_id is None or membership is not MembershipKind.intrinsic:
+            return
+        existing = self.title_content_repository.intrinsic_parent_edge_id(child_title_id)
+        if existing is None or existing == excluding_edge_id:
+            return
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Title {child_title_id} already has an intrinsic parent, recorded by "
+                f"containment row {existing}. A title has one home; to list it "
+                "elsewhere as well, add the edge as curated."
+            ),
+        )
+
     @translate_repository_errors
     def insert_positioned(
         self,
@@ -115,6 +164,7 @@ class TitleContentService:
         if not self.title_repository.exists(parent_title_id):
             raise HTTPException(status_code=404, detail="Title not found")
         self._reject_cycle(parent_title_id, insert.child_title_id)
+        self._reject_second_intrinsic_parent(insert.child_title_id, insert.membership)
         return self.title_content_repository.create_positioned(  # type: ignore
             parent_title_id,
             insert,
@@ -139,7 +189,21 @@ class TitleContentService:
         # A patch can repoint an existing row at a different child, which reaches the
         # same invalid state as inserting one. Guarding only the insert would leave
         # the shorter path to a cycle open.
-        self._reject_cycle(parent_title_id, getattr(update, "child_title_id", None))
+        new_child_title_id = getattr(update, "child_title_id", None)
+        self._reject_cycle(parent_title_id, new_child_title_id)
+        # Repointing an existing intrinsic edge at a different child reaches the same
+        # invalid state as inserting one, so the patch path needs the guard too -- with
+        # the row itself excluded, or it would collide with its own edge. The membership
+        # comes from the stored row rather than the patch: a patch cannot carry one,
+        # which is why TitleContentPatchPublic omits the field.
+        if new_child_title_id is not None:
+            existing_row = self.title_content_repository.get(title_contents_id)
+            if existing_row is not None:
+                self._reject_second_intrinsic_parent(
+                    new_child_title_id,
+                    existing_row.membership,
+                    excluding_edge_id=title_contents_id,
+                )
         return self.title_content_repository.update(
             title_contents_id,
             TitleContentUpdateInternal(

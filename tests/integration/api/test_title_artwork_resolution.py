@@ -33,7 +33,7 @@ from app.schemas import (
     TitleContentCreateInternal,
     TitleCreateInternal,
 )
-from app.schemas.enums import ContentKind, EntityTypeEnum
+from app.schemas.enums import ContentKind, MembershipKind, EntityTypeEnum
 
 
 @contextmanager
@@ -101,7 +101,13 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
             keys[parent] += 1
             return f"m{keys[parent]:03d}"
 
-        def contains_title(self, parent: int, child: int, order_key: str | None = None) -> None:
+        def contains_title(
+            self,
+            parent: int,
+            child: int,
+            order_key: str | None = None,
+            membership: MembershipKind = MembershipKind.intrinsic,
+        ) -> None:
             contents.create(
                 TitleContentCreateInternal(
                     parent_title_id=parent,
@@ -109,6 +115,7 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
                     child_title_id=child,
                     asset_id=None,
                     label=None,
+                    membership=membership,
                     order_key=order_key or self._next_key(parent),
                 )
             )
@@ -301,12 +308,19 @@ class TestGraphSafety:
         assert _poster(client, a) is None
 
     def test_a_shared_child_resolves_for_both_parents(self, client, world):
-        """A DAG, not a tree: one episode may sit under a season and a collection."""
+        """A DAG, not a tree: one episode may sit under a season and a collection.
+
+        Which is the intrinsic/curated split #90 went on to name: the season is the
+        episode's home, the collection merely lists it. Resolution deliberately does not
+        care -- a curated list showing a poster drawn from what it lists is right, and
+        the membership rule that counts intrinsic edges only belongs to aggregates
+        (#96), not to artwork.
+        """
         season = world.title("Season", "season")
         collection = world.title("Collection", "collection")
         episode = world.title("Episode", "tv")
         world.contains_title(season, episode)
-        world.contains_title(collection, episode)
+        world.contains_title(collection, episode, membership=MembershipKind.curated)
         shared = world.art(EntityTypeEnum.title, episode)
 
         assert _poster(client, season)["id"] == shared

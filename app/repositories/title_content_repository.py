@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import selectinload
 
 from app.models import TitleContentORM, TitleORM
+from app.schemas.enums import MembershipKind
 from app.schemas import (
     TitleContentCreateInternal,
     TitleContentInsert,
@@ -185,6 +186,28 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         )
         rows = self.db.scalars(stmt).all()
         return [TitleContentReadParent.model_validate(row) for row in rows]
+
+    def intrinsic_parent_edge_id(self, child_title_id: int) -> int | None:
+        """The id of the edge already recording this title's intrinsic parent, if any.
+
+        Backs the service's 409. ``uq_one_intrinsic_parent`` is what actually enforces
+        the rule -- this only exists so a caller gets told which edge it collided with
+        instead of a bare "unique constraint violated", and so the check also covers the
+        patch path, where the row being repointed has to be excluded by id.
+
+        Args:
+            child_title_id: The title whose existing intrinsic parent to look for.
+
+        Returns:
+            int | None: The containment row's id, or None if the title has no intrinsic
+                parent yet.
+        """
+        return self.db.scalar(
+            select(TitleContentORM.id)
+            .where(TitleContentORM.child_title_id == child_title_id)
+            .where(TitleContentORM.membership == MembershipKind.intrinsic)
+            .limit(1)
+        )
 
     # ---- Ordering helpers -------------------------------------------------
     def _get_order_key(self, content_id: int) -> str | None:
@@ -384,6 +407,7 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
             child_title_id=title_content.child_title_id,
             asset_id=title_content.asset_id,
             label=title_content.label,
+            membership=title_content.membership,
             order_key=new_key,
         )
         return self.create(to_create)

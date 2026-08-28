@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from app.models.title_contents import ContentKind
+from app.models.title_contents import ContentKind, MembershipKind
 from app.schemas import AssetRead, TitleRead
 from .mixins import IDMixin
 
@@ -27,7 +27,15 @@ class TitleContentAttrs(BaseModel):
 
 
 class TitleContentInsert(TitleContentAttrs):
-    pass
+    membership: MembershipKind = Field(
+        MembershipKind.intrinsic,
+        title="Membership",
+        description=(
+            "Whether this row is the child's home (intrinsic) or a curated list it also "
+            "appears in (curated). Intrinsic parentage drives breadcrumbs and is limited "
+            "to one per child; curated membership is unlimited."
+        ),
+    )
 
 
 class TitleContentCreateInternal(TitleContentInsert):
@@ -47,7 +55,17 @@ class TitleContentRead(TitleContentCreateInternal, IDMixin):
     pass
 
 
-TitleContentPatchPublic = make_partial_model(TitleContentInsert, name="TitleContentPatchPublic")
+# Built from TitleContentAttrs rather than TitleContentInsert so that `membership` is
+# absent from the patch model entirely. The requirement is asymmetric: a curated
+# membership must be settable, which is the whole feature, while an intrinsic one must
+# not be casually flipped -- moving an item's home is a different operation from
+# editing a list entry, and should not be reachable by a field on a PATCH body.
+#
+# Absence is the enforcement. TitleContentAttrs forbids extra fields, so a PATCH
+# carrying `membership` is rejected by the schema with a 422 before any service code
+# runs, rather than being silently ignored. `order_key` is kept out of reach the same
+# way -- reordering has its own endpoint.
+TitleContentPatchPublic = make_partial_model(TitleContentAttrs, name="TitleContentPatchPublic")
 
 TitleContentUpdateInternal = make_partial_model(
     TitleContentCreateInternal, name="TitleContentUpdateInternal"

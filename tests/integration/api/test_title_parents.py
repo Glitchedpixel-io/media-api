@@ -20,7 +20,7 @@ from app.repositories import (
     SQLAlchemyTitleRepository,
 )
 from app.schemas import AssetCreateInternal, TitleContentCreateInternal, TitleCreateInternal
-from app.schemas.enums import ContentKind
+from app.schemas.enums import ContentKind, MembershipKind
 
 
 @pytest.fixture
@@ -45,7 +45,12 @@ def contain(db_session):
     repo = SQLAlchemyTitleContentRepository(db_session)
     counter = {"n": 0}
 
-    def _contain(parent_id: int, child_id: int, label: str | None = None) -> int:
+    def _contain(
+        parent_id: int,
+        child_id: int,
+        label: str | None = None,
+        membership: MembershipKind = MembershipKind.intrinsic,
+    ) -> int:
         counter["n"] += 1
         return repo.create(
             TitleContentCreateInternal(
@@ -54,6 +59,7 @@ def contain(db_session):
                 child_title_id=child_id,
                 asset_id=None,
                 label=label,
+                membership=membership,
                 order_key="U" + "U" * counter["n"],
             )
         ).id
@@ -103,12 +109,16 @@ class TestParents:
         """No title has two parents in the current data, which says more about there
         being no easy way to create one than about the need: nothing in the UI offers
         it, so nobody has. This route is part of what makes it expressible, so the
-        multi-parent case is first-class here rather than a schema curiosity."""
+        multi-parent case is first-class here rather than a schema curiosity.
+
+        #90 has since named the two kinds. It caps the *intrinsic* parents at one, so
+        the additional parents here are curated -- which is the shape the multi-parent
+        case actually takes, not a workaround for the constraint."""
         left = make_title("Alpha")
         right = make_title("Beta")
         child = make_title()
         contain(left, child)
-        contain(right, child)
+        contain(right, child, membership=MembershipKind.curated)
 
         body = client.get(f"/api/titles/{child}/parents").json()
 
@@ -117,7 +127,7 @@ class TestParents:
     def test_parents_are_ordered_by_name(self, client: TestClient, make_title, contain):
         child = make_title()
         contain(make_title("Zulu"), child)
-        contain(make_title("Alpha"), child)
+        contain(make_title("Alpha"), child, membership=MembershipKind.curated)
 
         body = client.get(f"/api/titles/{child}/parents").json()
 
