@@ -1,9 +1,20 @@
 {
-  "app_version": "1.9.0",
+  "app_version": "1.9.2.dev1+g5de681b47",
   "data_shape": {
-    "baseline_rtt_ms": 31.9,
+    "baseline_rtt_ms": 25.34,
     "captured_from": "read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)",
     "collections": [
+      {
+        "child_table": "artwork",
+        "fk_column": "artwork_kind_id",
+        "max_children": 1194,
+        "median_children": 1194.0,
+        "min_children": 1194,
+        "p95_children": 1194.0,
+        "parent_table": "artwork_kinds",
+        "parents_total": 6,
+        "parents_with_children": 1
+      },
       {
         "child_table": "asset_tags",
         "fk_column": "asset_id",
@@ -12,8 +23,8 @@
         "min_children": 1,
         "p95_children": 3.0,
         "parent_table": "assets",
-        "parents_total": 13332,
-        "parents_with_children": 1370
+        "parents_total": 13333,
+        "parents_with_children": 1371
       },
       {
         "child_table": "assets",
@@ -23,7 +34,7 @@
         "min_children": 1,
         "p95_children": 4.0,
         "parent_table": "assets",
-        "parents_total": 13332,
+        "parents_total": 13333,
         "parents_with_children": 6
       },
       {
@@ -34,8 +45,8 @@
         "min_children": 1,
         "p95_children": 4.0,
         "parent_table": "assets",
-        "parents_total": 13332,
-        "parents_with_children": 13317
+        "parents_total": 13333,
+        "parents_with_children": 13318
       },
       {
         "child_table": "metadata",
@@ -45,8 +56,8 @@
         "min_children": 1,
         "p95_children": 2.0,
         "parent_table": "assets",
-        "parents_total": 13332,
-        "parents_with_children": 13220
+        "parents_total": 13333,
+        "parents_with_children": 13221
       },
       {
         "child_table": "streams",
@@ -56,8 +67,8 @@
         "min_children": 1,
         "p95_children": 20.0,
         "parent_table": "assets",
-        "parents_total": 13332,
-        "parents_with_children": 12983
+        "parents_total": 13333,
+        "parents_with_children": 12987
       },
       {
         "child_table": "title_contents",
@@ -67,14 +78,14 @@
         "min_children": 1,
         "p95_children": 1.0,
         "parent_table": "assets",
-        "parents_total": 13332,
-        "parents_with_children": 1387
+        "parents_total": 13333,
+        "parents_with_children": 1388
       },
       {
         "child_table": "external_identifiers",
         "fk_column": "scheme_id",
         "max_children": 705,
-        "median_children": 663.0,
+        "median_children": 664.0,
         "min_children": 133,
         "p95_children": 705.0,
         "parent_table": "id_schemes",
@@ -89,13 +100,13 @@
         "min_children": 1,
         "p95_children": 3.0,
         "parent_table": "media_transform_requests",
-        "parents_total": 18252,
-        "parents_with_children": 1479
+        "parents_total": 18261,
+        "parents_with_children": 1483
       },
       {
         "child_table": "asset_tags",
         "fk_column": "tag_id",
-        "max_children": 731,
+        "max_children": 732,
         "median_children": 29.0,
         "min_children": 1,
         "p95_children": 500.0,
@@ -117,10 +128,10 @@
       {
         "child_table": "title_tags",
         "fk_column": "tag_id",
-        "max_children": 714,
+        "max_children": 715,
         "median_children": 133.0,
         "min_children": 133,
-        "p95_children": 714.0,
+        "p95_children": 715.0,
         "parent_table": "tags",
         "parents_total": 43,
         "parents_with_children": 2
@@ -128,10 +139,10 @@
       {
         "child_table": "titles",
         "fk_column": "title_type_id",
-        "max_children": 733,
+        "max_children": 734,
         "median_children": 133.0,
         "min_children": 11,
-        "p95_children": 733.0,
+        "p95_children": 734.0,
         "parent_table": "title_types",
         "parents_total": 8,
         "parents_with_children": 6
@@ -144,7 +155,7 @@
         "min_children": 1,
         "p95_children": 2.0,
         "parent_table": "titles",
-        "parents_total": 1584,
+        "parents_total": 1585,
         "parents_with_children": 504
       },
       {
@@ -155,8 +166,8 @@
         "min_children": 1,
         "p95_children": 2.0,
         "parent_table": "titles",
-        "parents_total": 1584,
-        "parents_with_children": 1572
+        "parents_total": 1585,
+        "parents_with_children": 1573
       },
       {
         "child_table": "title_tags",
@@ -166,8 +177,8 @@
         "min_children": 1,
         "p95_children": 1.0,
         "parent_table": "titles",
-        "parents_total": 1584,
-        "parents_with_children": 847
+        "parents_total": 1585,
+        "parents_with_children": 848
       }
     ],
     "columns": [
@@ -176,99 +187,99 @@
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "created_at",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "entity_id",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "entity_type",
-        "distinct": null,
+        "distinct": 1,
         "distinct_capped": false,
-        "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "height",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 0.0008,
+        "non_null": 1,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "id",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "is_primary",
-        "distinct": null,
+        "distinct": 1,
         "distinct_capped": false,
-        "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "mime",
-        "distinct": null,
+        "distinct": 2,
         "distinct_capped": false,
-        "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "source_external_id",
-        "distinct": null,
+        "distinct": 0,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.0,
         "non_null": 0,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "source_scheme_id",
@@ -279,40 +290,40 @@
         "non_null": 0,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "source_url",
-        "distinct": null,
+        "distinct": 0,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.0,
         "non_null": 0,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "storage_path",
-        "distinct": null,
+        "distinct": 1145,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 1.0,
+        "non_null": 1194,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "width",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.0,
-        "non_null": 0,
+        "fill_rate": 0.0008,
+        "non_null": 1,
         "table": "artwork",
         "top_values": [],
-        "total": 0
+        "total": 1194
       },
       {
         "column": "code",
@@ -364,10 +375,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 2832,
+        "non_null": 2836,
         "table": "asset_tags",
         "top_values": [],
-        "total": 2832
+        "total": 2836
       },
       {
         "column": "created_at",
@@ -375,10 +386,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 2832,
+        "non_null": 2836,
         "table": "asset_tags",
         "top_values": [],
-        "total": 2832
+        "total": 2836
       },
       {
         "column": "tag_id",
@@ -386,10 +397,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 2832,
+        "non_null": 2836,
         "table": "asset_tags",
         "top_values": [],
-        "total": 2832
+        "total": 2836
       },
       {
         "column": "bitrate",
@@ -397,21 +408,21 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "container_format",
         "distinct": 4,
         "distinct_capped": false,
         "facet_candidate": true,
-        "fill_rate": 0.9887,
-        "non_null": 13181,
+        "fill_rate": 0.9889,
+        "non_null": 13185,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "created_at",
@@ -419,10 +430,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "duration",
@@ -430,10 +441,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "filename",
@@ -441,10 +452,10 @@
         "distinct_capped": true,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "id",
@@ -452,21 +463,21 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "last_seen",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.996,
-        "non_null": 13279,
+        "fill_rate": 0.9962,
+        "non_null": 13283,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "master_asset_id",
@@ -477,18 +488,18 @@
         "non_null": 10,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "mtime",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.99,
-        "non_null": 13199,
+        "fill_rate": 0.9902,
+        "non_null": 13203,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "path",
@@ -496,10 +507,10 @@
         "distinct_capped": true,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "size",
@@ -507,10 +518,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 13332,
+        "non_null": 13333,
         "table": "assets",
         "top_values": [],
-        "total": 13332
+        "total": 13333
       },
       {
         "column": "created_at",
@@ -518,10 +529,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "entity_id",
@@ -529,10 +540,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "entity_type",
@@ -540,21 +551,21 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "external_id",
-        "distinct": 1501,
+        "distinct": 1502,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "id",
@@ -562,10 +573,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "scheme_id",
@@ -573,10 +584,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1501,
+        "non_null": 1502,
         "table": "external_identifiers",
         "top_values": [],
-        "total": 1501
+        "total": 1502
       },
       {
         "column": "code",
@@ -628,10 +639,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.999,
-        "non_null": 3030,
+        "non_null": 3041,
         "table": "jobs",
         "top_values": [],
-        "total": 3033
+        "total": 3044
       },
       {
         "column": "created_at",
@@ -639,43 +650,43 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 3033,
+        "non_null": 3044,
         "table": "jobs",
         "top_values": [],
-        "total": 3033
+        "total": 3044
       },
       {
         "column": "heartbeat_at",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.5331,
-        "non_null": 1617,
+        "fill_rate": 0.5348,
+        "non_null": 1628,
         "table": "jobs",
         "top_values": [],
-        "total": 3033
+        "total": 3044
       },
       {
         "column": "job_key",
-        "distinct": 3033,
+        "distinct": 3044,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 3033,
+        "non_null": 3044,
         "table": "jobs",
         "top_values": [],
-        "total": 3033
+        "total": 3044
       },
       {
         "column": "actioned",
-        "distinct": 2,
+        "distinct": 1,
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 18252,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "asset_id",
@@ -683,10 +694,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 18252,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "created_at",
@@ -694,43 +705,43 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 18252,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "duration",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.9678,
-        "non_null": 17665,
+        "fill_rate": 0.968,
+        "non_null": 17677,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "external_job_id",
-        "distinct": 2684,
+        "distinct": 2693,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.9028,
-        "non_null": 16478,
+        "fill_rate": 0.9029,
+        "non_null": 16488,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "first_heartbeat",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.1978,
-        "non_null": 3610,
+        "fill_rate": 0.1982,
+        "non_null": 3620,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "id",
@@ -738,54 +749,54 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 18252,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "last_heartbeat",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.1978,
-        "non_null": 3610,
+        "fill_rate": 0.1982,
+        "non_null": 3620,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "on_failure",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.2435,
-        "non_null": 4444,
+        "fill_rate": 0.2439,
+        "non_null": 4453,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "on_success",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.2435,
-        "non_null": 4444,
+        "fill_rate": 0.2439,
+        "non_null": 4453,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "outcome",
         "distinct": 3,
         "distinct_capped": false,
         "facet_candidate": true,
-        "fill_rate": 0.9998,
-        "non_null": 18249,
+        "fill_rate": 1.0,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "parameters",
@@ -793,32 +804,32 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.9946,
-        "non_null": 18153,
+        "non_null": 18162,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "parent_transform_request_id",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.1608,
-        "non_null": 2935,
+        "fill_rate": 0.1612,
+        "non_null": 2943,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "processed_at",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.9998,
-        "non_null": 18249,
+        "fill_rate": 1.0,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "transform_type",
@@ -826,32 +837,32 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 18252,
+        "non_null": 18261,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "worker",
-        "distinct": 1035,
+        "distinct": 1044,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.9971,
-        "non_null": 18199,
+        "fill_rate": 0.9972,
+        "non_null": 18209,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "worker_notes",
         "distinct": 5000,
         "distinct_capped": true,
         "facet_candidate": false,
-        "fill_rate": 0.7761,
+        "fill_rate": 0.7758,
         "non_null": 14166,
         "table": "media_transform_requests",
         "top_values": [],
-        "total": 18252
+        "total": 18261
       },
       {
         "column": "asset_id",
@@ -859,10 +870,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "created_at",
@@ -870,10 +881,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "data",
@@ -881,10 +892,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "id",
@@ -892,10 +903,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "metadata_type",
@@ -903,10 +914,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "updated_at",
@@ -914,10 +925,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 14544,
+        "non_null": 14551,
         "table": "metadata",
         "top_values": [],
-        "total": 14544
+        "total": 14551
       },
       {
         "column": "created_at",
@@ -925,10 +936,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "extras",
@@ -936,10 +947,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "failed_count",
@@ -947,10 +958,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "id",
@@ -958,10 +969,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "processed_count",
@@ -969,10 +980,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "running_time",
@@ -980,10 +991,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "started_at",
@@ -991,10 +1002,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "success_count",
@@ -1002,10 +1013,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "transform_type",
@@ -1013,21 +1024,21 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "worker_name",
-        "distinct": 1089,
+        "distinct": 1101,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "worker_type",
@@ -1035,10 +1046,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 1089,
+        "non_null": 1101,
         "table": "run_summaries",
         "top_values": [],
-        "total": 1089
+        "total": 1101
       },
       {
         "column": "runner_key",
@@ -1082,7 +1093,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "created_at",
@@ -1090,10 +1101,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "dry_run",
@@ -1101,32 +1112,32 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "error_count",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.6974,
-        "non_null": 53,
+        "fill_rate": 0.6897,
+        "non_null": 60,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "excluded_count",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.1184,
-        "non_null": 9,
+        "fill_rate": 0.1149,
+        "non_null": 10,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "extras",
@@ -1134,10 +1145,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "folder_count",
@@ -1148,7 +1159,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "id",
@@ -1156,10 +1167,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "no_metadata_count",
@@ -1170,7 +1181,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "previously_seen_count",
@@ -1178,10 +1189,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "processed_count",
@@ -1189,10 +1200,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "relative_to_path",
@@ -1203,7 +1214,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "running_time",
@@ -1211,10 +1222,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "scan_path",
@@ -1225,7 +1236,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "started_at",
@@ -1233,10 +1244,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "total_count",
@@ -1247,7 +1258,7 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "unsupported_file_count",
@@ -1258,18 +1269,18 @@
         "non_null": 0,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "worker_name",
-        "distinct": 15,
+        "distinct": 17,
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "worker_type",
@@ -1277,10 +1288,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 76,
+        "non_null": 87,
         "table": "scanner_run_summaries",
         "top_values": [],
-        "total": 76
+        "total": 87
       },
       {
         "column": "asset_id",
@@ -1288,10 +1299,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "channels",
@@ -1299,10 +1310,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.3245,
-        "non_null": 21152,
+        "non_null": 21156,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "codec_name",
@@ -1310,10 +1321,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 0.9999,
-        "non_null": 65170,
+        "non_null": 65181,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "codec_type",
@@ -1321,10 +1332,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "frame_rate",
@@ -1332,10 +1343,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.2862,
-        "non_null": 18653,
+        "non_null": 18659,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "height",
@@ -1343,10 +1354,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.2888,
-        "non_null": 18820,
+        "non_null": 18826,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "id",
@@ -1354,10 +1365,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "is_default",
@@ -1365,10 +1376,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "is_forced",
@@ -1376,10 +1387,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "language",
@@ -1387,10 +1398,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 0.9161,
-        "non_null": 59708,
+        "non_null": 59719,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "sample_rate",
@@ -1398,10 +1409,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.3245,
-        "non_null": 21152,
+        "non_null": 21156,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "stream_index",
@@ -1409,10 +1420,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 65175,
+        "non_null": 65186,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "title",
@@ -1423,7 +1434,7 @@
         "non_null": 14185,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "width",
@@ -1431,10 +1442,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.2888,
-        "non_null": 18820,
+        "non_null": 18826,
         "table": "streams",
         "top_values": [],
-        "total": 65175
+        "total": 65186
       },
       {
         "column": "color",
@@ -1518,22 +1529,22 @@
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.6439,
-        "non_null": 1387,
+        "fill_rate": 0.6441,
+        "non_null": 1388,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "child_title_id",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.3561,
+        "fill_rate": 0.3559,
         "non_null": 767,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "id",
@@ -1541,10 +1552,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 2154,
+        "non_null": 2155,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "kind",
@@ -1552,10 +1563,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 2154,
+        "non_null": 2155,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "label",
@@ -1563,10 +1574,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.9912,
-        "non_null": 2135,
+        "non_null": 2136,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "order_key",
@@ -1574,10 +1585,10 @@
         "distinct_capped": false,
         "facet_candidate": true,
         "fill_rate": 1.0,
-        "non_null": 2154,
+        "non_null": 2155,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "parent_title_id",
@@ -1585,10 +1596,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 2154,
+        "non_null": 2155,
         "table": "title_contents",
         "top_values": [],
-        "total": 2154
+        "total": 2155
       },
       {
         "column": "id",
@@ -1651,10 +1662,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 847,
+        "non_null": 848,
         "table": "title_tags",
         "top_values": [],
-        "total": 847
+        "total": 848
       },
       {
         "column": "tag_id",
@@ -1662,10 +1673,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 847,
+        "non_null": 848,
         "table": "title_tags",
         "top_values": [],
-        "total": 847
+        "total": 848
       },
       {
         "column": "title_id",
@@ -1673,10 +1684,10 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 847,
+        "non_null": 848,
         "table": "title_tags",
         "top_values": [],
-        "total": 847
+        "total": 848
       },
       {
         "column": "code",
@@ -1728,43 +1739,43 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1584,
+        "non_null": 1585,
         "table": "titles",
         "top_values": [],
-        "total": 1584
+        "total": 1585
       },
       {
         "column": "name",
-        "distinct": 1284,
+        "distinct": 1285,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1584,
+        "non_null": 1585,
         "table": "titles",
         "top_values": [],
-        "total": 1584
+        "total": 1585
       },
       {
         "column": "release_year",
         "distinct": null,
         "distinct_capped": false,
         "facet_candidate": false,
-        "fill_rate": 0.553,
-        "non_null": 876,
+        "fill_rate": 0.5533,
+        "non_null": 877,
         "table": "titles",
         "top_values": [],
-        "total": 1584
+        "total": 1585
       },
       {
         "column": "synopsis",
-        "distinct": 1436,
+        "distinct": 1437,
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 0.9577,
-        "non_null": 1517,
+        "non_null": 1518,
         "table": "titles",
         "top_values": [],
-        "total": 1584
+        "total": 1585
       },
       {
         "column": "title_type_id",
@@ -1772,32 +1783,32 @@
         "distinct_capped": false,
         "facet_candidate": false,
         "fill_rate": 1.0,
-        "non_null": 1584,
+        "non_null": 1585,
         "table": "titles",
         "top_values": [],
-        "total": 1584
+        "total": 1585
       }
     ],
     "row_counts": {
-      "artwork": 0,
+      "artwork": 1194,
       "artwork_kinds": 6,
-      "asset_tags": 2832,
-      "assets": 13332,
-      "external_identifiers": 1501,
+      "asset_tags": 2836,
+      "assets": 13333,
+      "external_identifiers": 1502,
       "id_schemes": 3,
-      "jobs": 3033,
-      "media_transform_requests": 18252,
-      "metadata": 14544,
-      "run_summaries": 1089,
+      "jobs": 3044,
+      "media_transform_requests": 18261,
+      "metadata": 14551,
+      "run_summaries": 1101,
       "runner_state": 5,
-      "scanner_run_summaries": 76,
-      "streams": 65175,
+      "scanner_run_summaries": 87,
+      "streams": 65186,
       "tags": 43,
-      "title_contents": 2154,
+      "title_contents": 2155,
       "title_references": 0,
-      "title_tags": 847,
+      "title_tags": 848,
       "title_types": 8,
-      "titles": 1584
+      "titles": 1585
     },
     "server_version": "PostgreSQL 17.9 (Debian 17.9-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
     "unknowns": []
@@ -1992,20 +2003,28 @@
       },
       "probes": [
         {
-          "bytes_": null,
+          "bytes_": 340,
           "endpoint_key": "GET /api/artwork/{artwork_id}",
-          "http_status": null,
+          "http_status": 200,
           "item_count": null,
           "method": "GET",
           "name": "artwork-one",
           "notes": [
-            "index-covered detail read; `unavailable` until the instance holds artwork, see the note on the `artwork_id` variable"
+            "index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable"
           ],
-          "reason": "probe variable 'artwork_id' could not be resolved against the probed instance, so this probe was not run",
+          "reason": null,
           "records_failure_mode": false,
-          "status": "unavailable",
-          "timing": null,
-          "url": "/api/artwork/{artwork_id}"
+          "status": "ok",
+          "timing": {
+            "max_ms": 104.2,
+            "min_ms": 85.6,
+            "p50_ms": 89.5,
+            "p95_ms": 104.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/artwork/1"
         }
       ],
       "risks": [],
@@ -2159,8 +2178,8 @@
           "tests/unit/services/test_artwork_service.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown"
+      "verdict": "p95 104ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe"
     },
     {
       "annotation": {
@@ -2572,10 +2591,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 112.6,
-            "min_ms": 97.1,
-            "p50_ms": 108.6,
-            "p95_ms": 112.6,
+            "max_ms": 96.9,
+            "min_ms": 81.3,
+            "p50_ms": 86.3,
+            "p95_ms": 96.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2656,7 +2675,7 @@
           "tests/integration/api/test_artwork_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 6 rows (measured directly from a probe response), measured p95 113ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 6 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -2880,10 +2899,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 175.8,
-            "min_ms": 148.4,
-            "p50_ms": 160.7,
-            "p95_ms": 175.8,
+            "max_ms": 144.0,
+            "min_ms": 131.0,
+            "p50_ms": 136.7,
+            "p95_ms": 144.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2904,10 +2923,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 211.4,
-            "min_ms": 192.7,
-            "p50_ms": 199.4,
-            "p95_ms": 211.4,
+            "max_ms": 185.2,
+            "min_ms": 170.1,
+            "p50_ms": 174.1,
+            "p95_ms": 185.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2928,10 +2947,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 153.4,
-            "min_ms": 130.7,
-            "p50_ms": 141.8,
-            "p95_ms": 153.4,
+            "max_ms": 139.5,
+            "min_ms": 120.0,
+            "p50_ms": 132.8,
+            "p95_ms": 139.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2952,10 +2971,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 180.7,
-            "min_ms": 143.7,
-            "p50_ms": 153.6,
-            "p95_ms": 180.7,
+            "max_ms": 173.1,
+            "min_ms": 155.0,
+            "p50_ms": 160.8,
+            "p95_ms": 173.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2976,10 +2995,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 322.8,
-            "min_ms": 264.5,
-            "p50_ms": 268.1,
-            "p95_ms": 322.8,
+            "max_ms": 311.6,
+            "min_ms": 229.5,
+            "p50_ms": 244.0,
+            "p95_ms": 311.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3000,10 +3019,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 281.0,
-            "min_ms": 254.5,
-            "p50_ms": 262.7,
-            "p95_ms": 281.0,
+            "max_ms": 252.0,
+            "min_ms": 229.1,
+            "p50_ms": 240.4,
+            "p95_ms": 252.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3024,10 +3043,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 275.4,
-            "min_ms": 226.6,
-            "p50_ms": 253.9,
-            "p95_ms": 275.4,
+            "max_ms": 247.7,
+            "min_ms": 232.1,
+            "p50_ms": 241.5,
+            "p95_ms": 247.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3048,10 +3067,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 163.6,
-            "min_ms": 147.2,
-            "p50_ms": 157.6,
-            "p95_ms": 163.6,
+            "max_ms": 373.3,
+            "min_ms": 142.9,
+            "p50_ms": 151.8,
+            "p95_ms": 373.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3073,10 +3092,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 162.4,
-            "min_ms": 153.9,
-            "p50_ms": 160.2,
-            "p95_ms": 162.4,
+            "max_ms": 179.9,
+            "min_ms": 130.2,
+            "p50_ms": 141.4,
+            "p95_ms": 179.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3085,9 +3104,9 @@
         }
       ],
       "risks": [
-        "unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,332 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "filters that cannot use an index (`duration_max`, `duration_min`, `filename_ext`, `path_part`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,332 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 323ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke",
+        "unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,333 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`duration_max`, `duration_min`, `filename_ext`, `path_part`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,333 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "measured p95 of 373ms on `assets-broadest-filter` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
       "surface": {
@@ -3378,6 +3397,7 @@
           "tests/unit/api/assets/test_streams.py",
           "tests/unit/api/assets/test_tags.py",
           "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/api/test_openapi_binary_uploads.py",
           "tests/unit/api/test_trailing_slash_aliases.py",
           "tests/unit/tools/test_capability_inventory.py"
         ]
@@ -3600,6 +3620,7 @@
           "tests/unit/api/assets/test_streams.py",
           "tests/unit/api/assets/test_tags.py",
           "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/api/test_openapi_binary_uploads.py",
           "tests/unit/api/test_trailing_slash_aliases.py",
           "tests/unit/services/test_media_service.py",
           "tests/unit/tools/test_capability_inventory.py"
@@ -3674,10 +3695,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 121.0,
-            "min_ms": 100.5,
-            "p50_ms": 113.6,
-            "p95_ms": 121.0,
+            "max_ms": 101.2,
+            "min_ms": 83.8,
+            "p50_ms": 90.2,
+            "p95_ms": 101.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3837,7 +3858,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "the lookup is not index-covered and measures p95 121ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict": "the lookup is not index-covered and measures p95 101ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
       "verdict_class": "caution"
     },
     {
@@ -4045,10 +4066,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 152.2,
-            "min_ms": 123.9,
-            "p50_ms": 133.8,
-            "p95_ms": 152.2,
+            "max_ms": 125.3,
+            "min_ms": 110.3,
+            "p50_ms": 117.0,
+            "p95_ms": 125.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4227,12 +4248,13 @@
           "tests/unit/api/assets/test_tags.py",
           "tests/unit/api/assets/test_transform_requests.py",
           "tests/unit/api/test_file_stream_router.py",
+          "tests/unit/api/test_openapi_binary_uploads.py",
           "tests/unit/services/test_file_stream_service.py",
           "tests/unit/services/test_media_service.py",
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 152ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 125ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -4531,6 +4553,7 @@
           "tests/unit/api/assets/test_streams.py",
           "tests/unit/api/assets/test_tags.py",
           "tests/unit/api/assets/test_transform_requests.py",
+          "tests/unit/api/test_openapi_binary_uploads.py",
           "tests/unit/services/test_media_service.py",
           "tests/unit/tools/test_capability_inventory.py"
         ]
@@ -4609,10 +4632,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 159.3,
-            "min_ms": 134.8,
-            "p50_ms": 141.8,
-            "p95_ms": 159.3,
+            "max_ms": 146.2,
+            "min_ms": 116.2,
+            "p50_ms": 121.3,
+            "p95_ms": 146.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4720,7 +4743,7 @@
           "tests/unit/api/assets/test_files.py"
         ]
       },
-      "verdict": "p95 159ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 146ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -4834,10 +4857,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 191.9,
-            "min_ms": 170.0,
-            "p50_ms": 184.1,
-            "p95_ms": 191.9,
+            "max_ms": 151.4,
+            "min_ms": 139.3,
+            "p50_ms": 145.4,
+            "p95_ms": 151.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5004,10 +5027,11 @@
         "referenced": true,
         "strength": "weak",
         "test_references": [
-          "tests/integration/api/test_artwork_api.py"
+          "tests/integration/api/test_artwork_api.py",
+          "tests/unit/api/test_openapi_binary_uploads.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 192ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 151ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -5409,7 +5433,8 @@
         "referenced": true,
         "strength": "weak",
         "test_references": [
-          "tests/integration/api/test_artwork_api.py"
+          "tests/integration/api/test_artwork_api.py",
+          "tests/unit/api/test_openapi_binary_uploads.py"
         ]
       },
       "verdict": "Single-row write with no loops. Safe to drive from a form submit and to treat optimistically, provided the UI reconciles against the response.",
@@ -5501,10 +5526,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 193.0,
-            "min_ms": 165.9,
-            "p50_ms": 176.3,
-            "p95_ms": 193.0,
+            "max_ms": 164.2,
+            "min_ms": 137.6,
+            "p50_ms": 143.3,
+            "p95_ms": 164.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5656,7 +5681,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 193ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -5997,10 +6022,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 108.8,
-            "min_ms": 88.3,
-            "p50_ms": 96.4,
-            "p95_ms": 108.8,
+            "max_ms": 116.1,
+            "min_ms": 82.5,
+            "p50_ms": 93.9,
+            "p95_ms": 116.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6129,7 +6154,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 109ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 116ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6811,10 +6836,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 183.5,
-            "min_ms": 153.2,
-            "p50_ms": 171.5,
-            "p95_ms": 183.5,
+            "max_ms": 155.8,
+            "min_ms": 142.9,
+            "p50_ms": 150.1,
+            "p95_ms": 155.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6934,7 +6959,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7392,10 +7417,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 190.7,
-            "min_ms": 164.7,
-            "p50_ms": 185.3,
-            "p95_ms": 190.7,
+            "max_ms": 159.1,
+            "min_ms": 143.9,
+            "p50_ms": 150.4,
+            "p95_ms": 159.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -7522,7 +7547,7 @@
           "tests/unit/services/test_metadata_service.py"
         ]
       },
-      "verdict": "p95 191ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 159ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -8001,10 +8026,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 197.7,
-            "min_ms": 161.3,
-            "p50_ms": 166.6,
-            "p95_ms": 197.7,
+            "max_ms": 161.9,
+            "min_ms": 135.9,
+            "p50_ms": 146.9,
+            "p95_ms": 161.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8172,7 +8197,7 @@
           "tests/unit/api/assets/test_streams.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 198ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -8509,10 +8534,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 174.0,
-            "min_ms": 153.8,
-            "p50_ms": 170.0,
-            "p95_ms": 174.0,
+            "max_ms": 161.4,
+            "min_ms": 138.3,
+            "p50_ms": 144.0,
+            "p95_ms": 161.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8640,7 +8665,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 174ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 161ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -9387,10 +9412,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 185.7,
-            "min_ms": 160.5,
-            "p50_ms": 172.4,
-            "p95_ms": 185.7,
+            "max_ms": 153.2,
+            "min_ms": 139.8,
+            "p50_ms": 145.5,
+            "p95_ms": 153.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -9524,7 +9549,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 186ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 153ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -9614,10 +9639,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 194.3,
-            "min_ms": 170.1,
-            "p50_ms": 180.8,
-            "p95_ms": 194.3,
+            "max_ms": 170.4,
+            "min_ms": 142.1,
+            "p50_ms": 149.9,
+            "p95_ms": 170.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -9804,7 +9829,7 @@
           "tests/unit/api/assets/test_transform_requests.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 194ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 170ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -10146,10 +10171,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 118.8,
-            "min_ms": 96.8,
-            "p50_ms": 105.4,
-            "p95_ms": 118.8,
+            "max_ms": 97.1,
+            "min_ms": 84.0,
+            "p50_ms": 89.6,
+            "p95_ms": 97.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10262,7 +10287,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "p95 119ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -10498,7 +10523,7 @@
           {
             "in_loop": false,
             "kind": "execute",
-            "line": 305,
+            "line": 345,
             "loop_note": null,
             "owner": "health_check (inline)",
             "source_file": "app/app_factory.py",
@@ -10512,7 +10537,7 @@
       },
       "probes": [
         {
-          "bytes_": 210,
+          "bytes_": 226,
           "endpoint_key": "GET /api/health",
           "http_status": 200,
           "item_count": null,
@@ -10525,10 +10550,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 142.6,
-            "min_ms": 122.6,
-            "p50_ms": 133.6,
-            "p95_ms": 142.6,
+            "max_ms": 127.6,
+            "min_ms": 105.6,
+            "p50_ms": 112.9,
+            "p95_ms": 127.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10574,7 +10599,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 143ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 128ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -10630,10 +10655,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 108.9,
-            "min_ms": 95.3,
-            "p50_ms": 101.7,
-            "p95_ms": 108.9,
+            "max_ms": 100.1,
+            "min_ms": 82.5,
+            "p50_ms": 90.6,
+            "p95_ms": 100.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10710,7 +10735,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 109ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 100ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -10933,10 +10958,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 114.1,
-            "min_ms": 96.0,
-            "p50_ms": 106.1,
-            "p95_ms": 114.1,
+            "max_ms": 97.3,
+            "min_ms": 80.3,
+            "p50_ms": 88.9,
+            "p95_ms": 97.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11042,7 +11067,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "p95 114ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -11399,10 +11424,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 3.0,
-            "min_ms": 1.6,
+            "max_ms": 7.7,
+            "min_ms": 1.7,
             "p50_ms": 1.9,
-            "p95_ms": 3.0,
+            "p95_ms": 7.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11423,10 +11448,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 2.3,
+            "max_ms": 1.8,
             "min_ms": 1.6,
-            "p50_ms": 1.8,
-            "p95_ms": 2.3,
+            "p50_ms": 1.7,
+            "p95_ms": 1.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11540,7 +11565,7 @@
           "tests/unit/services/test_inbox_service.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 8ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -12381,10 +12406,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 3.4,
+            "max_ms": 1.3,
             "min_ms": 1.2,
-            "p50_ms": 1.9,
-            "p95_ms": 3.4,
+            "p50_ms": 1.3,
+            "p95_ms": 1.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -12430,7 +12455,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 3ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 1ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -13518,7 +13543,7 @@
           "timing": {
             "max_ms": 2.7,
             "min_ms": 2.3,
-            "p50_ms": 2.3,
+            "p50_ms": 2.4,
             "p95_ms": 2.7,
             "runs": 7,
             "ttfb_p50_ms": null,
@@ -13858,10 +13883,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 132.8,
-            "min_ms": 108.7,
-            "p50_ms": 113.8,
-            "p95_ms": 132.8,
+            "max_ms": 106.3,
+            "min_ms": 90.6,
+            "p50_ms": 97.3,
+            "p95_ms": 106.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13882,10 +13907,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 201.0,
-            "min_ms": 116.2,
-            "p50_ms": 129.0,
-            "p95_ms": 201.0,
+            "max_ms": 174.0,
+            "min_ms": 110.7,
+            "p50_ms": 119.3,
+            "p95_ms": 174.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13906,10 +13931,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 109.4,
-            "min_ms": 84.3,
-            "p50_ms": 95.6,
-            "p95_ms": 109.4,
+            "max_ms": 98.4,
+            "min_ms": 86.2,
+            "p50_ms": 90.2,
+            "p95_ms": 98.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13918,8 +13943,7 @@
         }
       ],
       "risks": [
-        "unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,175 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "measured p95 of 201ms on `streams-max-page` is too slow to drive from a keystroke"
+        "unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,186 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -14167,10 +14191,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 128.2,
-            "min_ms": 100.9,
-            "p50_ms": 107.6,
-            "p95_ms": 128.2,
+            "max_ms": 92.1,
+            "min_ms": 84.3,
+            "p50_ms": 89.5,
+            "p95_ms": 92.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14337,7 +14361,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 128ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 92ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -14694,10 +14718,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 114.2,
-            "min_ms": 96.3,
-            "p50_ms": 108.2,
-            "p95_ms": 114.2,
+            "max_ms": 108.9,
+            "min_ms": 95.8,
+            "p50_ms": 99.0,
+            "p95_ms": 108.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15121,10 +15145,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 111.6,
-            "min_ms": 101.8,
-            "p50_ms": 107.2,
-            "p95_ms": 111.6,
+            "max_ms": 97.2,
+            "min_ms": 82.8,
+            "p50_ms": 89.8,
+            "p95_ms": 97.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15248,7 +15272,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "p95 112ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -15781,10 +15805,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 160.0,
-            "min_ms": 134.8,
-            "p50_ms": 146.8,
-            "p95_ms": 160.0,
+            "max_ms": 123.9,
+            "min_ms": 112.6,
+            "p50_ms": 116.6,
+            "p95_ms": 123.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -16236,10 +16260,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 122.4,
-            "min_ms": 96.7,
-            "p50_ms": 109.1,
-            "p95_ms": 122.4,
+            "max_ms": 97.1,
+            "min_ms": 83.0,
+            "p50_ms": 93.9,
+            "p95_ms": 97.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -16313,7 +16337,7 @@
           "tests/integration/api/test_title_types_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 122ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -16717,10 +16741,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 111.1,
-            "min_ms": 98.7,
-            "p50_ms": 104.9,
-            "p95_ms": 111.1,
+            "max_ms": 94.4,
+            "min_ms": 84.0,
+            "p50_ms": 86.8,
+            "p95_ms": 94.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -16826,7 +16850,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "p95 111ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 94ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -17136,10 +17160,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 139.8,
-            "min_ms": 123.1,
-            "p50_ms": 129.9,
-            "p95_ms": 139.8,
+            "max_ms": 115.3,
+            "min_ms": 101.9,
+            "p50_ms": 107.5,
+            "p95_ms": 115.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17160,10 +17184,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 210.8,
-            "min_ms": 178.4,
-            "p50_ms": 192.5,
-            "p95_ms": 210.8,
+            "max_ms": 192.0,
+            "min_ms": 173.2,
+            "p50_ms": 183.8,
+            "p95_ms": 192.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17171,7 +17195,7 @@
           "url": "/api/titles/?include=poster&limit=50"
         },
         {
-          "bytes_": 121482,
+          "bytes_": 157902,
           "endpoint_key": "GET /api/titles/",
           "http_status": 200,
           "item_count": 200,
@@ -17184,15 +17208,63 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 247.0,
-            "min_ms": 205.7,
-            "p50_ms": 213.7,
-            "p95_ms": 247.0,
+            "max_ms": 237.2,
+            "min_ms": 190.8,
+            "p50_ms": 209.6,
+            "p95_ms": 237.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
           },
           "url": "/api/titles/?include=poster&limit=200"
+        },
+        {
+          "bytes_": 18813,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-newest-page",
+          "notes": [
+            "baseline for the pair below -- same rows, no resolution"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 106.5,
+            "min_ms": 91.8,
+            "p50_ms": 102.6,
+            "p95_ms": 106.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50&sort=id:desc"
+        },
+        {
+          "bytes_": 35766,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-newest-page-with-poster",
+          "notes": [
+            "poster resolution where it finds a row for most of the page; the gap from `titles-newest-page` is the hit path, against the miss path measured above"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 184.6,
+            "min_ms": 168.4,
+            "p50_ms": 174.7,
+            "p95_ms": 184.6,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?include=poster&limit=50&sort=id:desc"
         },
         {
           "bytes_": 38915,
@@ -17208,10 +17280,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 125.2,
-            "min_ms": 110.8,
-            "p50_ms": 115.0,
-            "p95_ms": 125.2,
+            "max_ms": 115.7,
+            "min_ms": 101.3,
+            "p50_ms": 106.0,
+            "p95_ms": 115.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17234,9 +17306,9 @@
         }
       ],
       "risks": [
-        "unindexed sort keys (`name`); every page sorts the whole filtered set, but `titles` holds only 1,584 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "filters that cannot use an index (`name`); each forces a sequential scan, though `titles` holds only 1,584 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 247ms on `titles-poster-scaling-200-rows` is too slow to drive from a keystroke",
+        "unindexed sort keys (`name`); every page sorts the whole filtered set, but `titles` holds only 1,585 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`name`); each forces a sequential scan, though `titles` holds only 1,585 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "measured p95 of 237ms on `titles-poster-scaling-200-rows` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`"
       ],
       "surface": {
@@ -17692,10 +17764,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 116.1,
-            "min_ms": 101.7,
-            "p50_ms": 109.1,
-            "p95_ms": 116.1,
+            "max_ms": 94.9,
+            "min_ms": 79.0,
+            "p50_ms": 88.7,
+            "p95_ms": 94.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17814,7 +17886,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the lookup is not index-covered and measures p95 116ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict": "the lookup is not index-covered and measures p95 95ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
       "verdict_class": "caution"
     },
     {
@@ -17934,10 +18006,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 213.3,
-            "min_ms": 187.9,
-            "p50_ms": 199.9,
-            "p95_ms": 213.3,
+            "max_ms": 187.5,
+            "min_ms": 164.7,
+            "p50_ms": 166.1,
+            "p95_ms": 187.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17948,8 +18020,7 @@
       "risks": [
         "one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`",
         "one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`",
-        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent",
-        "measured p95 of 213ms on `title-contents` is too slow to drive from a keystroke"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -18078,7 +18149,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 213ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 188ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -19681,10 +19752,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 192.7,
-            "min_ms": 155.1,
-            "p50_ms": 161.6,
-            "p95_ms": 192.7,
+            "max_ms": 168.3,
+            "min_ms": 152.5,
+            "p50_ms": 155.7,
+            "p95_ms": 168.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -19705,10 +19776,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 191.5,
-            "min_ms": 165.2,
-            "p50_ms": 171.4,
-            "p95_ms": 191.5,
+            "max_ms": 165.8,
+            "min_ms": 143.4,
+            "p50_ms": 155.6,
+            "p95_ms": 165.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -19852,7 +19923,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the lookup is not index-covered and measures p95 193ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict": "the lookup is not index-covered and measures p95 168ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
       "verdict_class": "caution"
     },
     {
@@ -20428,10 +20499,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 151.1,
-            "min_ms": 132.0,
-            "p50_ms": 140.0,
-            "p95_ms": 151.1,
+            "max_ms": 130.6,
+            "min_ms": 108.7,
+            "p50_ms": 119.4,
+            "p95_ms": 130.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20452,10 +20523,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 186.6,
-            "min_ms": 171.6,
-            "p50_ms": 179.2,
-            "p95_ms": 186.6,
+            "max_ms": 160.5,
+            "min_ms": 136.4,
+            "p50_ms": 150.7,
+            "p95_ms": 160.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20624,7 +20695,7 @@
           "tests/integration/api/test_artwork_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 187ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 160ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -21125,10 +21196,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 121.8,
-            "min_ms": 96.6,
-            "p50_ms": 105.4,
-            "p95_ms": 121.8,
+            "max_ms": 90.5,
+            "min_ms": 87.8,
+            "p50_ms": 89.1,
+            "p95_ms": 90.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -21255,7 +21326,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 122ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 90ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -21933,10 +22004,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 162.0,
-            "min_ms": 131.0,
-            "p50_ms": 145.9,
-            "p95_ms": 162.0,
+            "max_ms": 125.2,
+            "min_ms": 108.4,
+            "p50_ms": 117.4,
+            "p95_ms": 125.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -22051,7 +22122,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 125ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -22529,10 +22600,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 140.8,
-            "min_ms": 121.8,
-            "p50_ms": 133.8,
-            "p95_ms": 140.8,
+            "max_ms": 137.3,
+            "min_ms": 111.2,
+            "p50_ms": 118.5,
+            "p95_ms": 137.3,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -22658,7 +22729,7 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 141ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 137ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -23440,7 +23511,7 @@
       },
       "probes": [
         {
-          "bytes_": 43587,
+          "bytes_": 44312,
           "endpoint_key": "GET /api/transform_requests",
           "http_status": 200,
           "item_count": 50,
@@ -23451,10 +23522,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 225.9,
-            "min_ms": 195.3,
-            "p50_ms": 203.9,
-            "p95_ms": 225.9,
+            "max_ms": 185.6,
+            "min_ms": 172.2,
+            "p50_ms": 179.1,
+            "p95_ms": 185.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -23463,9 +23534,8 @@
         }
       ],
       "risks": [
-        "unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,252 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,252 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 226ms on `transform-requests-page-1` is too slow to drive from a keystroke"
+        "unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,261 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,261 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -24054,10 +24124,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 116.4,
-            "min_ms": 102.5,
-            "p50_ms": 114.2,
-            "p95_ms": 116.4,
+            "max_ms": 95.5,
+            "min_ms": 89.0,
+            "p50_ms": 94.6,
+            "p95_ms": 95.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -24243,7 +24313,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 116ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 96ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -25399,7 +25469,7 @@
       },
       "probes": [
         {
-          "bytes_": 61,
+          "bytes_": 77,
           "endpoint_key": "GET /api/version",
           "http_status": 200,
           "item_count": null,
@@ -25410,10 +25480,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 8.9,
-            "min_ms": 5.8,
-            "p50_ms": 8.1,
-            "p95_ms": 8.9,
+            "max_ms": 8.6,
+            "min_ms": 2.0,
+            "p50_ms": 3.6,
+            "p95_ms": 8.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -26291,7 +26361,7 @@
   ],
   "notes": [
     "Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.",
-    "Probed `http://127.0.0.1:8137` with 64 probe(s)."
+    "Probed `http://127.0.0.1:8137` with 66 probe(s)."
   ],
   "phases_run": [
     "1 (static surface)",
@@ -26302,11 +26372,6 @@
   ],
   "phases_skipped": [],
   "unknowns": [
-    {
-      "question": "value for probe variable `artwork_id`",
-      "resolution": "/api/titles/ returned no row at `items.0.poster.id`; the probed instance appears to hold no rows for that resource",
-      "scope": "Phase 4"
-    },
     {
       "question": "whether an endpoint has any real caller",
       "resolution": "re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories",
