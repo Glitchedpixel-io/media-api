@@ -12,14 +12,17 @@ import hashlib
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 from app.config import AppConfig
 from app.repositories import SQLAlchemyArtworkRepository, SQLAlchemyMediaRepository
+from app.repositories.errors import UniqueViolation
 from app.schemas import AssetCreateInternal
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import MAX_ARTWORK_BYTES, ArtworkStore
 from app.utils.paths import accessory_relative_path
+from tools.artwork_backfill import backfill
 from tools.artwork_backfill.backfill import find_cover, run
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
@@ -292,6 +295,41 @@ class TestResilience:
         summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
         assert summary.skipped == {"empty file": 1}
 
+    def test_a_failed_insert_does_not_poison_the_rest_of_the_pass(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """Counting a failure and carrying on is only real if the session survives it.
+
+        A failed flush leaves the session needing a rollback, so without one the *next*
+        asset raises PendingRollbackError instead of being registered -- and the real
+        cause is reported once, against the wrong asset, for the whole rest of the run.
+        """
+        first = make_asset()
+        second = make_asset()
+        _place_cover(accessory_root, first, JPEG)
+        _place_cover(accessory_root, second, PNG, ".png")
+
+        real_insert = backfill._insert
+        calls = {"n": 0}
+
+        def failing_once(session, asset_id, kind_id, stored):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # A statement that genuinely fails, rather than a bare `raise`: the bug
+                # is the session's state after a failed flush, which only a real
+                # database error produces.
+                session.execute(sql_text("SELECT * FROM a_table_that_does_not_exist"))
+            return real_insert(session, asset_id, kind_id, stored)
+
+        monkeypatch.setattr(backfill, "_insert", failing_once)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
+
+        assert summary.failed == 1
+        assert summary.registered == 1
+        assert _artwork_for(db_session, first) == []
+        assert _artwork_for(db_session, second) != []
+
     def test_the_pass_does_not_stop_early_on_a_run_of_covered_assets(
         self, db_session, store, accessory_root, poster_kind_id, make_asset
     ):
@@ -346,3 +384,43 @@ class TestLimit:
 
         assert second.registered == 1
         assert second.already_registered == 2
+
+    def test_the_limit_is_honoured_when_every_registration_fails(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """The bound has to hold on the run that needs bounding.
+
+        `--limit 1` against a misconfigured database walked 500 assets, because the
+        limit was spent by successful registrations and there were none. A failing
+        write must consume the allowance exactly as a successful one does.
+        """
+        for i in range(4):
+            _place_cover(accessory_root, make_asset(), JPEG + bytes([i]))
+
+        def always_fails(session, asset_id, kind_id, stored):
+            session.execute(sql_text("SELECT * FROM a_table_that_does_not_exist"))
+
+        monkeypatch.setattr(backfill, "_insert", always_fails)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False, limit=2)
+
+        assert summary.registered == 0
+        assert summary.failed == 2
+        assert summary.limit_reached is True
+
+    def test_an_already_present_row_still_spends_the_limit(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """A racing writer must not buy the pass an unbounded number of extra assets."""
+        for i in range(4):
+            _place_cover(accessory_root, make_asset(), JPEG + bytes([i]))
+
+        def always_conflicts(session, asset_id, kind_id, stored):
+            raise UniqueViolation("artwork already exists")
+
+        monkeypatch.setattr(backfill, "_insert", always_conflicts)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False, limit=2)
+
+        assert summary.already_registered == 2
+        assert summary.limit_reached is True
