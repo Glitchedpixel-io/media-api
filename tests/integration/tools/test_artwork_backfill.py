@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import AppConfig
 from app.repositories import SQLAlchemyArtworkRepository, SQLAlchemyMediaRepository
+from app.repositories.errors import UniqueViolation
 from app.schemas import AssetCreateInternal
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import MAX_ARTWORK_BYTES, ArtworkStore
@@ -383,3 +384,43 @@ class TestLimit:
 
         assert second.registered == 1
         assert second.already_registered == 2
+
+    def test_the_limit_is_honoured_when_every_registration_fails(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """The bound has to hold on the run that needs bounding.
+
+        `--limit 1` against a misconfigured database walked 500 assets, because the
+        limit was spent by successful registrations and there were none. A failing
+        write must consume the allowance exactly as a successful one does.
+        """
+        for i in range(4):
+            _place_cover(accessory_root, make_asset(), JPEG + bytes([i]))
+
+        def always_fails(session, asset_id, kind_id, stored):
+            session.execute(sql_text("SELECT * FROM a_table_that_does_not_exist"))
+
+        monkeypatch.setattr(backfill, "_insert", always_fails)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False, limit=2)
+
+        assert summary.registered == 0
+        assert summary.failed == 2
+        assert summary.limit_reached is True
+
+    def test_an_already_present_row_still_spends_the_limit(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """A racing writer must not buy the pass an unbounded number of extra assets."""
+        for i in range(4):
+            _place_cover(accessory_root, make_asset(), JPEG + bytes([i]))
+
+        def always_conflicts(session, asset_id, kind_id, stored):
+            raise UniqueViolation("artwork already exists")
+
+        monkeypatch.setattr(backfill, "_insert", always_conflicts)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False, limit=2)
+
+        assert summary.already_registered == 2
+        assert summary.limit_reached is True
