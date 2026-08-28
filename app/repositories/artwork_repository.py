@@ -1,20 +1,26 @@
 # app/repositories/artwork_repository.py
 from collections.abc import Sequence
 
-from sqlalchemy import Integer, Text, func, literal, select
+from sqlakeyset import select_page
+from sqlalchemy import Integer, Text, func, literal, or_, select
 from sqlalchemy.sql import ColumnElement, Select
 from sqlalchemy.dialects.postgresql import array
 
 from app.models import ArtworkKindORM, ArtworkORM, TitleContentORM, TitleORM
+from app.models.sort_configs import ARTWORK_SORT
 from app.schemas import (
     ArtworkCreateInternal,
     ArtworkKindCreateInternal,
     ArtworkKindRead,
     ArtworkKindUpdateInternal,
+    ArtworkListParams,
     ArtworkRead,
     ArtworkUpdateInternal,
+    PaginatedResponse,
 )
 from app.schemas.enums import EntityTypeEnum
+
+from ..utils.sorting import apply_ordering
 
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
@@ -112,6 +118,50 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
     def get(self, artwork_id: int) -> ArtworkRead | None:
         orm = self.db.get(ArtworkORM, artwork_id)
         return ArtworkRead.model_validate(orm, from_attributes=True) if orm else None
+
+    def list_paged(
+        self, params: ArtworkListParams, kind_id: int | None = None
+    ) -> PaginatedResponse[ArtworkRead]:
+        """A page of artwork across every entity.
+
+        The kind arrives already resolved to an id: the code -> id lookup belongs to
+        the service, which raises the same 422 for an unknown code here as it does on
+        the nested routes. A repository that silently returned an empty page instead
+        would make a typo indistinguishable from a kind nothing uses.
+
+        Args:
+            params: Filters, sort and cursor.
+            kind_id: The resolved artwork kind to restrict to, if `params.kind` was set.
+
+        Returns:
+            PaginatedResponse[ArtworkRead]: The page and its cursors.
+        """
+        stmt = select(ArtworkORM)
+
+        if params.entity_type is not None:
+            stmt = stmt.where(ArtworkORM.entity_type == params.entity_type)
+        if params.entity_id is not None:
+            stmt = stmt.where(ArtworkORM.entity_id == params.entity_id)
+        if kind_id is not None:
+            stmt = stmt.where(ArtworkORM.artwork_kind_id == kind_id)
+        if params.is_primary is not None:
+            stmt = stmt.where(ArtworkORM.is_primary.is_(params.is_primary))
+        if params.missing_dimensions is not None:
+            missing = or_(ArtworkORM.width.is_(None), ArtworkORM.height.is_(None))
+            # `~missing` rather than "both are not null" spelled out again, so the two
+            # branches cannot drift into disagreeing about what "missing" means.
+            stmt = stmt.where(missing if params.missing_dimensions else ~missing)
+
+        stmt = apply_ordering(stmt, ARTWORK_SORT, params.sort)
+
+        cursor = params.after or params.before
+        page = select_page(self.db, stmt, per_page=params.limit, page=cursor)
+        rows = [row[0] for row in list(page)]
+
+        return PaginatedResponse[ArtworkRead](
+            items=[ArtworkRead.model_validate(row) for row in rows],
+            page=self._page_info(page),
+        )
 
     def list_for_entity(
         self, entity_type: EntityTypeEnum, entity_id: int, kind_id: int | None = None

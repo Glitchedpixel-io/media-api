@@ -7,7 +7,14 @@ from pydantic import ValidationError
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_artwork_kind_service, get_artwork_service
 from app.routers.base import QuietClientErrorRoute
-from app.schemas import ArtworkKindRead, ArtworkPatchPublic, ArtworkRead, ArtworkUploadForm
+from app.schemas import (
+    ArtworkKindRead,
+    ArtworkListParams,
+    ArtworkPatchPublic,
+    ArtworkRead,
+    ArtworkUploadForm,
+    PaginatedResponse,
+)
 from app.services import ArtworkKindService, ArtworkService
 
 router = APIRouter(route_class=QuietClientErrorRoute)
@@ -75,6 +82,24 @@ def artwork_upload_form(
             status_code=422,
             detail=e.errors(include_url=False, include_context=False, include_input=False),
         ) from e
+
+
+@router.get(
+    "",
+    response_model=PaginatedResponse[ArtworkRead],
+    operation_id="list_artwork",
+)
+def list_artwork(
+    params: ArtworkListParams = Depends(),
+    service: ArtworkService = Depends(get_artwork_service),
+) -> PaginatedResponse[ArtworkRead]:
+    """Every artwork, filtered and paged.
+
+    Declared before ``/{artwork_id}`` so the empty path is matched as a collection
+    rather than as an id, and capped by ``KeysetPagination`` like the other listings --
+    the nested per-entity routes are uncapped, which is not a shape to copy.
+    """
+    return service.list_all_artwork(params)
 
 
 @router.get(
