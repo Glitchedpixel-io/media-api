@@ -162,6 +162,15 @@ def run(
     of already-registered assets either: covered and uncovered assets are interleaved
     arbitrarily, so a stretch of one says nothing about the next.
 
+    **Continuing after a failed insert requires rolling the session back**, which is
+    why every failure path does. SQLAlchemy leaves a session in a failed state after a
+    failed flush, so without it the next statement raises ``PendingRollbackError``
+    rather than doing its work -- including the id iterator's next batch query, which
+    is issued outside the per-asset ``try``. The pass would then die on the batch
+    boundary with a traceback naming the rollback, having attributed every failure
+    after the first to the wrong cause. Counting a failure and carrying on is only
+    real if the session is usable afterwards.
+
     Args:
         session: A session to read assets and write artwork through.
         store: Where artwork files are written.
@@ -224,9 +233,11 @@ def run(
                 # Another writer got there between the pre-load and now, or the same
                 # digest is already registered for this asset. Either way the row
                 # exists, which is the outcome this pass wanted.
+                session.rollback()
                 summary.already_registered += 1
                 continue
             except Exception as e:  # noqa: BLE001 - one bad row must not end the pass
+                session.rollback()
                 summary.failed += 1
                 if emit:
                     emit(f"asset {asset_id}: could not register {cover}: {e}")
