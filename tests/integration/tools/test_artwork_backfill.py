@@ -12,6 +12,7 @@ import hashlib
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 from app.config import AppConfig
@@ -20,6 +21,7 @@ from app.schemas import AssetCreateInternal
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import MAX_ARTWORK_BYTES, ArtworkStore
 from app.utils.paths import accessory_relative_path
+from tools.artwork_backfill import backfill
 from tools.artwork_backfill.backfill import find_cover, run
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
@@ -291,6 +293,41 @@ class TestResilience:
         _place_cover(accessory_root, make_asset(), b"")
         summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
         assert summary.skipped == {"empty file": 1}
+
+    def test_a_failed_insert_does_not_poison_the_rest_of_the_pass(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch
+    ):
+        """Counting a failure and carrying on is only real if the session survives it.
+
+        A failed flush leaves the session needing a rollback, so without one the *next*
+        asset raises PendingRollbackError instead of being registered -- and the real
+        cause is reported once, against the wrong asset, for the whole rest of the run.
+        """
+        first = make_asset()
+        second = make_asset()
+        _place_cover(accessory_root, first, JPEG)
+        _place_cover(accessory_root, second, PNG, ".png")
+
+        real_insert = backfill._insert
+        calls = {"n": 0}
+
+        def failing_once(session, asset_id, kind_id, stored):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # A statement that genuinely fails, rather than a bare `raise`: the bug
+                # is the session's state after a failed flush, which only a real
+                # database error produces.
+                session.execute(sql_text("SELECT * FROM a_table_that_does_not_exist"))
+            return real_insert(session, asset_id, kind_id, stored)
+
+        monkeypatch.setattr(backfill, "_insert", failing_once)
+
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
+
+        assert summary.failed == 1
+        assert summary.registered == 1
+        assert _artwork_for(db_session, first) == []
+        assert _artwork_for(db_session, second) != []
 
     def test_the_pass_does_not_stop_early_on_a_run_of_covered_assets(
         self, db_session, store, accessory_root, poster_kind_id, make_asset
