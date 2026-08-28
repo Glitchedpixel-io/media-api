@@ -48,7 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=0,
         metavar="N",
-        help="Stop after N registrations, so a first real run is small enough to inspect.",
+        help=(
+            "Stop after attempting N covers, so a first real run is small enough to "
+            "inspect. Counts attempts, not successes, so a run whose writes are all "
+            "failing still stops at N."
+        ),
     )
     parser.add_argument(
         "--kind",
