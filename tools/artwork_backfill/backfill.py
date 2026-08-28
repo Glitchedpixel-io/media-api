@@ -177,7 +177,11 @@ def run(
         accessory_root: ACCESSORY_ROOT, where the covers currently live.
         kind_id: ID of the artwork kind to register covers as.
         dry_run: Report what would happen without writing files or rows.
-        limit: Stop after this many registrations, or 0 for no limit.
+        limit: Stop after attempting this many candidates, or 0 for no limit. Counts
+            every asset whose cover was opened and acted on -- registered, failed, or
+            found already present -- not successful registrations alone. Assets with
+            no cover, and those the pre-load already knows are covered, are skipped
+            before any work happens and do not count against it.
         on_event: Optional ``callable(str)`` for per-asset progress lines.
 
     Returns:
@@ -186,6 +190,7 @@ def run(
     summary = Summary(dry_run=dry_run)
     already = _assets_with_artwork(session, kind_id)
     emit = on_event
+    attempted = 0
 
     for asset_id in _iter_asset_ids(session):
         summary.assets_scanned += 1
@@ -222,6 +227,12 @@ def run(
                 emit(f"asset {asset_id}: could not read {cover}: {e}")
             continue
 
+        # Counted before the attempt rather than after a successful one. `--limit` is
+        # what bounds a first run against real data, and a run whose writes are all
+        # failing is exactly when that bound matters -- so it cannot be spent only by
+        # successes, and a failure cannot `continue` past the check.
+        attempted += 1
+
         if dry_run:
             summary.registered += 1
             if emit:
@@ -235,18 +246,17 @@ def run(
                 # exists, which is the outcome this pass wanted.
                 session.rollback()
                 summary.already_registered += 1
-                continue
             except Exception as e:  # noqa: BLE001 - one bad row must not end the pass
                 session.rollback()
                 summary.failed += 1
                 if emit:
                     emit(f"asset {asset_id}: could not register {cover}: {e}")
-                continue
-            summary.registered += 1
-            if emit:
-                emit(f"asset {asset_id}: registered {cover.name} -> {stored.storage_path}")
+            else:
+                summary.registered += 1
+                if emit:
+                    emit(f"asset {asset_id}: registered {cover.name} -> {stored.storage_path}")
 
-        if limit and summary.registered >= limit:
+        if limit and attempted >= limit:
             summary.limit_reached = True
             break
 
