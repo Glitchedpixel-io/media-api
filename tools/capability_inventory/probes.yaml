@@ -106,6 +106,39 @@ variables:
   external_id:
     literal: "capinv-probe-no-such-external-id"
 
+  # The newest asset, as the one likeliest to carry artwork.
+  #
+  # This is the only heuristic available: the API exposes no way to ask for an
+  # entity that *has* artwork. There is no collection route over `artwork`, and
+  # neither listing takes a "has artwork" filter, so artwork is reachable only
+  # through an id a caller already holds. Picking the newest asset is not
+  # arbitrary -- covers are fetched when an asset is acquired, so registrations
+  # cluster at the top of the id range rather than spreading evenly.
+  #
+  # If that asset has no artwork the probes below measure the empty case and the
+  # report records `0 items`, which is a true statement about that asset and not
+  # a bound on the collection. `asset_id` deliberately stays on the *oldest*
+  # asset, so the pair spans both cases.
+  covered_asset_id:
+    from_endpoint: /api/assets/
+    query: {limit: 1, sort: "id:desc"}
+    pick: items.0.id
+
+  # Resolved from that asset's own artwork list, which is a direct read rather
+  # than the recursive poster resolution -- one hop, and it does not depend on
+  # the asset belonging to any title.
+  #
+  # It resolves nothing while the artwork table is empty, and every probe that
+  # needs it is then reported `unavailable` with that reason rather than silently
+  # skipped. An instance that has not had `tools/artwork_backfill` run against it
+  # is in exactly that state: the schema and the seeded kinds are deployed, but
+  # nothing has registered any artwork yet. Nothing in this file can fix that,
+  # and it should not try -- no `fallback`, for the same reason the `runner_key`
+  # note below gives.
+  artwork_id:
+    from_endpoint: /api/assets/{covered_asset_id}/artwork
+    pick: 0.id
+
   # There is deliberately no `runner_key` variable, so
   # GET /api/runner_state/{runner_key} stays unprobed.
   #
@@ -131,6 +164,48 @@ probes:
   - name: titles-page-1
     path: /api/titles/
     query: {limit: 50}
+
+  # -- isolating poster resolution ---------------------------------------
+  # `include=poster` returns the same rows as `titles-page-1` with one field
+  # added, so the difference between the two probes is the resolution and
+  # nothing else -- the same isolation the assets N+1 pair below uses.
+  #
+  # It is worth isolating because resolving a poster is not a per-row column
+  # read: when a title has no artwork of its own the service walks its contents
+  # to a bounded depth. The scaling probe says whether that walk is charged per
+  # row of the page or once for the lot.
+  - name: titles-page-1-with-poster
+    path: /api/titles/
+    query: {limit: 50, include: "poster"}
+    note: first screen a browse grid would issue, with a poster per title
+
+  - name: titles-poster-scaling-200-rows
+    path: /api/titles/
+    query: {limit: 200, include: "poster"}
+    note: >-
+      poster resolution against 200 rows -- compare with the 50-row probe above
+      to tell a per-row walk from a fixed cost
+
+  # The pair above resolves nothing on this library: the default page is the
+  # oldest titles, which predate the covers, so every row walks its contents to
+  # the depth limit and comes back empty. That is the *miss* path, and it is the
+  # expensive one worth having -- but on its own it says nothing about what a
+  # grid full of posters costs. Sorting newest-first hits instead of misses, and
+  # the two together bracket the endpoint.
+  #
+  # Sort is the only lever available for this: neither listing can filter on
+  # having artwork, so there is no way to ask for resolvable rows directly.
+  - name: titles-newest-page
+    path: /api/titles/
+    query: {limit: 50, sort: "id:desc"}
+    note: baseline for the pair below -- same rows, no resolution
+
+  - name: titles-newest-page-with-poster
+    path: /api/titles/
+    query: {limit: 50, sort: "id:desc", include: "poster"}
+    note: >-
+      poster resolution where it finds a row for most of the page; the gap from
+      `titles-newest-page` is the hit path, against the miss path measured above
 
   - name: tags-page-1
     path: /api/tags
@@ -279,6 +354,13 @@ probes:
   - name: title-detail
     path: /api/titles/{title_id}
 
+  - name: title-detail-with-poster
+    path: /api/titles/{title_id}
+    query: {include: "poster"}
+    note: >-
+      pairs with `title-detail` the way the listing pair above does: one title's
+      share of the contents walk, which a detail view pays on its own
+
   - name: tag-detail
     path: /api/tags/{tag_id}
 
@@ -371,6 +453,47 @@ probes:
   - name: transform-request-logs
     path: /api/transform_requests/{request_id}/logs
     note: uncapped; the collection size behind it was never measured
+
+  # -- artwork ------------------------------------------------------------
+  # Read a `0 rows` measurement here as the cost of the read, not as evidence the
+  # collection is small: an instance whose artwork table is empty answers these in
+  # the time it takes to miss an index. The bound that matters is structural and
+  # holds regardless -- `uq_artwork_one_primary_per_kind` allows one primary per
+  # kind, and there are six kinds -- but the unfiltered lists are uncapped and a
+  # backfilled instance is the only thing that measures them honestly.
+  - name: artwork-kinds
+    path: /api/artwork_kinds
+    note: bounded by the seeded kinds, which is small and fixed at six
+
+  - name: title-artwork
+    path: /api/titles/{title_id}/artwork
+    note: uncapped, and returns a bare array rather than a page
+
+  - name: title-artwork-by-kind
+    path: /api/titles/{title_id}/artwork
+    query: {kind: poster}
+    note: >-
+      the `kind` filter Phase 2 could not trace statically, because it looks for
+      an `if params.kind` branch and the repository names the parameter
+      `kind_id`. It is applied; this times it
+
+  # There is deliberately no second probe here on `{covered_asset_id}`, tempting
+  # as the empty/populated pair is. A probe attaches to an endpoint by its path
+  # *template*, so the placeholder has to be spelled exactly as the route
+  # declares it -- `/api/assets/{covered_asset_id}/artwork` matches no route and
+  # its timing is reported as unattached rather than against this endpoint, the
+  # same trap the `parent_title_id` note above describes. One id per route
+  # parameter is the limit, and `asset_id` is the oldest asset, so this measures
+  # the ordinary case: most assets carry no artwork at all.
+  - name: asset-artwork
+    path: /api/assets/{asset_id}/artwork
+    note: uncapped, and returns a bare array rather than a page
+
+  - name: artwork-one
+    path: /api/artwork/{artwork_id}
+    note: >-
+      index-covered detail read. Reports `unavailable` rather than a timing on an
+      instance holding no artwork -- see the note on the `artwork_id` variable
 
   # -- identifier lookups -------------------------------------------------
   # Probed with an external id no row holds. A miss runs the same query as a hit
