@@ -1,6 +1,7 @@
 # app/repositories/title_content_repository.py
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import Integer, delete, func, literal, select
+from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import selectinload
 
 from app.models import TitleContentORM, TitleORM
@@ -18,8 +19,69 @@ from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import TitleContentRepository
 
+#: How far to follow containment when testing whether an edge would close a cycle.
+#:
+#: Matches ``MAX_RESOLUTION_DEPTH`` in the artwork repository, because both walk the
+#: same graph and a guard that stops shallower than a reader would let through exactly
+#: the cycles that reader can still reach.
+MAX_CONTAINMENT_DEPTH = 8
+
 
 class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRepository):
+    def can_reach(
+        self, start_title_id: int, target_title_id: int, max_depth: int = MAX_CONTAINMENT_DEPTH
+    ) -> bool:
+        """Whether ``target_title_id`` is reachable from ``start_title_id``.
+
+        Used to answer "would adding parent -> child close a cycle?", which is the same
+        question as "can the child already reach the parent?".
+
+        The walk carries the set of titles already on its path and refuses to re-enter
+        one, exactly as ``resolve_for_titles`` does. That is not redundant with the
+        constraint this supports: the guard has to be safe on a database that *already*
+        contains a cycle, which every deployment does until its migration runs -- and a
+        depth cap alone would bound the damage rather than avoid the revisit.
+
+        Args:
+            start_title_id: The title to walk down from.
+            target_title_id: The title being looked for.
+            max_depth: How many levels of containment to descend.
+
+        Returns:
+            bool: True if the target is reachable, and so the edge would close a cycle.
+        """
+        seed = (
+            select(
+                TitleContentORM.child_title_id.label("title_id"),
+                literal(1, Integer).label("depth"),
+                array([TitleContentORM.parent_title_id, TitleContentORM.child_title_id]).label(
+                    "seen"
+                ),
+            )
+            .where(TitleContentORM.parent_title_id == start_title_id)
+            .where(TitleContentORM.child_title_id.isnot(None))
+        )
+
+        walk = seed.cte("containment_walk", recursive=True)
+        step = (
+            select(
+                TitleContentORM.child_title_id.label("title_id"),
+                (walk.c.depth + 1).label("depth"),
+                (walk.c.seen + array([TitleContentORM.child_title_id])).label("seen"),
+            )
+            .select_from(walk)
+            .join(TitleContentORM, TitleContentORM.parent_title_id == walk.c.title_id)
+            .where(TitleContentORM.child_title_id.isnot(None))
+            .where(walk.c.depth < max_depth)
+            .where(~walk.c.seen.contains(array([TitleContentORM.child_title_id])))
+        )
+        walk = walk.union_all(step)
+
+        found = self.db.execute(
+            select(literal(1)).select_from(walk).where(walk.c.title_id == target_title_id).limit(1)
+        ).first()
+        return found is not None
+
     def create(self, title_content: TitleContentCreateInternal) -> TitleContentRead:
         orm = TitleContentORM(**title_content.model_dump())
         self.db.add(orm)

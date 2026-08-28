@@ -37,6 +37,7 @@ class TestInsertPositioned:
         """insert_positioned creates content at end position successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         created_content = TitleContentReadFactory(
@@ -62,6 +63,7 @@ class TestInsertPositioned:
         """insert_positioned inserts content before specified ID."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         created_content = TitleContentReadFactory(parent_title_id=5)
@@ -81,6 +83,7 @@ class TestInsertPositioned:
         """insert_positioned inserts content after specified ID."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         created_content = TitleContentReadFactory(parent_title_id=5)
@@ -100,6 +103,7 @@ class TestInsertPositioned:
         """insert_positioned works with asset kind content."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         created_content = TitleContentReadFactory(
@@ -120,6 +124,7 @@ class TestInsertPositioned:
         """insert_positioned raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -139,6 +144,7 @@ class TestInsertPositioned:
         """insert_positioned raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.create_positioned.side_effect = UniqueViolation("Duplicate entry")
@@ -157,6 +163,7 @@ class TestInsertPositioned:
         """insert_positioned raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.create_positioned.side_effect = DatabaseLocked("Database locked")
@@ -185,6 +192,7 @@ class TestInsertPositioned:
         """insert_positioned raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.create_positioned.side_effect = exc_class("Constraint error")
@@ -206,6 +214,7 @@ class TestGetTitleContent:
         """get_title_content returns list of content items for title."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         content_items = [
@@ -231,6 +240,7 @@ class TestGetTitleContent:
         """get_title_content returns empty list when title has no content."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.list_title_content.return_value = []
@@ -246,6 +256,7 @@ class TestGetTitleContent:
         """get_title_content raises 404 when title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -263,6 +274,7 @@ class TestGetTitleContent:
         """get_title_content passes True flag for extended data."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.list_title_content.return_value = []
@@ -284,6 +296,7 @@ class TestUpdateTitleContent:
         """update_title_content updates content with exclude_none=True."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         updated_content = TitleContentReadFactory(id=7, parent_title_id=3, label="Updated")
         c_repo.update.return_value = updated_content
@@ -309,6 +322,7 @@ class TestUpdateTitleContent:
         """update_title_content updates content with exclude_none=False."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         updated_content = TitleContentReadFactory(id=7)
         c_repo.update.return_value = updated_content
@@ -326,6 +340,7 @@ class TestUpdateTitleContent:
         """update_title_content allows updating only label field."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.return_value = TitleContentReadFactory()
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -343,6 +358,7 @@ class TestUpdateTitleContent:
         """update_title_content raises 404 when content doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = NotFoundError("Content not found")
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -360,6 +376,7 @@ class TestUpdateTitleContent:
         """update_title_content raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = UniqueViolation("Unique constraint")
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -377,6 +394,7 @@ class TestUpdateTitleContent:
         """update_title_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = DatabaseLocked("Database locked")
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -404,6 +422,7 @@ class TestUpdateTitleContent:
         """update_title_content raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = exc_class("Constraint error")
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -424,6 +443,7 @@ class TestReorderContent:
         """reorder_content moves content after specified ID successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         reordered_content = TitleContentReadFactory(id=77, parent_title_id=4)
@@ -442,6 +462,7 @@ class TestReorderContent:
         """reorder_content moves content before specified ID successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         reordered_content = TitleContentReadFactory(id=77)
@@ -458,6 +479,7 @@ class TestReorderContent:
         """reorder_content moves content to position string (start/end)."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         reordered_content = TitleContentReadFactory(id=77)
@@ -476,6 +498,7 @@ class TestReorderContent:
         """reorder_content raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -493,6 +516,7 @@ class TestReorderContent:
         """reorder_content raises 404 when repository raises NotFoundError."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = NotFoundError("Content not found")
@@ -509,6 +533,7 @@ class TestReorderContent:
         """reorder_content raises 404 when repository returns None."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.return_value = None
@@ -525,6 +550,7 @@ class TestReorderContent:
         """reorder_content raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = UniqueViolation("Unique constraint")
@@ -541,6 +567,7 @@ class TestReorderContent:
         """reorder_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = DatabaseLocked("Database locked")
@@ -567,6 +594,7 @@ class TestReorderContent:
         """reorder_content raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = exc_class("Constraint error")
@@ -582,6 +610,7 @@ class TestReorderContent:
         """reorder_content raises 500 on unexpected exceptions."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = RuntimeError("Unexpected error")
@@ -602,6 +631,7 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset returns list of titles for existing asset."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = True
         from app.schemas import TitleContentReadParent, TitleRead
@@ -645,6 +675,7 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset returns empty list when asset has no titles."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = True
         c_repo.get_titles_with_asset.return_value = []
@@ -661,6 +692,7 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset raises 404 when asset doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -682,6 +714,7 @@ class TestUnlinkContent:
         """unlink_content deletes title content successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -697,6 +730,7 @@ class TestUnlinkContent:
         """unlink_content correctly passes IDs to repository."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -711,6 +745,7 @@ class TestUnlinkContent:
         """unlink_content raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
@@ -728,6 +763,7 @@ class TestUnlinkContent:
         """unlink_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.delete_title_content.side_effect = DatabaseLocked("Database locked")
@@ -744,6 +780,7 @@ class TestUnlinkContent:
         """unlink_content raises 500 on unexpected exceptions."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         c_repo.delete_title_content.side_effect = RuntimeError("Unexpected error")
