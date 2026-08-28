@@ -106,6 +106,23 @@ variables:
   external_id:
     literal: "capinv-probe-no-such-external-id"
 
+  # Read through `include=poster` rather than from one entity's own artwork list,
+  # because poster resolution reaches a title's *contents* as well as the title
+  # itself -- so it finds a row in strictly more cases than
+  # `/api/titles/{title_id}/artwork` would, for the same one request.
+  #
+  # It resolves nothing while the artwork table is empty, and every probe below
+  # that needs it is then reported `unavailable` with that reason rather than
+  # silently skipped. An instance that has not had `tools/artwork_backfill` run
+  # against it is in exactly that state: the schema and the seeded kinds are
+  # deployed, but nothing has registered any artwork yet. Nothing in this file
+  # can fix that, and it should not try -- no `fallback`, for the same reason
+  # the `runner_key` note below gives.
+  artwork_id:
+    from_endpoint: /api/titles/
+    query: {limit: 1, sort: "id:asc", include: "poster"}
+    pick: items.0.poster.id
+
   # There is deliberately no `runner_key` variable, so
   # GET /api/runner_state/{runner_key} stays unprobed.
   #
@@ -131,6 +148,27 @@ probes:
   - name: titles-page-1
     path: /api/titles/
     query: {limit: 50}
+
+  # -- isolating poster resolution ---------------------------------------
+  # `include=poster` returns the same rows as `titles-page-1` with one field
+  # added, so the difference between the two probes is the resolution and
+  # nothing else -- the same isolation the assets N+1 pair below uses.
+  #
+  # It is worth isolating because resolving a poster is not a per-row column
+  # read: when a title has no artwork of its own the service walks its contents
+  # to a bounded depth. The scaling probe says whether that walk is charged per
+  # row of the page or once for the lot.
+  - name: titles-page-1-with-poster
+    path: /api/titles/
+    query: {limit: 50, include: "poster"}
+    note: first screen a browse grid would issue, with a poster per title
+
+  - name: titles-poster-scaling-200-rows
+    path: /api/titles/
+    query: {limit: 200, include: "poster"}
+    note: >-
+      poster resolution against 200 rows -- compare with the 50-row probe above
+      to tell a per-row walk from a fixed cost
 
   - name: tags-page-1
     path: /api/tags
@@ -279,6 +317,13 @@ probes:
   - name: title-detail
     path: /api/titles/{title_id}
 
+  - name: title-detail-with-poster
+    path: /api/titles/{title_id}
+    query: {include: "poster"}
+    note: >-
+      pairs with `title-detail` the way the listing pair above does: one title's
+      share of the contents walk, which a detail view pays on its own
+
   - name: tag-detail
     path: /api/tags/{tag_id}
 
@@ -371,6 +416,39 @@ probes:
   - name: transform-request-logs
     path: /api/transform_requests/{request_id}/logs
     note: uncapped; the collection size behind it was never measured
+
+  # -- artwork ------------------------------------------------------------
+  # Read a `0 rows` measurement here as the cost of the read, not as evidence the
+  # collection is small: an instance whose artwork table is empty answers these in
+  # the time it takes to miss an index. The bound that matters is structural and
+  # holds regardless -- `uq_artwork_one_primary_per_kind` allows one primary per
+  # kind, and there are six kinds -- but the unfiltered lists are uncapped and a
+  # backfilled instance is the only thing that measures them honestly.
+  - name: artwork-kinds
+    path: /api/artwork_kinds
+    note: bounded by the seeded kinds, which is small and fixed at six
+
+  - name: title-artwork
+    path: /api/titles/{title_id}/artwork
+    note: uncapped, and returns a bare array rather than a page
+
+  - name: title-artwork-by-kind
+    path: /api/titles/{title_id}/artwork
+    query: {kind: poster}
+    note: >-
+      the `kind` filter Phase 2 could not trace statically, because it looks for
+      an `if params.kind` branch and the repository names the parameter
+      `kind_id`. It is applied; this times it
+
+  - name: asset-artwork
+    path: /api/assets/{asset_id}/artwork
+    note: uncapped, and returns a bare array rather than a page
+
+  - name: artwork-one
+    path: /api/artwork/{artwork_id}
+    note: >-
+      index-covered detail read; `unavailable` until the instance holds artwork,
+      see the note on the `artwork_id` variable
 
   # -- identifier lookups -------------------------------------------------
   # Probed with an external id no row holds. A miss runs the same query as a hit
