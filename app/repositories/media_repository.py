@@ -4,12 +4,13 @@ from __future__ import annotations
 from typing import cast
 
 from sqlakeyset import select_page
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.models import AssetORM, AssetTagORM
+from app.models import ArtworkORM, AssetORM, AssetTagORM
 from app.models.sort_configs import ASSET_SORT
+from app.schemas.enums import EntityTypeEnum
 from app.schemas import (
     AssetCreateInternal,
     AssetListParams,
@@ -88,6 +89,17 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
             stmt = stmt.where(AssetORM.duration >= params.duration_min)
         if params.duration_max is not None:
             stmt = stmt.where(AssetORM.duration <= params.duration_max)
+        if params.has_artwork is not None:
+            # A correlated EXISTS rather than a join: an asset may hold several
+            # artworks, and a join would return it once per row and turn `limit` into
+            # a cap on artworks rather than on assets. Pinning entity_type and
+            # entity_id in this order matches the leading columns of
+            # ix_artwork_entity_kind_primary, so both directions are index-covered.
+            has_artwork = exists().where(
+                ArtworkORM.entity_type == EntityTypeEnum.asset,
+                ArtworkORM.entity_id == AssetORM.id,
+            )
+            stmt = stmt.where(has_artwork if params.has_artwork else ~has_artwork)
 
         # tag filtering
         if params.tag_ids:

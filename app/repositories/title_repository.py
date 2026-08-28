@@ -1,10 +1,11 @@
 # app/repositories/title_repository.py
 from sqlakeyset import select_page
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import contains_eager, selectinload
 
-from app.models import TitleORM
+from app.models import ArtworkORM, TitleORM
 from app.models.sort_configs import TITLE_SORT
+from app.schemas.enums import EntityTypeEnum
 from app.schemas import (
     PaginatedResponse,
     TitleCreateInternal,
@@ -51,6 +52,20 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
 
         if params.name:
             stmt = stmt.where(TitleORM.name.ilike(f"%{params.name}%"))
+        if params.has_artwork is not None:
+            # Artwork the title holds *itself*, which is not the same question as
+            # whether the grid shows it a poster -- a title with none of its own can
+            # still resolve one from its contents (#110). That resolution is a
+            # recursive walk, so expressing it as a filter is a separate piece of work
+            # rather than another branch here.
+            #
+            # Correlated EXISTS rather than a join, so a title holding several artworks
+            # is still returned once and `limit` stays a cap on titles.
+            has_artwork = exists().where(
+                ArtworkORM.entity_type == EntityTypeEnum.title,
+                ArtworkORM.entity_id == TitleORM.id,
+            )
+            stmt = stmt.where(has_artwork if params.has_artwork else ~has_artwork)
 
         # Apply sorting
         stmt = apply_ordering(stmt, TITLE_SORT, params.sort)
