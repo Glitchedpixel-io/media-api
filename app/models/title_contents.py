@@ -75,6 +75,17 @@ class TitleContentORM(Base):
             ")",
             name="one_target_chk",
         ),
+        # A title cannot contain itself. The shortest possible containment cycle, and
+        # the only one the database can rule out declaratively -- reachability needs a
+        # recursive walk, which lives in TitleContentService (#88).
+        #
+        # Worth having even so: 263 of these existed in production, created by a
+        # producer that has no idea it is doing it, and every consumer that walks
+        # containment would otherwise need its own defence against the shortest case.
+        CheckConstraint(
+            "child_title_id IS DISTINCT FROM parent_title_id",
+            name="no_self_containment_chk",
+        ),
         # Prevent duplicate asset entries under the same parent
         Index(
             "uq_parent_asset_once",

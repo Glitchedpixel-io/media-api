@@ -39,6 +39,47 @@ class TitleContentService:
             raise HTTPException(status_code=404, detail="Asset not found")
         return self.title_content_repository.get_titles_with_asset(asset_id)
 
+    def _reject_cycle(self, parent_title_id: int, child_title_id: int | None) -> None:
+        """Refuse an edge that would make a title contain itself, directly or not.
+
+        Containment is a DAG, and nothing in the schema can say so: Postgres cannot
+        express reachability as a constraint, so the only declarative half is the
+        self-edge case (``no_self_containment_chk``). The rest is here, in the same
+        place the artwork service owns the integrity checks its own table cannot.
+
+        A cycle is not a cosmetic problem. Any consumer walking containment for a
+        breadcrumb or a tree hangs on one unless it carries its own defence -- the
+        poster resolution has to, and that machinery exists only because this guard
+        did not.
+
+        409 rather than 422: the payload is well formed and the referenced titles both
+        exist. What it conflicts with is the structure already stored, which is what
+        409 is for.
+
+        Args:
+            parent_title_id: The title that would do the containing.
+            child_title_id: The title that would be contained, or None for an asset
+                entry, which cannot form a cycle because assets are leaves.
+
+        Raises:
+            HTTPException: 409 if the edge would close a containment cycle.
+        """
+        if child_title_id is None:
+            return
+        if child_title_id == parent_title_id:
+            raise HTTPException(
+                status_code=409,
+                detail="A title cannot contain itself.",
+            )
+        if self.title_content_repository.can_reach(child_title_id, parent_title_id):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Title {child_title_id} already contains title {parent_title_id}, "
+                    "directly or through its contents, so this would create a cycle."
+                ),
+            )
+
     @translate_repository_errors
     def insert_positioned(
         self,
@@ -51,6 +92,7 @@ class TitleContentService:
     ) -> TitleContentRead:
         if not self.title_repository.exists(parent_title_id):
             raise HTTPException(status_code=404, detail="Title not found")
+        self._reject_cycle(parent_title_id, insert.child_title_id)
         return self.title_content_repository.create_positioned(  # type: ignore
             parent_title_id,
             insert,
@@ -72,6 +114,10 @@ class TitleContentService:
         update: TitleContentPatchPublic,  # type: ignore
         exclude_none: bool,
     ) -> TitleContentRead:
+        # A patch can repoint an existing row at a different child, which reaches the
+        # same invalid state as inserting one. Guarding only the insert would leave
+        # the shorter path to a cycle open.
+        self._reject_cycle(parent_title_id, getattr(update, "child_title_id", None))
         return self.title_content_repository.update(
             title_contents_id,
             TitleContentUpdateInternal(
