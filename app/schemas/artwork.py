@@ -179,7 +179,76 @@ class ArtworkRead(ArtworkAttrs, IDMixin):
     )
 
 
-ArtworkPatchPublic = make_partial_model(ArtworkCreatePublic, name="ArtworkPatchPublic")
+class ArtworkPatchPublic(BaseModel):
+    """What a client may change about an artwork after it was uploaded.
+
+    Deliberately **not** a partial of ``ArtworkCreatePublic``, and the distinction is
+    the point of the model: ``storage_path``, ``mime``, ``width`` and ``height`` are
+    established by the server from the bytes it received, so a client able to rewrite
+    them could undo every check ``ArtworkStore`` performs. That store sniffs magic
+    numbers precisely because the filename and ``Content-Type`` are caller-controlled;
+    a patchable ``mime`` hands that decision straight back, and a patchable
+    ``storage_path`` lets a row be repointed at any other file under ``ARTWORK_ROOT``
+    while keeping the dimensions of the file it used to be.
+
+    The line is: **discovered from the bytes is immutable, asserted by the caller is
+    mutable.** Provenance and the kind are the caller's claims and stay editable; the
+    kind in particular is the lever any reclassification needs. See #139.
+
+    ``extra="forbid"`` makes a submitted ``width`` a 422 naming the field rather than a
+    silent no-op, which would otherwise leave the caller believing the write landed.
+    """
+
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    artwork_kind: str | None = Field(
+        None,
+        title="Artwork Kind",
+        description=(
+            "Code of the artwork's kind, e.g. poster, backdrop or thumbnail. Must match "
+            "the code of an existing artwork kind."
+        ),
+        max_length=32,
+    )
+    is_primary: bool | None = Field(
+        None,
+        title="Is Primary",
+        description=(
+            "Make this the artwork used for its entity and kind, demoting whichever "
+            "artwork currently holds that position."
+        ),
+    )
+    source_scheme_id: int | None = Field(
+        None,
+        title="Source Scheme ID",
+        description="ID scheme this artwork was sourced from; paired with source_external_id",
+    )
+    source_external_id: str | None = Field(
+        None,
+        title="Source External ID",
+        description="Identifier within source_scheme_id; paired with source_scheme_id",
+    )
+    source_url: str | None = Field(
+        None, title="Source URL", description="Where this artwork was fetched from, if anywhere"
+    )
+
+    @model_validator(mode="after")
+    def source_scheme_and_id_travel_together(self) -> ArtworkPatchPublic:
+        """Reject half a provenance pair, as ``ArtworkAttrs`` does.
+
+        Returns:
+            ArtworkPatchPublic: This model, unchanged.
+
+        Raises:
+            ValueError: If exactly one of the pair is set.
+        """
+        if (self.source_scheme_id is None) != (self.source_external_id is None):
+            raise ValueError(
+                "source_scheme_id and source_external_id must be provided together, or not at all"
+            )
+        return self
+
+
 ArtworkUpdateInternal = make_partial_model(ArtworkCreateInternal, name="ArtworkUpdateInternal")
 
 
