@@ -180,7 +180,7 @@ class TestOwnArtworkWins:
     def test_its_own_beats_a_childs(self, client, world):
         """Depth 0 sorts first, so a season with a poster does not borrow one."""
         season = world.title("Season", "season")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         world.contains_title(season, episode)
         world.art(EntityTypeEnum.title, episode)
         own = world.art(EntityTypeEnum.title, season)
@@ -205,7 +205,7 @@ class TestFallback:
 
     def test_a_title_borrows_from_its_child_title(self, client, world):
         season = world.title("Season", "season")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         world.contains_title(season, episode)
         borrowed = world.art(EntityTypeEnum.title, episode)
 
@@ -226,7 +226,7 @@ class TestFallback:
         """Collection -> season -> episode -> asset is four levels in real data."""
         collection = world.title("Collection", "collection")
         season = world.title("Season", "season")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         asset = world.asset()
         world.contains_title(collection, season)
         world.contains_title(season, episode)
@@ -239,7 +239,7 @@ class TestFallback:
         """A closer relative is a better guess than a distant one."""
         collection = world.title("Collection", "collection")
         season = world.title("Season", "season")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         world.contains_title(collection, season)
         world.contains_title(season, episode)
         world.art(EntityTypeEnum.title, episode)
@@ -251,8 +251,8 @@ class TestFallback:
         """ "The first entry of its contents" has to mean the list's own order, which
         is order_key -- not insertion order and not id order."""
         season = world.title("Season", "season")
-        second = world.title("Second", "tv")
-        first = world.title("First", "tv")
+        second = world.title("Second", "episode")
+        first = world.title("First", "episode")
         world.contains_title(season, second, order_key="z")
         world.contains_title(season, first, order_key="a")
         world.art(EntityTypeEnum.title, second)
@@ -266,7 +266,7 @@ class TestFallback:
 
     def test_contents_without_artwork_resolve_to_nothing(self, client, world):
         season = world.title("Season", "season")
-        world.contains_title(season, world.title("Episode", "tv"))
+        world.contains_title(season, world.title("Episode", "episode"))
         world.contains_asset(season, world.asset())
         assert _poster(client, season) is None
 
@@ -274,8 +274,8 @@ class TestFallback:
         """Ordering picks the first entry, but an entry with no artwork must not stop
         the search -- the second branch still gets looked at."""
         season = world.title("Season", "season")
-        empty = world.title("Empty", "tv")
-        stocked = world.title("Stocked", "tv")
+        empty = world.title("Empty", "episode")
+        stocked = world.title("Stocked", "episode")
         world.contains_title(season, empty, order_key="a")
         world.contains_title(season, stocked, order_key="b")
         expected = world.art(EntityTypeEnum.title, stocked)
@@ -318,7 +318,7 @@ class TestGraphSafety:
         """
         season = world.title("Season", "season")
         collection = world.title("Collection", "collection")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         world.contains_title(season, episode)
         world.contains_title(collection, episode, membership=MembershipKind.curated)
         shared = world.art(EntityTypeEnum.title, episode)
@@ -368,7 +368,7 @@ class TestListEndpoint:
 
     def test_the_list_resolves_the_same_way_the_detail_does(self, client, world):
         season = world.title("Season", "season")
-        episode = world.title("Episode", "tv")
+        episode = world.title("Episode", "episode")
         world.contains_title(season, episode)
         world.art(EntityTypeEnum.title, episode)
 
@@ -418,7 +418,7 @@ class TestTitleListQueryCount:
         """Depth is handled inside the recursive CTE, so it must not add queries."""
         for _ in range(4):
             season = world.title("Season", "season")
-            episode = world.title("Episode", "tv")
+            episode = world.title("Episode", "episode")
             asset = world.asset()
             world.contains_title(season, episode)
             world.contains_asset(episode, asset)

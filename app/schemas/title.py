@@ -20,7 +20,7 @@ class TitleAttrs(BaseModel):
         ...,
         title="Title Type",
         description=(
-            "Code of the title's type, e.g. movie, tv, or season. Must match the code of an "
+            "Code of the title's type, e.g. movie, episode, or season. Must match the code of an "
             "existing title type; see GET /api/title_types for the available codes."
         ),
         max_length=32,

@@ -157,7 +157,7 @@ class TestUploadTitleArtwork:
             TitleCreateInternal(name="Season 1", title_type_id=title_type_ids["season"])
         ).id
         b = title_repository.create(
-            TitleCreateInternal(name="Episode 1", title_type_id=title_type_ids["tv"])
+            TitleCreateInternal(name="Episode 1", title_type_id=title_type_ids["episode"])
         ).id
 
         first = _upload(client, f"/api/titles/{a}/artwork").json()
