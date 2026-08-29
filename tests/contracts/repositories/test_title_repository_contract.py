@@ -183,12 +183,12 @@ def test_list_paged_sorting_by_title_type_is_alphabetical_by_code(bundle, title_
 
     title_type is no longer a column on titles -- it lives on the joined
     title_types table, and TITLE_SORT reaches it through a field override. The
-    three types here are chosen so that alphabetical order (audiobook, movie,
-    tv) and seeded order (movie=1, tv=2, audiobook=4) disagree: sorting by the
-    foreign key instead of the code would pass a two-type test but fails this
-    one.
+    three types here are chosen so that alphabetical order (audiobook, episode,
+    movie) and seeded order (movie=1, episode=2, audiobook=4) disagree: sorting
+    by the foreign key instead of the code would pass a two-type test but fails
+    this one.
     """
-    codes = ["movie", "tv", "audiobook"]
+    codes = ["movie", "episode", "audiobook"]
     for i in range(21):
         code = codes[i % len(codes)]
         bundle.titles.create(
@@ -196,12 +196,12 @@ def test_list_paged_sorting_by_title_type_is_alphabetical_by_code(bundle, title_
         )
 
     title_list = bundle.titles.list_paged(TitleListParams(limit=21, sort="title_type:asc"))
-    assert [t.title_type for t in title_list.items] == ["audiobook"] * 7 + ["movie"] * 7 + [
-        "tv"
+    assert [t.title_type for t in title_list.items] == ["audiobook"] * 7 + ["episode"] * 7 + [
+        "movie"
     ] * 7
 
     title_list = bundle.titles.list_paged(TitleListParams(limit=21, sort="title_type:desc"))
-    assert [t.title_type for t in title_list.items] == ["tv"] * 7 + ["movie"] * 7 + [
+    assert [t.title_type for t in title_list.items] == ["movie"] * 7 + ["episode"] * 7 + [
         "audiobook"
     ] * 7
 

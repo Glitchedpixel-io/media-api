@@ -96,4 +96,4 @@ def test_usage_count_reflects_titles_using_the_type(repo, db_session):
     titles.create(TitleCreateFactory(name="Dune", title_type_id=movie.id))
 
     assert repo.usage_count(movie.id) == 2
-    assert repo.usage_count(repo.get_by_code("tv").id) == 0
+    assert repo.usage_count(repo.get_by_code("episode").id) == 0

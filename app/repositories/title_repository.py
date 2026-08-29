@@ -47,7 +47,7 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
         """List titles, filtered and keyset-paginated.
 
         **The query the library grid issues** is
-        ``?library_root=true&title_type=movie,tv&tag_ids=<genre>``, paged at the default
+        ``?library_root=true&title_type=movie,episode&tag_ids=<genre>``, paged at the default
         ``sort=id:asc``. Probed as one query rather than only as separate filters (#94):
         a filter that is correct alone and drops rows in combination is the failure that
         reaches production. Against a table seeded to the production shape -- 1,585

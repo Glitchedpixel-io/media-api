@@ -16,7 +16,7 @@ from app.database import Base
 # of this table replacing the old `title_type_enum` (issue #41).
 DEFAULT_TITLE_TYPES: tuple[tuple[str, str], ...] = (
     ("movie", "Movie"),
-    ("tv", "TV"),
+    ("episode", "Episode"),
     ("music", "Music"),
     ("audiobook", "Audiobook"),
     ("event", "Event"),

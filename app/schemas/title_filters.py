@@ -30,7 +30,7 @@ class TitleFilters(BaseModel):
     title_type: str | None = Field(
         None,
         description=(
-            "Comma-separated title type codes, matching any of them: `movie,tv`. Codes "
+            "Comma-separated title type codes, matching any of them: `movie,episode`. Codes "
             "are matched exactly and case-insensitively; see GET /api/title_types for "
             "the available codes. An unknown code matches nothing rather than erroring, "
             "so a grid whose type list is stale degrades to an empty page instead of a "

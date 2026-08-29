@@ -130,10 +130,10 @@ class TestTitleTypeFilter:
         assert _ids(client, "title_type=movie") == {movie}
 
     def test_matches_any_of_several(self, client: TestClient, make_title):
-        movie, tv = make_title(type_code="movie"), make_title(type_code="tv")
+        movie, episode = make_title(type_code="movie"), make_title(type_code="episode")
         make_title(type_code="season")
 
-        assert _ids(client, "title_type=movie,tv") == {movie, tv}
+        assert _ids(client, "title_type=movie,episode") == {movie, episode}
 
     def test_codes_are_case_insensitive(self, client: TestClient, make_title):
         """Folded on the input, not the column, so `ix_title_types_code` still serves it."""
@@ -258,7 +258,7 @@ class TestTheGridQuery:
         tag_title(wrong_type, genre)
         untagged = make_title(name="Untagged", type_code="movie", library_root=True)
 
-        found = _ids(client, f"library_root=true&title_type=movie,tv&tag_ids={genre}")
+        found = _ids(client, f"library_root=true&title_type=movie,episode&tag_ids={genre}")
 
         assert found == {wanted}
 
