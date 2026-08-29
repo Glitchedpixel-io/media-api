@@ -9,6 +9,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models import ArtworkORM, AssetORM, AssetTagORM
+from app.models.asset import filename_extension
 from app.models.sort_configs import ASSET_SORT
 from app.schemas.enums import EntityTypeEnum
 from app.schemas import (
@@ -79,8 +80,16 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
         if params.created_since:
             stmt = stmt.where(AssetORM.created_at >= params.created_since)
         if params.filename_ext:
-            ext = params.filename_ext.lstrip(".")
-            stmt = stmt.where(AssetORM.filename.ilike(f"%.{ext}"))
+            # Written against the extension expression rather than as
+            # `filename ILIKE '%.ext'` so it matches ix_assets_filename_ext. The
+            # behaviour is the same -- both are a case-insensitive match on the run
+            # of characters after the final dot -- but the ILIKE form cannot use
+            # this index, and a trigram index serving it would be eight times the
+            # size and four times slower. Changing it back without dropping that
+            # index would silently reinstate a sequential scan, exactly as for
+            # path_prefix above.
+            ext = params.filename_ext.lstrip(".").lower()
+            stmt = stmt.where(filename_extension(AssetORM.filename) == ext)
         if params.size_min is not None:
             stmt = stmt.where(AssetORM.size >= params.size_min)
         if params.size_max is not None:

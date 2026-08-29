@@ -85,6 +85,36 @@ class TitleORM(Base):
         # column is what makes this index worth having -- see the EXPLAIN recorded in
         # the migration.
         Index("ix_titles_library_root_id", "library_root", "id"),
+        # Backs the `name` filter, which is `name ILIKE '%term%'`.
+        #
+        # A leading wildcard defeats a btree outright, so no opclass rescues the
+        # plain index here -- this needs trigram or nothing. gin_trgm_ops matches
+        # ILIKE directly, so the predicate needs no lower() rewrite.
+        #
+        # Measured at 200k rows, sequential against index-covered:
+        #   a rare term (5 rows)        71.5ms -> 0.5ms
+        #   two words (275 rows)        70.2ms -> 1.7ms
+        #   one word (5,812 rows)       68.6ms -> 4.3ms
+        #   a common word (9,979 rows)  67.0ms -> 5.6ms
+        # The gain narrows as the term matches more rows, which is the shape of
+        # every index: it finds rows cheaply, it still has to read them.
+        Index(
+            "ix_titles_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
+        ),
+        # Backs `sort=name`, which the trigram index above cannot serve -- GIN has no
+        # order. Measured at 200k rows: 11.3ms sorting the table against 0.15ms as an
+        # ordered scan that stops at the page boundary.
+        #
+        # Single-column rather than (name, id), following the same measurement #62
+        # recorded for assets: the composite is wider and buys a keyset resume
+        # 0.03ms, which is noise. `id`, the current default sort, is served by the
+        # primary key. `title_type` is deliberately unindexed -- it sorts on
+        # title_types.code, a lookup table small enough that the planner is right to
+        # scan it.
+        Index("ix_titles_name", "name"),
     )
 
     @property

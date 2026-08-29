@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logfire
-from sqlalchemy import create_engine, event, text as sql_text
+from sqlalchemy import DDL, create_engine, event, text as sql_text
 from sqlalchemy.engine import Engine, ExceptionContext
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -12,6 +12,25 @@ from app.repositories.errors import DatabaseLocked
 
 class Base(DeclarativeBase):
     pass
+
+
+# `ix_titles_name_trgm` and `ix_assets_path_trgm` are declared with `gin_trgm_ops`,
+# which does not exist until pg_trgm is installed. The migration creates it, but
+# tests build their schema from the models via `create_all` (see tests/conftest.py)
+# and would otherwise fail with `operator class "gin_trgm_ops" does not exist` before
+# a single test ran -- taking CI's build-from-scratch gate with them.
+#
+# Attached to the metadata rather than left to conftest so that any create_all is
+# self-sufficient, and so the requirement lives next to the models that impose it.
+# Postgres-only: the DDL is skipped on other dialects rather than failing there.
+#
+# pg_trgm is a *trusted* extension (PG13+), so the connecting role needs CREATE on
+# the database, not superuser -- which is what makes this safe to run unattended.
+event.listen(
+    Base.metadata,
+    "before_create",
+    DDL("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute_if(dialect="postgresql"),
+)
 
 
 # List of error messages that indicate read-only database state
