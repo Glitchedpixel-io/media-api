@@ -37,6 +37,22 @@ class AssetORM(Base):
     duration: Mapped[float] = mapped_column(Numeric, nullable=False)
     bitrate: Mapped[int] = mapped_column(BigInteger, nullable=False)
     container_format: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Which cut of the work this file is -- theatrical, director's cut -- as opposed to
+    # which encoding of it, which resolution and codec already describe. Siblings that
+    # differ only in encoding can be chosen between silently; siblings that differ in
+    # edition have to be offered to the person (#92).
+    #
+    # Free text rather than a database enum, and NULL means "no edition marker", not
+    # "unrecognised". The two must not collapse: NULL is the licence to pick silently,
+    # so folding an unrecognised-but-real edition into it would produce exactly the
+    # wrong behaviour for the case this field exists to catch. A marker outside the
+    # canonical vocabulary is stored as its own slug instead -- see app/utils/editions.py.
+    #
+    # A closed enum would also have to be widened by migration each time a distributor
+    # invents a cut. This repository has twice moved the other way for open vocabularies:
+    # title types became a table (#41) and transform types became free text.
+    edition: Mapped[str | None] = mapped_column(Text, nullable=True)
     size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     mtime: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     master_asset_id: Mapped[int | None] = mapped_column(
