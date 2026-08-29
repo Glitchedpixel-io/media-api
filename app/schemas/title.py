@@ -29,6 +29,17 @@ class TitleAttrs(BaseModel):
         None, title="Release Year", description="Release year of the title"
     )
     synopsis: str | None = Field(None, title="Synopsis", description="Synopsis of the title")
+    library_root: bool = Field(
+        False,
+        title="Library Root",
+        description=(
+            "Whether the library grid should offer this title as an entry point. "
+            "Independent of whether it is watchable: a series is a root but is not "
+            "watchable, an episode is watchable but is not a root, and a season is "
+            "neither. Defaults to false, so a title is not offered until something "
+            "says it should be."
+        ),
+    )
 
 
 class TitleCreatePublic(TitleAttrs):
@@ -55,6 +66,17 @@ class TitleCreateInternal(BaseModel):
         None, title="Release Year", description="Release year of the title"
     )
     synopsis: str | None = Field(None, title="Synopsis", description="Synopsis of the title")
+    library_root: bool = Field(
+        False,
+        title="Library Root",
+        description=(
+            "Whether the library grid should offer this title as an entry point. "
+            "Independent of whether it is watchable: a series is a root but is not "
+            "watchable, an episode is watchable but is not a root, and a season is "
+            "neither. Defaults to false, so a title is not offered until something "
+            "says it should be."
+        ),
+    )
 
 
 class TitleRead(TitleAttrs, IDMixin):
