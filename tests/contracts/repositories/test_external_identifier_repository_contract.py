@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.repositories import external_identifier_repository
 from app.repositories.errors import UniqueViolation, NotFoundError, ForeignKeyViolation
 from app.schemas import ExternalIdentifierCreateInternal, ExternalIdentifierUpdateInternal
 from app.schemas.enums import EntityTypeEnum
@@ -370,3 +371,62 @@ def test_assets_and_titles_can_have_same_external_id_in_different_schemes(
 
     title_result = bundle.external_identifiers.resolve(scheme2.id, "123")
     assert title_result == (EntityTypeEnum.title, title.id)
+
+
+@pytest.mark.contract
+def test_the_identifier_list_is_capped(bundle: ExternalIdentifierRepoBundle, monkeypatch) -> None:
+    """More identifiers than the cap allows are truncated, not returned whole (#95).
+
+    Nothing stops one entity carrying many identifiers in a single scheme: unlike the
+    legacy asset table, ``external_identifiers`` is unique on (scheme_id, external_id)
+    only, with no per-entity-per-scheme constraint. The fan-out is genuinely unbounded,
+    which is why the cap is not merely theoretical.
+    """
+    monkeypatch.setattr(external_identifier_repository, "MAX_IDENTIFIERS_PER_ENTITY", 4)
+    title = bundle.titles.create(TitleCreateFactory())
+    scheme = bundle.id_schemes.create(IdSchemeCreateFactory(code="imdb", label="IMDb"))
+    for i in range(9):
+        bundle.external_identifiers.create(
+            ExternalIdentifierCreateInternal(
+                entity_type=EntityTypeEnum.title,
+                entity_id=title.id,
+                scheme_id=scheme.id,
+                external_id=f"tt{i:07d}",
+            )
+        )
+
+    ids = bundle.external_identifiers.list_for_entity(EntityTypeEnum.title, title.id)
+
+    assert len(ids) == 4, "the cap must bound the response"
+
+
+@pytest.mark.contract
+def test_the_capped_window_is_deterministic(
+    bundle: ExternalIdentifierRepoBundle, monkeypatch
+) -> None:
+    """The cap keeps the same rows every call.
+
+    The sort is by scheme label, which is not unique -- every row here shares one
+    scheme. Without the id tiebreaker the rows the LIMIT keeps are whatever the
+    planner returned first, so the same request could answer differently each time.
+    """
+    monkeypatch.setattr(external_identifier_repository, "MAX_IDENTIFIERS_PER_ENTITY", 3)
+    title = bundle.titles.create(TitleCreateFactory())
+    scheme = bundle.id_schemes.create(IdSchemeCreateFactory(code="imdb", label="IMDb"))
+    created = [
+        bundle.external_identifiers.create(
+            ExternalIdentifierCreateInternal(
+                entity_type=EntityTypeEnum.title,
+                entity_id=title.id,
+                scheme_id=scheme.id,
+                external_id=f"tt{i:07d}",
+            )
+        )
+        for i in range(8)
+    ]
+
+    first = bundle.external_identifiers.list_for_entity(EntityTypeEnum.title, title.id)
+    second = bundle.external_identifiers.list_for_entity(EntityTypeEnum.title, title.id)
+
+    assert [r.id for r in first] == [r.id for r in second]
+    assert [r.id for r in first] == sorted(r.id for r in created)[:3]

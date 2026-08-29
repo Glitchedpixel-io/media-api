@@ -28,13 +28,18 @@ router = APIRouter(route_class=QuietClientErrorRoute)
     operation_id="list_title_external_ids",
     responses={
         **COMMON_READ_RESPONSES,
-        200: {"description": "List of title external IDs retrieved successfully"},
+        200: {
+            "description": (
+                "List of title external IDs retrieved successfully. At most 500 "
+                "identifiers are returned; a title with more is truncated."
+            )
+        },
     },
 )
 def get_title_ids(
     title_id: int, service: ExternalIdentifierService = Depends(get_external_identifier_service)
 ) -> list[ExternalIdentifierReadExtended]:
-    """Get all external IDs for a title."""
+    """Get the external IDs for a title, capped at MAX_IDENTIFIERS_PER_ENTITY."""
     return service.list_for_entity(EntityTypeEnum.title, title_id)
 
 
