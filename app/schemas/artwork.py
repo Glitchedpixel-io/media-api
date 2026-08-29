@@ -260,11 +260,13 @@ class ArtworkUploadForm(BaseModel):
     the client also controls, so trusting it would let an HTML document be recorded --
     and later served -- as an image. ``ArtworkStore`` sniffs the real format.
 
-    ``width`` and ``height`` stay caller-supplied and optional. Reading them out of
-    the file needs either an image library this project does not depend on or
-    per-format header parsing, and neither is in scope for the registration path; a
-    producer that has just rendered or downloaded the image usually knows them
-    already, and the column is nullable for the case where nobody does.
+    It carries no ``width`` or ``height`` either, for the same reason and since #141.
+    Those are measured from the bytes by ``ArtworkStore`` and taken from what it
+    returns, never from the request: a submitted size is a claim about a file the
+    caller also controls, and one the caller could use to describe an image as
+    something it is not. An earlier version of this docstring argued the opposite --
+    that reading them needed an image library this project did not depend on -- which
+    #140 settled by taking the dependency.
     """
 
     model_config = {"from_attributes": True, "extra": "forbid"}
@@ -286,8 +288,6 @@ class ArtworkUploadForm(BaseModel):
             "artwork currently holds that position."
         ),
     )
-    width: int | None = Field(None, title="Width", description="Pixel width, when known", gt=0)
-    height: int | None = Field(None, title="Height", description="Pixel height, when known", gt=0)
     source_scheme_id: int | None = Field(
         None,
         title="Source Scheme ID",

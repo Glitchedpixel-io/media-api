@@ -548,3 +548,28 @@ class TestPatchRefusesDiscoveredFields:
         service.update_artwork(1, ArtworkPatchPublic(artwork_kind="poster"), exclude_none=True)
         written = repo.update.call_args.args[1].model_dump(exclude_unset=True)
         assert not {"storage_path", "mime", "width", "height"} & written.keys()
+
+
+@pytest.mark.unit
+class TestUploadDimensionsComeFromTheStore:
+    """The row records what the bytes turned out to be, not what the request said.
+
+    The upload form no longer carries width or height at all, so this pins the other
+    half: that the service reads them off the StoredArtwork the store returns, in the
+    same way it already takes storage_path and mime from there (#141).
+    """
+
+    def test_the_measured_dimensions_reach_the_row(self, service, repo, store):
+        service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        written = repo.create.call_args.args[0]
+        assert (written.width, written.height) == (
+            store.store.return_value.width,
+            store.store.return_value.height,
+        )
+
+    def test_the_form_cannot_carry_a_dimension(self):
+        """extra="forbid" makes a stale caller's width a loud 422 at the model, which
+        matters because the multipart layer would otherwise drop it silently."""
+        for field in ("width", "height"):
+            with pytest.raises(ValueError):
+                _upload(**{field: 900})

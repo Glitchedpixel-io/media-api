@@ -253,8 +253,9 @@ class ArtworkService:
 
         Raises:
             HTTPException: 404 for an unknown entity, 422 for an unknown kind, 400 for
-                an empty file, 413 for one over the size cap, 415 for one that is not
-                an image, and 409 if this entity already has this exact file.
+                an empty file or one whose dimensions cannot be read, 413 for one over
+                the size or pixel cap, 415 for one that is not an image, and 409 if
+                this entity already has this exact file.
         """
         self._require_entity(entity_type, entity_id)
         kind_id = self._resolve_kind_id(upload.artwork_kind)
@@ -266,10 +267,14 @@ class ArtworkService:
                 entity_type=entity_type,
                 entity_id=entity_id,
                 artwork_kind_id=kind_id,
+                # Every one of these comes from the bytes rather than the request.
+                # A caller-supplied size is a claim about a file the caller also
+                # controls, which is the same reason the mime is sniffed rather than
+                # read off the upload (#141).
                 storage_path=stored.storage_path,
                 mime=stored.mime,
-                width=upload.width,
-                height=upload.height,
+                width=stored.width,
+                height=stored.height,
                 # Never set on the insert. A second primary would collide with
                 # uq_artwork_one_primary_per_kind and surface as a 409 for what the
                 # caller reasonably means: "make this the poster". Promoting after the

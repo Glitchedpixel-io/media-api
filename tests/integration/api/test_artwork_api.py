@@ -372,13 +372,27 @@ class TestUploadFormValidation:
         assert response.status_code == HTTPStatus.CREATED
         assert response.json()["source_external_id"] == "abc123"
 
-    def test_a_non_positive_dimension_is_422(self, client, title_id):
+    def test_the_recorded_dimensions_are_measured_from_the_bytes(self, client, title_id):
         response = client.post(
             f"/api/titles/{title_id}/artwork",
-            files={"file": ("poster.jpg", JPEG, "image/jpeg")},
-            data={"artwork_kind": "poster", "width": "0"},
+            files={"file": ("poster.jpg", _image_bytes(321, 123), "image/jpeg")},
+            data={"artwork_kind": "poster"},
         )
-        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTPStatus.CREATED
+        assert (response.json()["width"], response.json()["height"]) == (321, 123)
+
+    def test_submitted_dimensions_are_ignored_in_favour_of_the_real_ones(self, client, title_id):
+        """The form no longer carries width or height, and FastAPI drops undeclared
+        multipart fields -- so a producer still sending them is harmless rather than
+        rejected. What matters is that its numbers cannot reach the row: a submitted
+        size is a claim about a file the caller also controls (#141)."""
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("poster.jpg", _image_bytes(321, 123), "image/jpeg")},
+            data={"artwork_kind": "poster", "width": "1", "height": "1"},
+        )
+        assert response.status_code == HTTPStatus.CREATED
+        assert (response.json()["width"], response.json()["height"]) == (321, 123)
 
     def test_a_missing_kind_is_422(self, client, title_id):
         response = client.post(
