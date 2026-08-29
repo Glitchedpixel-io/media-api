@@ -253,9 +253,35 @@ class TestRecordLifecycle:
 
     def test_patch_updates_metadata(self, client, title_id):
         created = _upload(client, f"/api/titles/{title_id}/artwork").json()
-        response = client.patch(f"/api/artwork/{created['id']}", json={"width": 1200})
+        response = client.patch(
+            f"/api/artwork/{created['id']}", json={"source_url": "https://example.test/a.jpg"}
+        )
         assert response.status_code == HTTPStatus.OK
-        assert response.json()["width"] == 1200
+        assert response.json()["source_url"] == "https://example.test/a.jpg"
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"storage_path": "ab/12/" + "cd" * 32 + ".jpg"},
+            {"mime": "image/png"},
+            {"width": 1200},
+            {"height": 800},
+        ],
+    )
+    def test_patch_refuses_a_server_discovered_field(self, client, title_id, payload):
+        """The server established these from the uploaded bytes. Accepting a patch of
+        them would let a client rewrite what we hold about a file, or repoint a row at
+        another entity's image while keeping this one's dimensions. See #139."""
+        created = _upload(client, f"/api/titles/{title_id}/artwork").json()
+        response = client.patch(f"/api/artwork/{created['id']}", json=payload)
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+    def test_a_refused_patch_changes_nothing(self, client, title_id):
+        created = _upload(client, f"/api/titles/{title_id}/artwork").json()
+        client.patch(f"/api/artwork/{created['id']}", json={"width": 1200})
+        after = client.get(f"/api/artwork/{created['id']}").json()
+        assert after["width"] == created["width"]
+        assert after["storage_path"] == created["storage_path"]
 
     def test_patch_can_change_the_kind(self, client, title_id):
         created = _upload(client, f"/api/titles/{title_id}/artwork").json()
@@ -268,7 +294,8 @@ class TestRecordLifecycle:
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
 
     def test_patch_on_a_missing_record_is_404(self, client):
-        assert client.patch("/api/artwork/999999", json={"width": 10}).status_code == 404
+        patch = {"source_url": "https://example.test/a.jpg"}
+        assert client.patch("/api/artwork/999999", json=patch).status_code == 404
 
     def test_delete_removes_the_record(self, client, title_id):
         created = _upload(client, f"/api/titles/{title_id}/artwork").json()

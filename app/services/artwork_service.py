@@ -290,10 +290,10 @@ class ArtworkService:
     def update_artwork(
         self,
         artwork_id: int,
-        update: ArtworkPatchPublic,  # type: ignore
+        update: ArtworkPatchPublic,
         exclude_none: bool,
     ) -> ArtworkRead:
-        payload = update.model_dump(exclude_none=exclude_none, exclude_unset=True)  # type: ignore
+        payload = update.model_dump(exclude_none=exclude_none, exclude_unset=True)
         kind_code = payload.pop("artwork_kind", None)
         if kind_code is not None:
             payload["artwork_kind_id"] = self._resolve_kind_id(kind_code)

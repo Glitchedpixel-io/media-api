@@ -194,7 +194,9 @@ class TestKindResolution:
 
     def test_an_update_that_omits_the_kind_leaves_it_alone(self, service, repo, kinds):
         repo.update.return_value = _read()
-        service.update_artwork(1, ArtworkPatchPublic(width=99), exclude_none=True)
+        service.update_artwork(
+            1, ArtworkPatchPublic(source_url="https://example.test/a.jpg"), exclude_none=True
+        )
         kinds.get_by_code.assert_not_called()
         internal = repo.update.call_args.args[1]
         assert not internal.model_dump(exclude_unset=True).get("artwork_kind_id")
@@ -482,8 +484,12 @@ class TestPrimaryViaPatch:
     def test_other_fields_are_applied_alongside_a_promotion(self, service, repo):
         repo.update.return_value = _read()
         repo.set_primary.return_value = _read(is_primary=True)
-        service.update_artwork(1, ArtworkPatchPublic(width=900, is_primary=True), exclude_none=True)
-        assert repo.update.call_args_list[0].args[1].width == 900
+        service.update_artwork(
+            1,
+            ArtworkPatchPublic(source_url="https://example.test/a.jpg", is_primary=True),
+            exclude_none=True,
+        )
+        assert repo.update.call_args_list[0].args[1].source_url == "https://example.test/a.jpg"
         repo.set_primary.assert_called_once_with(1)
 
     def test_a_patch_touching_nothing_still_404s_for_a_missing_row(self, service, repo):
@@ -493,3 +499,50 @@ class TestPrimaryViaPatch:
         with pytest.raises(HTTPException) as exc:
             service.update_artwork(1, ArtworkPatchPublic(), exclude_none=True)
         assert exc.value.status_code == 404
+
+
+@pytest.mark.unit
+class TestPatchRefusesDiscoveredFields:
+    """The server establishes these from the uploaded bytes; a client that could patch
+    them could undo every check ``ArtworkStore`` performs -- rewriting the measured
+    dimensions, claiming a mime the bytes contradict, or repointing ``storage_path`` at
+    another entity's file while keeping this row's dimensions. See #139."""
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("storage_path", "ab/12/" + "cd" * 32 + ".jpg"),
+            ("mime", "image/png"),
+            ("width", 900),
+            ("height", 600),
+        ],
+    )
+    def test_a_discovered_field_is_rejected(self, field, value):
+        with pytest.raises(ValueError) as exc:
+            ArtworkPatchPublic(**{field: value})
+        # Named rather than silently dropped: a no-op would leave the caller believing
+        # the write landed.
+        assert field in str(exc.value)
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("artwork_kind", "backdrop"),
+            ("is_primary", True),
+            ("source_url", "https://example.test/a.jpg"),
+        ],
+    )
+    def test_an_asserted_field_is_accepted(self, field, value):
+        assert getattr(ArtworkPatchPublic(**{field: value}), field) == value
+
+    def test_provenance_still_travels_as_a_pair(self):
+        with pytest.raises(ValueError):
+            ArtworkPatchPublic(source_scheme_id=1)
+
+    def test_the_service_never_sees_a_discovered_field(self, service, repo):
+        """The schema is the only guard, so this pins the whole surface rather than
+        one field: nothing reaching the repository can carry a discovered value."""
+        repo.update.return_value = _read()
+        service.update_artwork(1, ArtworkPatchPublic(artwork_kind="poster"), exclude_none=True)
+        written = repo.update.call_args.args[1].model_dump(exclude_unset=True)
+        assert not {"storage_path", "mime", "width", "height"} & written.keys()

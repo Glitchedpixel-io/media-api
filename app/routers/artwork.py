@@ -129,14 +129,18 @@ def get_artwork(
 )
 def update_artwork(
     artwork_id: int,
-    update: ArtworkPatchPublic,  # type: ignore[valid-type]
+    update: ArtworkPatchPublic,
     service: ArtworkService = Depends(get_artwork_service),
 ) -> ArtworkRead:
-    """Update an artwork's metadata, including which one is primary.
+    """Update the artwork metadata a client is allowed to assert.
 
     Setting ``is_primary`` to true here demotes whichever artwork currently holds that
     position for the same entity and kind; the service does that rather than writing
     the flag straight through, which would collide with the unique index.
+
+    ``storage_path``, ``mime``, ``width`` and ``height`` are **not** accepted: the
+    server established them from the uploaded bytes, and submitting one is a 422 rather
+    than a silent no-op. See ``ArtworkPatchPublic``.
     """
     return service.update_artwork(artwork_id, update, exclude_none=True)
 
