@@ -102,6 +102,42 @@ class TitleReadExtended(TitleRead):
         title="Collection of reference material for this title",
         description="External reference material (reviews, articles, etc.) linked to this title",
     )
+    child_count: int | None = Field(
+        None,
+        title="Child Title Count",
+        description=(
+            "How many titles this title directly contains. Counts every containment "
+            "edge regardless of membership, so a curated list reports its real size. "
+            "Null when `include=counts` was not requested -- distinct from 0, which "
+            "means the title genuinely contains no titles."
+        ),
+    )
+    asset_count: int | None = Field(
+        None,
+        title="Asset Count",
+        description=(
+            "How many assets this title directly contains, counted the same way as "
+            "`child_count`. Null when `include=counts` was not requested."
+        ),
+    )
+    total_runtime: float | None = Field(
+        None,
+        title="Total Runtime",
+        description=(
+            "Combined duration in seconds of every distinct asset beneath this title, "
+            "following intrinsic containment only. Null when `include=totals` was not "
+            "requested."
+        ),
+    )
+    total_size: int | None = Field(
+        None,
+        title="Total Size",
+        description=(
+            "Combined size in bytes of every distinct asset beneath this title, "
+            "counted the same way as `total_runtime`. Null when `include=totals` was "
+            "not requested."
+        ),
+    )
 
 
 TitlePatchPublic = make_partial_model(TitleCreatePublic, name="TitlePatchPublic")

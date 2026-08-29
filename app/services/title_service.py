@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from app.repositories import (
     ArtworkKindRepository,
     ArtworkRepository,
+    TitleContentRepository,
     TitleRepository,
     TitleTypeRepository,
 )
@@ -26,6 +27,14 @@ from app.services.errors import domain_error_detail, translate_repository_errors
 #: lesson), so this has to be resolved at request time.
 POSTER_INCLUDE = "poster"
 
+#: The `include=` token asking how many titles and assets each title directly holds.
+COUNTS_INCLUDE = "counts"
+
+#: The `include=` token asking for combined runtime and size beneath each title.
+#: Separate from `counts` because it costs a recursive walk rather than a group-by,
+#: and the grid needs the counts without paying for the walk.
+TOTALS_INCLUDE = "totals"
+
 
 class TitleService:
     def __init__(
@@ -34,21 +43,57 @@ class TitleService:
         title_type_repository: TitleTypeRepository,
         artwork_repository: ArtworkRepository,
         artwork_kind_repository: ArtworkKindRepository,
+        title_content_repository: TitleContentRepository,
     ) -> None:
         self.repository = repository
         self.title_type_repo = title_type_repository
         self.artwork_repo = artwork_repository
         self.artwork_kind_repo = artwork_kind_repository
+        self.title_content_repo = title_content_repository
 
-    def _wants_poster(self, include: str | None) -> bool:
-        """Whether this request asked for a resolved poster.
+    @staticmethod
+    def _includes(include: str | None, token: str) -> bool:
+        """Whether `include=` carries a given token.
 
         Parsed the way the repository parses `include` for tags and references, so
         `include=tags,poster` behaves as a caller would expect.
         """
         if not include:
             return False
-        return POSTER_INCLUDE in {item.strip().lower() for item in include.split(",")}
+        return token in {item.strip().lower() for item in include.split(",")}
+
+    def _wants_poster(self, include: str | None) -> bool:
+        """Whether this request asked for a resolved poster."""
+        return self._includes(include, POSTER_INCLUDE)
+
+    def _attach_counts(self, titles: list[TitleReadExtended]) -> None:
+        """Attach direct child and asset counts, in one query for the lot.
+
+        A title absent from the result contains nothing, so it gets an explicit 0
+        rather than being left null: null means "not requested" on these fields, and
+        conflating the two would leave a caller unable to tell an empty title from an
+        unasked question.
+        """
+        if not titles:
+            return
+        counts = self.title_content_repo.counts_for_titles([t.id for t in titles])
+        for title in titles:
+            found = counts.get(title.id)
+            title.child_count = found.child_count if found else 0
+            title.asset_count = found.asset_count if found else 0
+
+    def _attach_totals(self, titles: list[TitleReadExtended]) -> None:
+        """Attach combined runtime and size, in one query for the lot.
+
+        Zero-filled for the same reason as `_attach_counts`.
+        """
+        if not titles:
+            return
+        totals = self.title_content_repo.totals_for_titles([t.id for t in titles])
+        for title in titles:
+            found = totals.get(title.id)
+            title.total_runtime = found.total_runtime if found else 0.0
+            title.total_size = found.total_size if found else 0
 
     def _attach_posters(self, titles: list[TitleReadExtended]) -> None:
         """Resolve and attach a poster for each title, in one query for the lot.
@@ -83,6 +128,10 @@ class TitleService:
         page = self.repository.list_paged(params)
         if self._wants_poster(params.include):
             self._attach_posters(page.items)
+        if self._includes(params.include, COUNTS_INCLUDE):
+            self._attach_counts(page.items)
+        if self._includes(params.include, TOTALS_INCLUDE):
+            self._attach_totals(page.items)
         return page
 
     def get_title(self, title_id: int) -> TitleReadExtended:
@@ -99,6 +148,12 @@ class TitleService:
             raise HTTPException(status_code=404, detail="Title not found")
         extended = TitleReadExtended(**title.model_dump())
         self._attach_posters([extended])
+        # Counts and totals are resolved unconditionally here, for the same reason the
+        # poster is: `include` exists to avoid doing work per row across a 500-row
+        # page, and one row costs one extra query either way. A detail view is also
+        # precisely where the totals are wanted.
+        self._attach_counts([extended])
+        self._attach_totals([extended])
         return extended
 
     def get_title_by_external_id(self, scheme_id: int, external_id: str) -> TitleRead:

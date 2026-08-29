@@ -190,7 +190,7 @@ def get_runner_state_service(
 
 
 def get_title_service(db: Session = Depends(get_db_session)) -> TitleService:
-    # TitleService needs four repositories, so the session is injected once and all
+    # TitleService needs five repositories, so the session is injected once and all
     # of them are built from it. Chaining Depends(get_*_repository) calls would make
     # FastAPI open a separate session per repository and break transactional
     # consistency.
@@ -199,6 +199,7 @@ def get_title_service(db: Session = Depends(get_db_session)) -> TitleService:
         SQLAlchemyTitleTypeRepository(db),
         SQLAlchemyArtworkRepository(db),
         SQLAlchemyArtworkKindRepository(db),
+        SQLAlchemyTitleContentRepository(db),
     )
 
 

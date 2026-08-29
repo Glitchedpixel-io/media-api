@@ -87,3 +87,37 @@ class TitleContentReadExtended(TitleContentRead):
         title="Child Title",
         description="Title backing this item of content, if kind is title",
     )
+
+
+class TitleContentCounts(BaseModel):
+    """How many titles and assets a title directly contains.
+
+    Direct edges only -- nothing beneath the children is counted. Membership is
+    deliberately not filtered: a curated list's whole purpose is the things in it,
+    so counting intrinsic edges only would report every curated collection as empty.
+
+    No deduplication is applied because none is needed. ``uq_parent_child_title_once``
+    and ``uq_parent_asset_once`` are unique on (parent, target) with membership outside
+    their predicates, so a target cannot appear twice under one parent whatever its
+    membership. Dedup is load-bearing for ``TitleMediaTotals``, not here.
+    """
+
+    model_config = {"from_attributes": True}
+
+    child_count: int = Field(0, title="Child Title Count", description="Titles directly contained")
+    asset_count: int = Field(0, title="Asset Count", description="Assets directly contained")
+
+
+class TitleMediaTotals(BaseModel):
+    """Combined runtime and size of every distinct asset beneath a title.
+
+    Follows intrinsic containment only, so a title borrowed into a curated list does
+    not add its runtime to that list's total.
+    """
+
+    model_config = {"from_attributes": True}
+
+    total_runtime: float = Field(
+        0.0, title="Total Runtime", description="Combined duration in seconds"
+    )
+    total_size: int = Field(0, title="Total Size", description="Combined size in bytes")

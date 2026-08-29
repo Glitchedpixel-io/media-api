@@ -65,6 +65,15 @@ class TitleFilters(BaseModel):
 class TitleListParams(KeysetPagination, TitleFilters):
     """All list params for /titles as query params."""
 
-    include: str | None = Field(None, description="Optional linked resources to include")
+    include: str | None = Field(
+        None,
+        description=(
+            "Comma-separated optional resources to include: `poster` for a resolved "
+            "poster, `counts` for `child_count` and `asset_count`, `totals` for "
+            "`total_runtime` and `total_size`. Each is a single extra query for the "
+            "whole page. Fields not asked for come back null, which is distinct from "
+            "a count of 0"
+        ),
+    )
 
     model_config = dict(extra="forbid")
