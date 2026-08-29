@@ -129,6 +129,23 @@ class TitleContentORM(Base):
         # preference -- see #90. The asymmetry is what justifies constraining now: a
         # unique index can only be added while the data already satisfies it, whereas
         # dropping one is free.
+        # Containment asked from the child's side, filtered by kind -- the shape
+        # `GET /api/titles/?membership=...` issues (#94).
+        #
+        # `uq_one_intrinsic_parent` already serves the intrinsic half, being keyed on
+        # `child_title_id`, but its predicate excludes curated rows entirely, so the
+        # curated half had nothing. Measured at 100,129 containment rows: an index-only
+        # scan at 1.08ms against a sequential scan at 34.7ms.
+        #
+        # Not measurable at today's 2,155 rows, where the table is a single page and the
+        # planner correctly ignores every index on it. Added on the strength of the
+        # scaled measurement rather than a present-day one, and deliberately not claimed
+        # as a current improvement.
+        Index(
+            "ix_title_contents_child_membership",
+            "child_title_id",
+            "membership",
+        ),
         Index(
             "uq_one_intrinsic_parent",
             "child_title_id",
