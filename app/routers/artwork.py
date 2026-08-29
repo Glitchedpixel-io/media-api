@@ -29,8 +29,8 @@ ARTWORK_UPLOAD_RESPONSES: dict[int | str, dict] = {
     **COMMON_READ_RESPONSES,
     **COMMON_WRITE_RESPONSES,
     201: {"description": "Artwork stored and registered successfully"},
-    400: {"description": "Bad Request - the uploaded file is empty"},
-    413: {"description": "Payload Too Large - the uploaded file exceeds the size cap"},
+    400: {"description": "Bad Request - the file is empty, or is not a readable image"},
+    413: {"description": "Payload Too Large - the file exceeds the size or pixel cap"},
     415: {"description": "Unsupported Media Type - the file is not a supported image"},
 }
 
@@ -38,8 +38,6 @@ ARTWORK_UPLOAD_RESPONSES: dict[int | str, dict] = {
 def artwork_upload_form(
     artwork_kind: Annotated[str, Form(description="Code of the artwork kind, e.g. poster")],
     is_primary: Annotated[bool, Form(description="Make this the artwork for its kind")] = False,
-    width: Annotated[int | None, Form(description="Pixel width, when known")] = None,
-    height: Annotated[int | None, Form(description="Pixel height, when known")] = None,
     source_scheme_id: Annotated[int | None, Form(description="Source ID scheme")] = None,
     source_external_id: Annotated[str | None, Form(description="ID within the scheme")] = None,
     source_url: Annotated[str | None, Form(description="Where it was fetched from")] = None,
@@ -62,8 +60,6 @@ def artwork_upload_form(
         return ArtworkUploadForm(
             artwork_kind=artwork_kind,
             is_primary=is_primary,
-            width=width,
-            height=height,
             source_scheme_id=source_scheme_id,
             source_external_id=source_external_id,
             source_url=source_url,
