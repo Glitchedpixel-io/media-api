@@ -58,11 +58,11 @@ def contain(db_session):
     return _contain
 
 
-def _add_content(client: TestClient, parent_id: int, child_id: int):
-    return client.post(
-        f"/api/titles/{parent_id}/contents",
-        json={"kind": "title", "child_title_id": child_id},
-    )
+def _add_content(client: TestClient, parent_id: int, child_id: int, membership: str | None = None):
+    body: dict[str, object] = {"kind": "title", "child_title_id": child_id}
+    if membership is not None:
+        body["membership"] = membership
+    return client.post(f"/api/titles/{parent_id}/contents", json=body)
 
 
 @pytest.mark.integration
@@ -109,17 +109,44 @@ class TestCycles:
 
     def test_a_diamond_is_still_allowed(self, client: TestClient, make_title):
         """Containment is a DAG, not a tree: two parents may share a child, and that is
-        not a cycle. A guard that rejected this would break legitimate structure."""
+        not a cycle. A guard that rejected this would break legitimate structure.
+
+        Since #90 the second edge has to say it is curated. That is a statement about
+        which parent is the child's *home*, not a restriction on the shape of the graph
+        -- the diamond is intact, and the cycle guard is what this asserts.
+        """
         top, left, right, bottom = (make_title() for _ in range(4))
         _add_content(client, top, left)
         _add_content(client, top, right)
         assert _add_content(client, left, bottom).status_code == HTTPStatus.CREATED
-        assert _add_content(client, right, bottom).status_code == HTTPStatus.CREATED
+        assert (
+            _add_content(client, right, bottom, membership="curated").status_code
+            == HTTPStatus.CREATED
+        )
 
     def test_the_same_child_under_two_parents_is_allowed(self, client: TestClient, make_title):
         a, b, shared = make_title(), make_title(), make_title()
         assert _add_content(client, a, shared).status_code == HTTPStatus.CREATED
-        assert _add_content(client, b, shared).status_code == HTTPStatus.CREATED
+        assert (
+            _add_content(client, b, shared, membership="curated").status_code == HTTPStatus.CREATED
+        )
+
+    def test_a_second_intrinsic_parent_is_refused_not_as_a_cycle(
+        self, client: TestClient, make_title
+    ):
+        """The two guards are distinct, and this is the one that catches a shared child.
+
+        Both answer 409, so a test that only checked the status could not tell which
+        guard fired -- and a regression that made the cycle walk reject diamonds would
+        hide behind the membership rule.
+        """
+        a, b, shared = make_title(), make_title(), make_title()
+        _add_content(client, a, shared)
+
+        response = _add_content(client, b, shared)
+
+        assert response.status_code == HTTPStatus.CONFLICT
+        assert "intrinsic parent" in response.json()["detail"]
 
     def test_a_patch_cannot_repoint_a_row_into_a_cycle(self, client: TestClient, make_title):
         """The shorter path to the same invalid state."""
@@ -147,6 +174,11 @@ class TestWalkTerminates:
 
         The constraint is dropped for the duration so a cycle can be planted at all --
         which is precisely the state this deployment is upgrading from.
+
+        The new edge is curated because `a` already has an intrinsic parent here, and an
+        intrinsic one would be refused by #90's rule before the walk ever ran. That
+        would still return 409 and the test would still look like it passed, while
+        asserting nothing about termination.
         """
         a, b, c = make_title(), make_title(), make_title()
         db_session.execute(
@@ -157,7 +189,7 @@ class TestWalkTerminates:
         db_session.commit()
 
         try:
-            response = _add_content(client, c, a)
+            response = _add_content(client, c, a, membership="curated")
         finally:
             db_session.execute(
                 sql_text(

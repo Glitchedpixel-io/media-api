@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.schemas.enums import ContentKind
+from app.schemas.enums import ContentKind, MembershipKind
 
 if TYPE_CHECKING:
     # Only imported for type checking; no runtime import cycles
@@ -45,6 +45,19 @@ class TitleContentORM(Base):
     )
     child_title_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("titles.id", ondelete="RESTRICT"), nullable=True
+    )
+
+    # Why this row exists: the child's home, or a curated list it also appears in.
+    #
+    # NOT NULL with a server default rather than nullable, because something writes to
+    # this table outside the API -- the 263 self-containment rows #125 removed arrived
+    # that way, from a producer still running. A nullable column would fill with nulls
+    # forever and every consumer would grow a branch for them. Defaulting to intrinsic
+    # keeps that writer producing correct rows: everything it writes today is a home.
+    membership: Mapped[MembershipKind] = mapped_column(
+        Enum(MembershipKind, name="membership_kind", native_enum=True),
+        nullable=False,
+        server_default=MembershipKind.intrinsic.name,
     )
 
     # UI-friendly label for the line item
@@ -101,5 +114,26 @@ class TitleContentORM(Base):
             "child_title_id",
             unique=True,
             postgresql_where=(child_title_id.isnot(None)),
+        ),
+        # At most one intrinsic parent per child title, so a breadcrumb has exactly one
+        # path upward. Declarative for the same reason the self-containment check is:
+        # the guard has to hold against a writer that never goes near the service layer.
+        #
+        # Curated edges are deliberately outside the predicate -- a title appearing in
+        # any number of curated lists is the entire point of the distinction. So are
+        # asset rows: an asset in two titles is ordinary (the same file under two cuts),
+        # and no breadcrumb is drawn through an asset for the ambiguity to matter.
+        #
+        # The absence of multi-parent titles in the data today is not evidence this
+        # should be tighter. It reflects how hard such edges are to create, not a
+        # preference -- see #90. The asymmetry is what justifies constraining now: a
+        # unique index can only be added while the data already satisfies it, whereas
+        # dropping one is free.
+        Index(
+            "uq_one_intrinsic_parent",
+            "child_title_id",
+            unique=True,
+            postgresql_where=(child_title_id.isnot(None))
+            & (membership == MembershipKind.intrinsic),
         ),
     )

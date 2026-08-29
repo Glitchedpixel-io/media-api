@@ -37,6 +37,9 @@ class TestInsertPositioned:
         """insert_positioned creates content at end position successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -63,6 +66,9 @@ class TestInsertPositioned:
         """insert_positioned inserts content before specified ID."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -83,6 +89,9 @@ class TestInsertPositioned:
         """insert_positioned inserts content after specified ID."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -103,6 +112,9 @@ class TestInsertPositioned:
         """insert_positioned works with asset kind content."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -124,6 +136,9 @@ class TestInsertPositioned:
         """insert_positioned raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
@@ -144,6 +159,9 @@ class TestInsertPositioned:
         """insert_positioned raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -163,6 +181,9 @@ class TestInsertPositioned:
         """insert_positioned raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -192,6 +213,9 @@ class TestInsertPositioned:
         """insert_positioned raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -214,6 +238,9 @@ class TestGetTitleContent:
         """get_title_content returns list of content items for title."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -240,6 +267,9 @@ class TestGetTitleContent:
         """get_title_content returns empty list when title has no content."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -256,6 +286,9 @@ class TestGetTitleContent:
         """get_title_content raises 404 when title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
@@ -274,6 +307,9 @@ class TestGetTitleContent:
         """get_title_content passes True flag for extended data."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -296,6 +332,9 @@ class TestUpdateTitleContent:
         """update_title_content updates content with exclude_none=True."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         updated_content = TitleContentReadFactory(id=7, parent_title_id=3, label="Updated")
@@ -322,6 +361,9 @@ class TestUpdateTitleContent:
         """update_title_content updates content with exclude_none=False."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         updated_content = TitleContentReadFactory(id=7)
@@ -340,6 +382,9 @@ class TestUpdateTitleContent:
         """update_title_content allows updating only label field."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.return_value = TitleContentReadFactory()
@@ -358,6 +403,9 @@ class TestUpdateTitleContent:
         """update_title_content raises 404 when content doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = NotFoundError("Content not found")
@@ -376,6 +424,9 @@ class TestUpdateTitleContent:
         """update_title_content raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = UniqueViolation("Unique constraint")
@@ -394,6 +445,9 @@ class TestUpdateTitleContent:
         """update_title_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = DatabaseLocked("Database locked")
@@ -422,6 +476,9 @@ class TestUpdateTitleContent:
         """update_title_content raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = exc_class("Constraint error")
@@ -443,6 +500,9 @@ class TestReorderContent:
         """reorder_content moves content after specified ID successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -462,6 +522,9 @@ class TestReorderContent:
         """reorder_content moves content before specified ID successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -479,6 +542,9 @@ class TestReorderContent:
         """reorder_content moves content to position string (start/end)."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -498,6 +564,9 @@ class TestReorderContent:
         """reorder_content raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
@@ -516,6 +585,9 @@ class TestReorderContent:
         """reorder_content raises 404 when repository raises NotFoundError."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -533,6 +605,9 @@ class TestReorderContent:
         """reorder_content raises 404 when repository returns None."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -550,6 +625,9 @@ class TestReorderContent:
         """reorder_content raises 409 on unique constraint violation."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -567,6 +645,9 @@ class TestReorderContent:
         """reorder_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -594,6 +675,9 @@ class TestReorderContent:
         """reorder_content raises 422 for various constraint violations."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -610,6 +694,9 @@ class TestReorderContent:
         """reorder_content raises 500 on unexpected exceptions."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -631,6 +718,9 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset returns list of titles for existing asset."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = True
@@ -675,6 +765,9 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset returns empty list when asset has no titles."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = True
@@ -692,6 +785,9 @@ class TestGetTitlesWithAsset:
         """get_titles_with_asset raises 404 when asset doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         m_repo.exists.return_value = False
@@ -714,6 +810,9 @@ class TestUnlinkContent:
         """unlink_content deletes title content successfully."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -730,6 +829,9 @@ class TestUnlinkContent:
         """unlink_content correctly passes IDs to repository."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -745,6 +847,9 @@ class TestUnlinkContent:
         """unlink_content raises 404 when parent title doesn't exist."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
@@ -763,6 +868,9 @@ class TestUnlinkContent:
         """unlink_content raises 423 when database is read-only."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
@@ -780,6 +888,9 @@ class TestUnlinkContent:
         """unlink_content raises 500 on unexpected exceptions."""
         t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        # No existing intrinsic parent unless a test says so; an autospec mock would
+        # otherwise return a truthy Mock and every insert would read as a conflict.
+        c_repo.intrinsic_parent_edge_id.return_value = None
         c_repo.can_reach.return_value = False
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
