@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from app.repositories.protocols import (
     ArtworkKindRepository,
     ArtworkRepository,
+    TitleContentRepository,
     TitleRepository,
     TitleTypeRepository,
 )
@@ -41,6 +42,14 @@ def _artwork_repo():
 def _kind_repo():
     repo = create_autospec(ArtworkKindRepository, instance=True, spec_set=True)
     repo.get_by_code.return_value = ArtworkKindRead(id=7, code="poster", label="Poster")
+    return repo
+
+
+def _content_repo():
+    """Aggregates nothing; these tests are about type resolution, not counts."""
+    repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+    repo.counts_for_titles.return_value = {}
+    repo.totals_for_titles.return_value = {}
     return repo
 
 
@@ -75,7 +84,11 @@ class TestCreateResolution:
         repo = _title_repo()
         repo.create.return_value = TitleReadFactory(id=1, title_type="season")
         svc = TitleService(
-            repo, _type_repo({"movie": 1, "season": 7}), _artwork_repo(), _kind_repo()
+            repo,
+            _type_repo({"movie": 1, "season": 7}),
+            _artwork_repo(),
+            _kind_repo(),
+            _content_repo(),
         )
 
         svc.create_title(TitleCreatePublic(name="Season 1", title_type="season"))
@@ -92,7 +105,9 @@ class TestCreateResolution:
         thing standing between a bad code and a foreign key error.
         """
         repo = _title_repo()
-        svc = TitleService(repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo())
+        svc = TitleService(
+            repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo(), _content_repo()
+        )
 
         with pytest.raises(HTTPException) as exc_info:
             svc.create_title(TitleCreatePublic(name="X", title_type="not_a_type"))
@@ -108,7 +123,9 @@ class TestCreateResolution:
 class TestUpdateResolution:
     def test_update_with_unknown_code_is_422(self) -> None:
         repo = _title_repo()
-        svc = TitleService(repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo())
+        svc = TitleService(
+            repo, _type_repo({"movie": 1}), _artwork_repo(), _kind_repo(), _content_repo()
+        )
 
         with pytest.raises(HTTPException) as exc_info:
             svc.update_title(5, TitlePatchPublic(title_type="not_a_type"), exclude_none=True)
@@ -125,7 +142,7 @@ class TestUpdateResolution:
         """
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo())
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo(), _content_repo())
 
         svc.update_title(5, TitlePatchPublic(name="Renamed"), exclude_none=True)
 
@@ -138,7 +155,11 @@ class TestUpdateResolution:
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5, title_type="season")
         svc = TitleService(
-            repo, _type_repo({"movie": 1, "season": 7}), _artwork_repo(), _kind_repo()
+            repo,
+            _type_repo({"movie": 1, "season": 7}),
+            _artwork_repo(),
+            _kind_repo(),
+            _content_repo(),
         )
 
         svc.update_title(5, TitlePatchPublic(title_type="season"), exclude_none=True)
@@ -155,7 +176,7 @@ class TestUpdateResolution:
         """
         repo = _title_repo()
         repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo())
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo(), _content_repo())
 
         svc.update_title(5, TitlePatchPublic(name="Replaced"), exclude_none=False)
 

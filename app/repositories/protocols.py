@@ -46,6 +46,7 @@ from app.schemas import (
     TagListParams,
     TagRead,
     TagUpdateInternal,
+    TitleContentCounts,
     TitleContentCreateInternal,
     TitleContentInsert,
     TitleContentRead,
@@ -54,6 +55,7 @@ from app.schemas import (
     TitleContentUpdateInternal,
     TitleCreateInternal,
     TitleListParams,
+    TitleMediaTotals,
     TitleRead,
     TitleReadExtended,
     TitleReferenceCreateInternal,
@@ -155,6 +157,10 @@ class TitleContentRepository(Protocol):
     def can_reach(
         self, start_title_id: int, target_title_id: int, max_depth: int = ...
     ) -> bool: ...
+    def counts_for_titles(self, title_ids: Sequence[int]) -> dict[int, TitleContentCounts]: ...
+    def totals_for_titles(
+        self, title_ids: Sequence[int], max_depth: int = ...
+    ) -> dict[int, TitleMediaTotals]: ...
     def create(self, title_content: TitleContentCreateInternal) -> TitleContentRead: ...
     def get(self, title_content_id: int) -> TitleContentRead | None: ...
     def exists(self, title_content_id: int) -> bool: ...

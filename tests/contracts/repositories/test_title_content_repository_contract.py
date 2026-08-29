@@ -315,3 +315,197 @@ def test_get_titles_with_asset_empty_list(bundle):
 
     # Verify empty list is returned
     assert results == []
+
+
+# --- Aggregates (#96) ----------------------------------------------------------
+#
+# Two rules that differ deliberately, so each needs a fixture the other would pass:
+#   counts  -- direct edges, every membership, no dedup needed
+#   totals  -- recursive over intrinsic edges only, deduplicated by asset
+
+
+def _contains_title(bundle, parent, child, membership="intrinsic"):
+    return bundle.title_contents.create_positioned(
+        parent.id,
+        TitleContentInsert.model_validate(
+            {
+                "kind": "title",
+                "child_title_id": child.id,
+                "asset_id": None,
+                "membership": membership,
+            }
+        ),
+        position="end",
+    )
+
+
+def _contains_asset(bundle, parent, asset):
+    return bundle.title_contents.create_positioned(
+        parent.id,
+        TitleContentInsert.model_validate(
+            {"kind": "asset", "asset_id": asset.id, "child_title_id": None}
+        ),
+        position="end",
+    )
+
+
+@pytest.mark.contract
+def test_counts_are_direct_edges_only(bundle):
+    """A grandchild belongs to its own parent's count, not its grandparent's."""
+    season = bundle.titles.create(TitleCreateFactory())
+    episode = bundle.titles.create(TitleCreateFactory())
+    asset = bundle.assets.create(AssetCreateFactory())
+    _contains_title(bundle, season, episode)
+    _contains_asset(bundle, episode, asset)
+
+    counts = bundle.title_contents.counts_for_titles([season.id, episode.id])
+
+    assert counts[season.id].child_count == 1
+    assert counts[season.id].asset_count == 0, "the grandchild asset is not a direct edge"
+    assert counts[episode.id].asset_count == 1
+
+
+@pytest.mark.contract
+def test_counts_include_curated_edges(bundle):
+    """A curated list reports the things in it.
+
+    This is the rule #96's text got wrong. Filtering to `membership = 'intrinsic'`
+    would report every curated collection as containing nothing -- and the size of
+    the list is the one number its tile exists to show.
+    """
+    curated_list = bundle.titles.create(TitleCreateFactory())
+    for _ in range(3):
+        member = bundle.titles.create(TitleCreateFactory())
+        _contains_title(bundle, curated_list, member, membership="curated")
+
+    counts = bundle.title_contents.counts_for_titles([curated_list.id])
+
+    assert counts[curated_list.id].child_count == 3, "a curated list must report its real size"
+
+
+@pytest.mark.contract
+def test_a_child_under_two_parents_is_counted_by_both(bundle):
+    """The fixture #96 asks for: one child, an intrinsic parent and a curated one.
+
+    A fixture with one parent per child cannot distinguish a correct aggregate from a
+    broken one -- both pass. This is the case that tells them apart.
+    """
+    home = bundle.titles.create(TitleCreateFactory())
+    collection = bundle.titles.create(TitleCreateFactory())
+    child = bundle.titles.create(TitleCreateFactory())
+    _contains_title(bundle, home, child, membership="intrinsic")
+    _contains_title(bundle, collection, child, membership="curated")
+
+    counts = bundle.title_contents.counts_for_titles([home.id, collection.id])
+
+    assert counts[home.id].child_count == 1
+    assert counts[collection.id].child_count == 1
+
+
+@pytest.mark.contract
+def test_counts_omit_titles_that_contain_nothing(bundle):
+    """An empty title is absent from the mapping; the service supplies the zero."""
+    empty = bundle.titles.create(TitleCreateFactory())
+
+    counts = bundle.title_contents.counts_for_titles([empty.id])
+
+    assert empty.id not in counts
+
+
+@pytest.mark.contract
+def test_counts_of_nothing_issues_no_query(bundle):
+    assert bundle.title_contents.counts_for_titles([]) == {}
+
+
+@pytest.mark.contract
+def test_totals_sum_assets_across_depth(bundle):
+    """Runtime and size accumulate down the intrinsic tree."""
+    season = bundle.titles.create(TitleCreateFactory())
+    episode = bundle.titles.create(TitleCreateFactory())
+    _contains_title(bundle, season, episode)
+    _contains_asset(
+        bundle, episode, bundle.assets.create(AssetCreateFactory(duration=90.0, size=700))
+    )
+    _contains_asset(
+        bundle, season, bundle.assets.create(AssetCreateFactory(duration=10.0, size=300))
+    )
+
+    totals = bundle.title_contents.totals_for_titles([season.id])
+
+    assert totals[season.id].total_runtime == 100.0
+    assert totals[season.id].total_size == 1000
+
+
+@pytest.mark.contract
+def test_totals_count_a_shared_asset_once(bundle):
+    """One asset under two titles in the same subtree contributes once.
+
+    This is the deduplication that actually matters, and it is *not* the one #96
+    describes. `uq_parent_asset_once` is scoped to a single parent, so the same file
+    under two cuts is ordinary -- summing the join directly would double it.
+    """
+    season = bundle.titles.create(TitleCreateFactory())
+    cut_a = bundle.titles.create(TitleCreateFactory())
+    cut_b = bundle.titles.create(TitleCreateFactory())
+    _contains_title(bundle, season, cut_a)
+    _contains_title(bundle, season, cut_b)
+    shared = bundle.assets.create(AssetCreateFactory(duration=50.0, size=500))
+    _contains_asset(bundle, cut_a, shared)
+    _contains_asset(bundle, cut_b, shared)
+
+    totals = bundle.title_contents.totals_for_titles([season.id])
+
+    assert totals[season.id].total_runtime == 50.0, "a shared asset must not be summed twice"
+    assert totals[season.id].total_size == 500
+
+
+@pytest.mark.contract
+def test_totals_follow_intrinsic_edges_only(bundle):
+    """A curated list does not absorb the runtime of what it borrows.
+
+    The mirror of `test_counts_include_curated_edges`: the same edge is counted by
+    `counts_for_titles` and ignored by `totals_for_titles`, which is the whole point
+    of the two rules being different.
+    """
+    home = bundle.titles.create(TitleCreateFactory())
+    collection = bundle.titles.create(TitleCreateFactory())
+    child = bundle.titles.create(TitleCreateFactory())
+    _contains_title(bundle, home, child, membership="intrinsic")
+    _contains_title(bundle, collection, child, membership="curated")
+    _contains_asset(bundle, child, bundle.assets.create(AssetCreateFactory(duration=42.0, size=99)))
+
+    totals = bundle.title_contents.totals_for_titles([home.id, collection.id])
+    counts = bundle.title_contents.counts_for_titles([collection.id])
+
+    assert totals[home.id].total_runtime == 42.0, "the intrinsic parent owns the runtime"
+    assert collection.id not in totals, "a curated edge contributes no runtime"
+    assert counts[collection.id].child_count == 1, "but the same edge still counts as a child"
+
+
+@pytest.mark.contract
+def test_totals_omit_titles_with_nothing_beneath_them(bundle):
+    bare = bundle.titles.create(TitleCreateFactory())
+
+    assert bare.id not in bundle.title_contents.totals_for_titles([bare.id])
+
+
+@pytest.mark.contract
+def test_totals_of_nothing_issues_no_query(bundle):
+    assert bundle.title_contents.totals_for_titles([]) == {}
+
+
+@pytest.mark.contract
+def test_totals_stop_at_the_depth_cap(bundle):
+    """The walk is bounded, so a deep chain cannot cost unbounded recursion."""
+    chain = [bundle.titles.create(TitleCreateFactory()) for _ in range(4)]
+    for parent, child in zip(chain, chain[1:]):
+        _contains_title(bundle, parent, child)
+    _contains_asset(
+        bundle, chain[-1], bundle.assets.create(AssetCreateFactory(duration=5.0, size=5))
+    )
+
+    reached = bundle.title_contents.totals_for_titles([chain[0].id], max_depth=8)
+    stopped = bundle.title_contents.totals_for_titles([chain[0].id], max_depth=1)
+
+    assert reached[chain[0].id].total_runtime == 5.0
+    assert chain[0].id not in stopped, "the cap must stop the walk short of the asset"

@@ -1,18 +1,22 @@
 # app/repositories/title_content_repository.py
 
+from collections.abc import Sequence
+
 from sqlalchemy import Integer, delete, func, literal, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import selectinload
 
-from app.models import TitleContentORM, TitleORM
+from app.models import AssetORM, TitleContentORM, TitleORM
 from app.schemas.enums import MembershipKind
 from app.schemas import (
+    TitleContentCounts,
     TitleContentCreateInternal,
     TitleContentInsert,
     TitleContentRead,
     TitleContentReadExtended,
     TitleContentReadParent,
     TitleContentUpdateInternal,
+    TitleMediaTotals,
 )
 from app.utils.order_key import DIGITS, between, head, tail
 
@@ -411,3 +415,140 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
             order_key=new_key,
         )
         return self.create(to_create)
+
+    def counts_for_titles(self, title_ids: Sequence[int]) -> dict[int, TitleContentCounts]:
+        """Count the titles and assets each title directly contains.
+
+        **One query for the whole page**, not one per title. A count evaluated per row
+        is #49 wearing different clothes -- that shape measured 14.6s at the 500-row
+        cap against 263ms without it -- so this groups by parent and the service joins
+        the result back onto the page in memory.
+
+        Two deliberate omissions, both of which look like bugs until checked:
+
+        ``DISTINCT`` is absent because it would be redundant.
+        ``uq_parent_child_title_once`` and ``uq_parent_asset_once`` are unique on
+        (parent, target) with membership *outside* their predicates, so one parent
+        cannot hold the same child twice under any membership. Deduplication is
+        load-bearing for ``totals_for_titles``, where one asset really can be reached
+        by two paths, and is simply not needed here.
+
+        A ``membership`` filter is absent because it would be wrong. Counting intrinsic
+        edges only would report every curated collection as containing nothing, and a
+        curated list's size is the one number its tile exists to show.
+
+        Args:
+            title_ids: The titles to count for. An empty sequence issues no query.
+
+        Returns:
+            dict[int, TitleContentCounts]: Title id -> counts, omitting titles that
+                contain nothing at all. Callers supply the zero.
+        """
+        if not title_ids:
+            return {}
+
+        stmt = (
+            select(
+                TitleContentORM.parent_title_id,
+                func.count()
+                .filter(TitleContentORM.child_title_id.isnot(None))
+                .label("child_count"),
+                func.count().filter(TitleContentORM.asset_id.isnot(None)).label("asset_count"),
+            )
+            .where(TitleContentORM.parent_title_id.in_(title_ids))
+            .group_by(TitleContentORM.parent_title_id)
+        )
+        return {
+            parent_id: TitleContentCounts(child_count=children, asset_count=assets)
+            for parent_id, children, assets in self.db.execute(stmt).all()
+        }
+
+    def totals_for_titles(
+        self, title_ids: Sequence[int], max_depth: int = MAX_CONTAINMENT_DEPTH
+    ) -> dict[int, TitleMediaTotals]:
+        """Sum the runtime and size of every distinct asset beneath each title.
+
+        **One query for the whole page**, for the same reason as ``counts_for_titles``.
+
+        Only intrinsic edges are followed. ``uq_one_intrinsic_parent`` allows a child
+        at most one intrinsic parent, so the intrinsic graph is a forest and no title
+        is reached twice from one root. Following curated edges as well would sum a
+        borrowed title's runtime into every list that borrowed it.
+
+        **The deduplication that matters here is over assets, not titles.** Only
+        ``uq_parent_asset_once`` constrains assets, and it is scoped to a single
+        parent -- the same asset under two different titles in one subtree is
+        explicitly ordinary (the same file under two cuts, per ``TitleContentORM``).
+        Summing the join directly would count that file's runtime twice, so the asset
+        set is made distinct per root before it is summed. A fixture with one asset
+        per title cannot tell the two apart.
+
+        The walk carries the set of titles already on its path and refuses to re-enter
+        one, exactly as ``can_reach`` and ``resolve_for_titles`` do. That is not made
+        redundant by ``uq_one_intrinsic_parent``: at most one intrinsic parent each
+        still permits a cycle among titles whose parents point round a loop, and the
+        guard has to be safe on a database that already contains one.
+
+        Args:
+            title_ids: The titles to total for. An empty sequence issues no query.
+            max_depth: How many levels of intrinsic containment to descend.
+
+        Returns:
+            dict[int, TitleMediaTotals]: Title id -> totals, omitting titles with no
+                assets beneath them. Callers supply the zero.
+        """
+        if not title_ids:
+            return {}
+
+        # Depth 0: each requested title standing for itself, so assets hanging
+        # directly off it are included alongside those further down.
+        seed = select(
+            TitleORM.id.label("root_id"),
+            TitleORM.id.label("title_id"),
+            literal(0, Integer).label("depth"),
+            array([TitleORM.id]).label("seen"),
+        ).where(TitleORM.id.in_(title_ids))
+
+        walk = seed.cte("totals_walk", recursive=True)
+        step = (
+            select(
+                walk.c.root_id,
+                TitleContentORM.child_title_id.label("title_id"),
+                (walk.c.depth + 1).label("depth"),
+                (walk.c.seen + array([TitleContentORM.child_title_id])).label("seen"),
+            )
+            .select_from(walk)
+            .join(TitleContentORM, TitleContentORM.parent_title_id == walk.c.title_id)
+            .where(TitleContentORM.child_title_id.isnot(None))
+            .where(TitleContentORM.membership == MembershipKind.intrinsic)
+            .where(walk.c.depth < max_depth)
+            .where(~walk.c.seen.contains(array([TitleContentORM.child_title_id])))
+        )
+        walk = walk.union_all(step)
+
+        # DISTINCT before SUM: one asset reachable under two titles in the same
+        # subtree must contribute its runtime once, not once per path.
+        reachable = (
+            select(
+                walk.c.root_id,
+                AssetORM.id.label("asset_id"),
+                AssetORM.duration,
+                AssetORM.size,
+            )
+            .select_from(walk)
+            .join(TitleContentORM, TitleContentORM.parent_title_id == walk.c.title_id)
+            .join(AssetORM, AssetORM.id == TitleContentORM.asset_id)
+            .distinct()
+            .subquery("reachable_assets")
+        )
+
+        stmt = select(
+            reachable.c.root_id,
+            func.coalesce(func.sum(reachable.c.duration), 0),
+            func.coalesce(func.sum(reachable.c.size), 0),
+        ).group_by(reachable.c.root_id)
+
+        return {
+            root_id: TitleMediaTotals(total_runtime=float(runtime), total_size=int(size))
+            for root_id, runtime, size in self.db.execute(stmt).all()
+        }
