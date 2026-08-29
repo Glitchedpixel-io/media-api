@@ -262,7 +262,9 @@ class TestTheGridQuery:
 
         assert found == {wanted}
 
-    def test_the_grid_combination_paginates(self, client: TestClient, make_title, make_tag, tag_title):
+    def test_the_grid_combination_paginates(
+        self, client: TestClient, make_title, make_tag, tag_title
+    ):
         genre = make_tag()
         wanted = []
         for i in range(5):
