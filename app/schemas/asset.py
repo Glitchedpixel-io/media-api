@@ -27,6 +27,19 @@ class AssetAttrs(UTCBaseModel):
         title="Container format",
         description="Container format of the asset file, may include multiple identifiers",
     )
+    edition: str | None = Field(
+        None,
+        title="Edition",
+        description=(
+            "Which cut of the work this file is, as a slug: `theatrical`, "
+            "`directors_cut`, `extended`. Null means no edition is recorded, which a "
+            "client may read as 'safe to choose between siblings silently' -- siblings "
+            "differing only in encoding. A non-null value that differs between siblings "
+            "means they are different content and the choice belongs to the person. "
+            "Values outside the canonical vocabulary are possible and deliberate: an "
+            "unrecognised edition is still an edition"
+        ),
+    )
     size: int = Field(..., title="Size", description="Size of the asset in bytes")
     mtime: Timestamp | None = Field(None, description="Timestamp of the last modification")
     last_seen: Timestamp | None = Field(
