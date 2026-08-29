@@ -20,12 +20,18 @@ router = APIRouter(route_class=QuietClientErrorRoute)
     operation_id="list_title_references",
     responses={
         **COMMON_READ_RESPONSES,
-        200: {"description": "List of title references retrieved successfully"},
+        200: {
+            "description": (
+                "List of title references retrieved successfully. At most 500 "
+                "references are returned; a title with more is truncated."
+            )
+        },
     },
 )
 def read_title_references(
     title_id: int, service: TitleReferenceService = Depends(get_title_reference_service)
 ) -> list[TitleReferenceRead]:
+    """Get the references for a title, capped at MAX_REFERENCES_PER_TITLE."""
     return service.get_title_references(title_id)
 
 

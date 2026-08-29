@@ -11,9 +11,13 @@ These are full-stack tests that exercise routers, services, repositories, and DB
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from http import HTTPStatus
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from tests.factories import (
     AssetReadFactory,
@@ -451,3 +455,96 @@ class TestCrossEntityExternalIdEnforcement:
             json={"scheme_id": scheme2["id"], "external_id": "123"},
         )
         assert res.status_code == HTTPStatus.CREATED
+
+
+@contextmanager
+def _statements_touching(engine: Engine, table: str) -> Iterator[list[str]]:
+    """Collect every SQL statement issued against ``table`` inside the block.
+
+    Args:
+        engine: The engine the request's session is bound to.
+        table: Table name to match, case-insensitively, against each statement.
+
+    Yields:
+        list[str]: The matching statements, appended as they are executed.
+    """
+    seen: list[str] = []
+
+    def _record(
+        conn: object,
+        cursor: object,
+        statement: str,
+        parameters: object,
+        context: object,
+        executemany: bool,
+    ) -> None:
+        if table in statement.lower():
+            seen.append(statement)
+
+    event.listen(engine, "after_cursor_execute", _record)
+    try:
+        yield seen
+    finally:
+        event.remove(engine, "after_cursor_execute", _record)
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestTitleIdsQueryCount:
+    """Guard the cost of GET /api/titles/{id}/ids against an N+1 (#95).
+
+    ``ExternalIdentifierReadExtended`` serialises ``scheme``, so if the relationship
+    lazy-loads the endpoint issues one extra SELECT against id_schemes per row. That
+    is invisible to a correctness test -- the response body is identical either way --
+    so it is asserted here as a query count, the same shape as #49.
+    """
+
+    def _create_scheme(self, client: TestClient, code: str, label: str) -> dict:
+        res = client.post("/api/id_schemes", json={"code": code, "label": label, "validator": None})
+        assert res.status_code == HTTPStatus.CREATED, res.text
+        return res.json()
+
+    def _create_title(self, client: TestClient) -> dict:
+        res = client.post("/api/titles", json=get_title_creation_json(TitleReadFactory()))
+        assert res.status_code == HTTPStatus.CREATED, res.text
+        return res.json()
+
+    def test_scheme_queries_do_not_scale_with_identifiers_returned(
+        self, client: TestClient, _test_engine: Engine
+    ) -> None:
+        """A title with more identifiers must not cost more queries against id_schemes.
+
+        Each identifier gets its own scheme deliberately. Pointing them all at one
+        shared scheme makes this test vacuous: the first lazy load puts that scheme in
+        the session identity map and every later row is served from it, so an
+        unfixed N+1 still shows a flat query count and the test passes green.
+        """
+        # Arrange - two titles, one carrying two identifiers and one carrying six,
+        # every identifier in a distinct scheme so a lazy load costs a real SELECT
+        counts: dict[int, int] = {}
+        for n in (2, 6):
+            title = self._create_title(client)
+            for i in range(n):
+                scheme = self._create_scheme(client, code=f"s{n}_{i}", label=f"Scheme {n}-{i}")
+                res = client.post(
+                    f"/api/titles/{title['id']}/ids",
+                    json={"scheme_id": scheme["id"], "external_id": f"tt{n}{i:06d}"},
+                )
+                assert res.status_code == HTTPStatus.CREATED, res.text
+
+            # Act - read it back, counting only the statements touching id_schemes
+            with _statements_touching(_test_engine, "id_schemes") as statements:
+                response = client.get(f"/api/titles/{title['id']}/ids")
+            assert response.status_code == HTTPStatus.OK
+            body = response.json()
+            assert len(body) == n
+            # The field must actually be populated, or the count below proves nothing
+            assert all(item["scheme"] for item in body)
+            counts[n] = len(statements)
+
+        # Assert - cost is a property of the request, not of the row count
+        assert counts[2] == counts[6], (
+            f"id_schemes queries scaled with the number of identifiers: "
+            f"{counts[2]} for 2 rows, {counts[6]} for 6 rows"
+        )
+        assert counts[6] < 6, f"expected a bounded number of queries, got {counts[6]} for 6 rows"
