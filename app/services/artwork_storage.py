@@ -11,6 +11,7 @@ from typing import BinaryIO, Protocol
 from fastapi import HTTPException
 
 from app.config import MediaConfig
+from app.utils.images import ImageTooManyPixels, UnreadableImage, measure
 from app.utils.paths import artwork_relative_path
 
 #: How much of an upload to read at a time. Small enough that a rejected upload is
@@ -42,7 +43,14 @@ _SIGNATURES: tuple[tuple[bytes, int, str, str], ...] = (
 #: is 8 bytes; the container formats below need 16.
 _SNIFF_BYTES = 16
 
-_NOT_AN_IMAGE = "Artwork must be a JPEG, PNG, WebP, GIF or AVIF image"
+NOT_AN_IMAGE = "Artwork must be a JPEG, PNG, WebP, GIF or AVIF image"
+
+#: A file whose signature says "image" but whose dimensions cannot be read -- truncated,
+#: corrupt, or a format Pillow declines. Refused rather than stored: an image the API
+#: knows nothing about is one it cannot responsibly serve (#140).
+UNREADABLE_IMAGE = "Artwork image data could not be read"
+
+TOO_MANY_PIXELS = "Artwork declares more pixels than this service will accept"
 
 
 class _Sink(Protocol):
@@ -64,6 +72,8 @@ class StoredArtwork:
     suffix: str
     mime: str
     size: int
+    width: int
+    height: int
     storage_path: str
     already_present: bool
 
@@ -147,7 +157,7 @@ class ArtworkStore:
                 if len(head) >= _SNIFF_BYTES:
                     sniffed = _sniff(head)
                     if sniffed is None:
-                        raise HTTPException(status_code=415, detail=_NOT_AN_IMAGE)
+                        raise HTTPException(status_code=415, detail=NOT_AN_IMAGE)
             hasher.update(chunk)
             if sink is not None:
                 sink.write(chunk)
@@ -157,39 +167,116 @@ class ArtworkStore:
         if sniffed is None:
             # Shorter than _SNIFF_BYTES, so the loop never got enough to decide. Too
             # short to be any of these formats, which is the same refusal.
-            raise HTTPException(status_code=415, detail=_NOT_AN_IMAGE)
+            raise HTTPException(status_code=415, detail=NOT_AN_IMAGE)
 
         mime, suffix = sniffed
         return hasher.hexdigest(), mime, suffix, size
 
+    @staticmethod
+    def _measure(path: Path) -> tuple[int, int]:
+        """Read a staged file's dimensions, or refuse it.
+
+        The backend is responsible for what it serves, so the dimensions are taken
+        from the bytes rather than from anything the caller said about them: a
+        client-supplied size is a claim about a file the client also controls, which
+        is the same reasoning that makes the store sniff its own MIME type.
+
+        Args:
+            path: The complete file on disk.
+
+        Returns:
+            tuple[int, int]: Width and height in pixels.
+
+        Raises:
+            HTTPException: 400 if the image cannot be read, 413 if it declares more
+                pixels than ``MAX_IMAGE_PIXELS``.
+        """
+        try:
+            return measure(path)
+        except ImageTooManyPixels as exc:
+            raise HTTPException(status_code=413, detail=TOO_MANY_PIXELS) from exc
+        except UnreadableImage as exc:
+            raise HTTPException(status_code=400, detail=UNREADABLE_IMAGE) from exc
+
+    def _stage(self, stream: BinaryIO) -> tuple[Path, StoredArtwork]:
+        """Write a stream to a temporary file and describe what it turned out to be.
+
+        Shared by :meth:`store` and :meth:`inspect` so the size cap, the format
+        sniffing, the digest and the measurement have exactly one implementation and
+        both methods accept and refuse precisely the same inputs. A dry run that
+        validated by a second, looser set of rules than the real write would report a
+        scope the real run does not deliver.
+
+        Measuring needs the complete file with random access -- an SOF marker can sit
+        well into a JPEG -- so this is also why the dry run now stages bytes rather
+        than discarding them as it reads.
+
+        The caller owns the temporary file on success: :meth:`store` moves it into
+        place, :meth:`inspect` deletes it. On any refusal it is removed here, because
+        a `.part` file left in the root is one nothing would ever collect.
+
+        Args:
+            stream: The bytes to examine.
+
+        Returns:
+            tuple[Path, StoredArtwork]: The staged file, and what storing it produces.
+
+        Raises:
+            HTTPException: 400 if the file is empty or unreadable as an image, 413 if
+                it exceeds ``MAX_ARTWORK_BYTES`` or ``MAX_IMAGE_PIXELS``, or 415 if
+                the bytes are not an image format artwork may be stored in.
+        """
+        self.root.mkdir(parents=True, exist_ok=True)
+
+        # delete=False because the file outlives the context manager on the success
+        # path, where the caller moves it rather than the cleanup removing it.
+        tmp = tempfile.NamedTemporaryFile(dir=self.root, delete=False, suffix=".part")
+        tmp_path = Path(tmp.name)
+        try:
+            with tmp:
+                digest, mime, suffix, size = self._consume(stream, tmp)
+
+            width, height = self._measure(tmp_path)
+            relative = artwork_relative_path(digest, suffix)
+            return tmp_path, StoredArtwork(
+                digest=digest,
+                suffix=suffix,
+                mime=mime,
+                size=size,
+                width=width,
+                height=height,
+                storage_path=relative,
+                already_present=(self.root / relative).exists(),
+            )
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+
     def inspect(self, stream: BinaryIO) -> StoredArtwork:
-        """Identify and digest a stream without writing anything.
+        """Identify, measure and digest a stream without keeping anything.
 
         Answers "what would storing this produce, and would it be accepted?" -- which
         is what a dry run needs in order to report a scope the real run will actually
         deliver.
+
+        It does touch the disk: measuring requires the complete file, so the bytes are
+        staged under ``ARTWORK_ROOT`` and removed again before returning. Nothing
+        survives the call.
 
         Args:
             stream: The bytes to examine.
 
         Returns:
             StoredArtwork: What :meth:`store` would produce. ``already_present``
-                reports whether that file is on disk already; nothing is written
-                either way.
+                reports whether that file is on disk already; nothing is kept either
+                way.
 
         Raises:
             HTTPException: The same refusals :meth:`store` raises.
         """
-        digest, mime, suffix, size = self._consume(stream, None)
-        relative = artwork_relative_path(digest, suffix)
-        return StoredArtwork(
-            digest=digest,
-            suffix=suffix,
-            mime=mime,
-            size=size,
-            storage_path=relative,
-            already_present=(self.root / relative).exists(),
-        )
+        tmp_path, described = self._stage(stream)
+        tmp_path.unlink(missing_ok=True)
+        return described
 
     def store(self, stream: BinaryIO) -> StoredArtwork:
         """Digest a stream and write it under ARTWORK_ROOT.
@@ -198,7 +285,8 @@ class ArtworkStore:
         ``os.replace`` once the digest is known -- the final path is *derived* from
         the content, so it cannot be known before the last byte is read. The move is
         atomic within a filesystem, so a reader never observes a partial file at a
-        content-addressed path.
+        content-addressed path. It is also what lets the measurement refuse a file
+        before it ever appears at a content-addressed path.
 
         Writing is idempotent by construction: identical bytes always produce the same
         path, so storing a file already present is a no-op rather than a conflict.
@@ -210,46 +298,26 @@ class ArtworkStore:
             stream: The bytes to store.
 
         Returns:
-            StoredArtwork: The digest, canonical type and relative path of the file.
+            StoredArtwork: The digest, canonical type, measured size and relative path
+                of the file.
 
         Raises:
-            HTTPException: 400 if the file is empty, 413 if it exceeds
-                ``MAX_ARTWORK_BYTES``, or 415 if the bytes are not an image format
-                artwork may be stored in.
+            HTTPException: 400 if the file is empty or unreadable as an image, 413 if
+                it exceeds ``MAX_ARTWORK_BYTES`` or ``MAX_IMAGE_PIXELS``, or 415 if
+                the bytes are not an image format artwork may be stored in.
         """
-        self.root.mkdir(parents=True, exist_ok=True)
-
-        # delete=False because the file outlives the context manager on the success
-        # path, where os.replace moves it rather than the cleanup removing it.
-        tmp = tempfile.NamedTemporaryFile(dir=self.root, delete=False, suffix=".part")
-        tmp_path = Path(tmp.name)
+        tmp_path, described = self._stage(stream)
         try:
-            with tmp:
-                digest, mime, suffix, size = self._consume(stream, tmp)
-
-            relative = artwork_relative_path(digest, suffix)
-            target = self.root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-
-            already_present = target.exists()
-            if already_present:
+            if described.already_present:
                 # Same digest means same bytes, so the file on disk is already
                 # correct. Replacing it would be a no-op that briefly unlinks a file
                 # other artwork rows point at.
                 tmp_path.unlink(missing_ok=True)
             else:
+                target = self.root / described.storage_path
+                target.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(tmp_path, target)
-
-            return StoredArtwork(
-                digest=digest,
-                suffix=suffix,
-                mime=mime,
-                size=size,
-                storage_path=relative,
-                already_present=already_present,
-            )
         except BaseException:
-            # Any refusal above leaves a .part file behind otherwise, and those
-            # accumulate in the root where nothing would ever collect them.
             tmp_path.unlink(missing_ok=True)
             raise
+        return described

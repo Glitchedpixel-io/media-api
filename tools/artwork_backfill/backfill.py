@@ -28,7 +28,13 @@ from app.repositories.artwork_repository import SQLAlchemyArtworkRepository
 from app.repositories.errors import UniqueViolation
 from app.schemas import ArtworkCreateInternal
 from app.schemas.enums import EntityTypeEnum
-from app.services.artwork_storage import ArtworkStore, StoredArtwork
+from app.services.artwork_storage import (
+    NOT_AN_IMAGE,
+    TOO_MANY_PIXELS,
+    UNREADABLE_IMAGE,
+    ArtworkStore,
+    StoredArtwork,
+)
 from app.utils.paths import accessory_relative_path
 
 #: The artwork kind a `cover.*` file represents. The producing runners write one image
@@ -264,12 +270,29 @@ def run(
 
 
 def _reason(error: HTTPException) -> str:
-    """Turn a store refusal into a summary bucket."""
+    """Turn a store refusal into a summary bucket.
+
+    Keyed on the detail rather than the status code, because since #140 a status is
+    no longer one cause: 400 is an empty file *or* an image whose dimensions cannot
+    be read, and 413 is over the byte cap *or* over the pixel cap. Bucketing by
+    status would report a corrupt poster as an empty one, which is exactly the kind
+    of summary that sends an operator looking in the wrong place.
+    """
     return {
-        400: "empty file",
-        413: "over the size cap",
-        415: "not a supported image",
-    }.get(error.status_code, f"refused ({error.status_code})")
+        "Artwork file is empty": "empty file",
+        UNREADABLE_IMAGE: "unreadable image",
+        NOT_AN_IMAGE: "not a supported image",
+        TOO_MANY_PIXELS: "over the pixel cap",
+    }.get(str(error.detail), _BY_STATUS.get(error.status_code, f"refused ({error.status_code})"))
+
+
+#: Fallback for a refusal whose detail is not one of the fixed strings above -- the
+#: byte-cap message interpolates its limit, so it cannot be a dict key.
+_BY_STATUS = {
+    400: "empty file",
+    413: "over the size cap",
+    415: "not a supported image",
+}
 
 
 def _insert(session: Session, asset_id: int, kind_id: int, stored: StoredArtwork) -> None:

@@ -21,8 +21,8 @@ from app.repositories import SQLAlchemyArtworkRepository, SQLAlchemyMediaReposit
 from app.schemas import ArtworkCreateInternal, AssetCreateInternal
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import ArtworkStore
+from app.utils.images import measure
 from tools.artwork_dimensions.dimensions import count_needing_dimensions, run
-from tools.artwork_dimensions.measure import measure
 
 
 def _image_bytes(width: int, height: int, fmt: str = "JPEG") -> bytes:
