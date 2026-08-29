@@ -24,12 +24,18 @@ router = APIRouter(route_class=QuietClientErrorRoute)
     operation_id="list_asset_external_ids",
     responses={
         **COMMON_READ_RESPONSES,
-        200: {"description": "List of asset external IDs retrieved successfully"},
+        200: {
+            "description": (
+                "List of asset external IDs retrieved successfully. At most 500 "
+                "identifiers are returned; an asset with more is truncated."
+            )
+        },
     },
 )
 def get_asset_ids(
     asset_id: int, service: ExternalIdentifierService = Depends(get_external_identifier_service)
 ) -> list[ExternalIdentifierReadExtended]:
+    """Get the external IDs for an asset, capped at MAX_IDENTIFIERS_PER_ENTITY."""
     return service.list_for_entity(EntityTypeEnum.asset, asset_id)
 
 

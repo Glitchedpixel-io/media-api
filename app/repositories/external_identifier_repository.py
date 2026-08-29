@@ -1,5 +1,6 @@
 # app/repositories/external_identifier_repository.py
 from sqlalchemy import select, delete
+from sqlalchemy.orm import contains_eager
 
 from app.models import ExternalIdentifierORM, IdSchemeORM
 from app.schemas import (
@@ -13,6 +14,13 @@ from app.schemas.enums import EntityTypeEnum
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import ExternalIdentifierRepository
+
+# Hard ceiling on a per-entity identifier list. Nothing bounds the fan-out: unlike
+# the legacy asset table, external_identifiers is unique on (scheme_id, external_id)
+# only, with no per-entity-per-scheme constraint, so one entity may carry any number
+# of identifiers in a single scheme. The endpoint had no bound of any kind (#95).
+# Restated in the 200 description of both /ids routes -- keep those in step.
+MAX_IDENTIFIERS_PER_ENTITY = 500
 
 
 class SQLAlchemyExternalIdentifierRepository(
@@ -69,15 +77,36 @@ class SQLAlchemyExternalIdentifierRepository(
     def list_for_entity(
         self, entity_type: EntityTypeEnum, entity_id: int
     ) -> list[ExternalIdentifierReadExtended]:
-        """Get all external identifiers for a specific entity."""
+        """Get the external identifiers for a specific entity, bounded.
+
+        At most ``MAX_IDENTIFIERS_PER_ENTITY`` rows are returned whatever the data
+        holds, so the response size cannot be dictated by how many identifiers
+        happen to be attached to one entity (#95).
+
+        ``ExternalIdentifierReadExtended`` serialises ``scheme``, so the join is
+        consumed via ``contains_eager``. The join was already here for the sort;
+        without the eager load the relationship still lazy-loads once per row, which
+        is the same N+1 shape as #49.
+
+        Args:
+            entity_type: Which kind of entity the identifiers are attached to.
+            entity_id: The id of that entity.
+
+        Returns:
+            list[ExternalIdentifierReadExtended]: The identifiers, ordered by scheme
+            label then id, capped at ``MAX_IDENTIFIERS_PER_ENTITY``.
+        """
         stmt = (
             select(ExternalIdentifierORM)
             .join(IdSchemeORM, ExternalIdentifierORM.scheme_id == IdSchemeORM.id)
+            .options(contains_eager(ExternalIdentifierORM.scheme))
             .where(
                 ExternalIdentifierORM.entity_type == entity_type,
                 ExternalIdentifierORM.entity_id == entity_id,
             )
-            .order_by(IdSchemeORM.label)
+            # id breaks ties on a non-unique label, so the capped window is stable
+            .order_by(IdSchemeORM.label, ExternalIdentifierORM.id)
+            .limit(MAX_IDENTIFIERS_PER_ENTITY)
         )
         return [
             ExternalIdentifierReadExtended.model_validate(orm, from_attributes=True)

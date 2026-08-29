@@ -1,6 +1,7 @@
 # tests/contracts/repositories/test_title_reference_repository_contract.py
 import pytest
 
+from app.repositories import title_reference_repository
 from app.repositories.errors import (
     ForeignKeyViolation,
     NotFoundError,
@@ -180,3 +181,54 @@ def test_invalid_updates_and_not_found(bundle):
         bundle.title_references.update(
             0, TitleReferenceUpdateInternal.model_validate({"label": "X"})
         )
+
+
+@pytest.mark.contract
+def test_the_reference_list_is_capped(bundle, monkeypatch) -> None:
+    """More references than the cap allows are truncated, not returned whole (#95)."""
+    monkeypatch.setattr(title_reference_repository, "MAX_REFERENCES_PER_TITLE", 4)
+    title = bundle.titles.create(TitleCreateFactory())
+    for i in range(9):
+        bundle.title_references.create(
+            TitleReferenceCreateInternal.model_validate(
+                {
+                    "title_id": title.id,
+                    "reference_type": "metadata",
+                    "reference_url": f"https://example.com/capped/{i}",
+                }
+            )
+        )
+
+    refs = bundle.title_references.list_title_references(title.id)
+
+    assert len(refs) == 4, "the cap must bound the response"
+
+
+@pytest.mark.contract
+def test_the_capped_window_is_deterministic(bundle, monkeypatch) -> None:
+    """The cap keeps the same rows every call.
+
+    Without an explicit ORDER BY the rows a LIMIT keeps are whatever the planner
+    returned first, so the same request could answer differently each time. This
+    asserts the ordering the cap depends on, which a length check alone would miss.
+    """
+    monkeypatch.setattr(title_reference_repository, "MAX_REFERENCES_PER_TITLE", 3)
+    title = bundle.titles.create(TitleCreateFactory())
+    created = [
+        bundle.title_references.create(
+            TitleReferenceCreateInternal.model_validate(
+                {
+                    "title_id": title.id,
+                    "reference_type": "metadata",
+                    "reference_url": f"https://example.com/ordered/{i}",
+                }
+            )
+        )
+        for i in range(8)
+    ]
+
+    first = bundle.title_references.list_title_references(title.id)
+    second = bundle.title_references.list_title_references(title.id)
+
+    assert [r.id for r in first] == [r.id for r in second]
+    assert [r.id for r in first] == sorted(r.id for r in created)[:3]
