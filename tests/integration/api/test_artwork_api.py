@@ -9,10 +9,12 @@ show is that the two halves agree -- that the row the API returns actually descr
 file that exists on disk at the path it names, and that a refusal leaves neither.
 """
 
+import io
 from http import HTTPStatus
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from fastapi.testclient import TestClient
 
 from app.config import AppConfig
@@ -21,8 +23,20 @@ from app.repositories.protocols import MediaRepository, TitleRepository
 from app.schemas import AssetCreateInternal, IdSchemeCreateInternal, TitleCreateInternal
 from app.services.artwork_storage import MAX_ARTWORK_BYTES
 
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+def _image_bytes(width: int = 40, height: int = 30, fmt: str = "JPEG") -> bytes:
+    """A real, decodable image.
+
+    The store measures every upload and refuses what it cannot read (#140), so a
+    plausible magic number with padding no longer gets through it.
+    """
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+JPEG = _image_bytes(fmt="JPEG")
+PNG = _image_bytes(fmt="PNG")
 NOT_AN_IMAGE = b"<!doctype html><h1>not a poster</h1>" + b" " * 32
 
 

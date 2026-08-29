@@ -27,8 +27,7 @@ from sqlalchemy.orm import Session
 from app.models import ArtworkORM
 from app.repositories.artwork_repository import SQLAlchemyArtworkRepository
 from app.schemas.artwork import ArtworkUpdateInternal
-
-from .measure import measure
+from app.utils.images import measure
 
 #: How many rows to pull per query. Matches the backfill's batch for the same reason:
 #: large enough to amortise the round trip, small enough that the id list is not the

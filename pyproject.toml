@@ -27,6 +27,15 @@ dependencies = [
     "opentelemetry-instrumentation-elasticsearch>=0.59b0,<0.60",
     "ecdsa==0.19.1",
     "python-multipart>=0.0.32",
+    # The API measures every uploaded image and refuses what it cannot read, so an
+    # image library is now core rather than an optional maintenance extra (#140).
+    # Only headers are read: Image.open is lazy and `size` comes from it, so nothing
+    # here decodes pixels.
+    #
+    # The 11.3 floor is load-bearing, not caution. ArtworkStore admits AVIF, and
+    # native AVIF support landed in Pillow 11.3 -- on an earlier 11.x every AVIF
+    # upload would sniff as valid and then be refused as unmeasurable.
+    "pillow>=11.3.0,<12.0.0",
 ]
 
 [project.optional-dependencies]
@@ -37,15 +46,6 @@ dependencies = [
 prefect = [
     "prefect>=3.6.2,<4.0.0",
 ]
-# Pillow is needed only by tools/artwork_dimensions, which measures stored artwork
-# during a one-off maintenance pass. Nothing the API serves decodes an image -- the
-# store identifies formats from magic bytes and never opens them -- so the production
-# image should not carry an image library by default:
-# `uv run --extra dimensions artwork-dimensions`.
-dimensions = [
-    "pillow>=11.0.0,<12.0.0",
-]
-
 [project.scripts]
 # The capability-inventory harness (tools/capability_inventory). It lives in this
 # project rather than a separate one so it can import the app object directly and
@@ -55,7 +55,8 @@ capability-inventory = "tools.capability_inventory.cli:main"
 # predate the artwork table. One-shot, dry-run by default; see its module docstring.
 artwork-backfill = "tools.artwork_backfill.cli:main"
 # The artwork dimensions pass (tools/artwork_dimensions). Fills in width/height on
-# rows registered before anything measured them. Needs the `dimensions` extra.
+# rows registered before anything measured them -- rows that predate #140, when the
+# API began measuring every upload itself. Also re-measures after a bad pass.
 artwork-dimensions = "tools.artwork_dimensions.cli:main"
 
 [project.entry-points."media_api.orchestration_providers"]
@@ -87,10 +88,6 @@ dev = [
     "ruff>=0.14.2",
     # Reads tools/capability_inventory/probes.yaml.
     "pyyaml>=6.0.2",
-    # Not a production dependency (see [project.optional-dependencies]), but
-    # tests/integration/tools/test_artwork_dimensions.py measures real images, so
-    # the extra has to be importable when the suite runs.
-    "pillow>=11.0.0,<12.0.0",
 ]
 
 [build-system]

@@ -94,6 +94,8 @@ def store():
         suffix=".jpg",
         mime="image/jpeg",
         size=1234,
+        width=1000,
+        height=1500,
         storage_path=PATH_A,
         already_present=False,
     )

@@ -1065,6 +1065,7 @@ dependencies = [
     { name = "httpx" },
     { name = "logfire", extra = ["fastapi", "sqlalchemy"] },
     { name = "opentelemetry-instrumentation-elasticsearch" },
+    { name = "pillow" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
@@ -1077,9 +1078,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dimensions = [
-    { name = "pillow" },
-]
 prefect = [
     { name = "prefect" },
 ]
@@ -1094,7 +1092,6 @@ dev = [
     { name = "hypothesis" },
     { name = "mutmut" },
     { name = "mypy" },
-    { name = "pillow" },
     { name = "prefect" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1116,7 +1113,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "logfire", extras = ["fastapi", "sqlalchemy"], specifier = ">=4.14.2,<5.0.0" },
     { name = "opentelemetry-instrumentation-elasticsearch", specifier = ">=0.59b0,<0.60" },
-    { name = "pillow", marker = "extra == 'dimensions'", specifier = ">=11.0.0,<12.0.0" },
+    { name = "pillow", specifier = ">=11.3.0,<12.0.0" },
     { name = "prefect", marker = "extra == 'prefect'", specifier = ">=3.6.2,<4.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.12,<4.0.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.12.4,<3.0.0" },
@@ -1128,7 +1125,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.44,<3.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
 ]
-provides-extras = ["dimensions", "prefect"]
+provides-extras = ["prefect"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1140,7 +1137,6 @@ dev = [
     { name = "hypothesis", specifier = ">=6.112.1" },
     { name = "mutmut", specifier = ">=2.5.1" },
     { name = "mypy", specifier = ">=1.18.2" },
-    { name = "pillow", specifier = ">=11.0.0,<12.0.0" },
     { name = "prefect", specifier = ">=3.6.2,<4.0.0" },
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },

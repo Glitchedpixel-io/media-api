@@ -9,9 +9,13 @@ truncated run says so rather than looking complete.
 from __future__ import annotations
 
 import hashlib
+import io
+import struct
+import zlib
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
@@ -25,8 +29,33 @@ from app.utils.paths import accessory_relative_path
 from tools.artwork_backfill import backfill
 from tools.artwork_backfill.backfill import find_cover, run
 
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+def _image_bytes(width: int = 40, height: int = 30, fmt: str = "JPEG") -> bytes:
+    """A real, decodable image.
+
+    The store measures every upload and refuses what it cannot read (#140), so a
+    plausible magic number with padding no longer gets through it.
+    """
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+def _png_declaring(width: int, height: int) -> bytes:
+    """A structurally valid PNG whose IHDR claims a size it does not contain.
+
+    Small on the wire, enormous once interpreted, so the byte cap cannot see it. The
+    CRC is recomputed because Pillow verifies it on critical chunks.
+    """
+    patched = bytearray(_image_bytes(1, 1, "PNG"))
+    # 8-byte signature, 4-byte length, 4-byte "IHDR", then width and height.
+    patched[16:24] = struct.pack(">II", width, height)
+    patched[29:33] = struct.pack(">I", zlib.crc32(bytes(patched[12:29])))
+    return bytes(patched)
+
+
+JPEG = _image_bytes(fmt="JPEG")
+PNG = _image_bytes(fmt="PNG")
 
 
 @pytest.fixture
@@ -294,6 +323,24 @@ class TestResilience:
         _place_cover(accessory_root, make_asset(), b"")
         summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
         assert summary.skipped == {"empty file": 1}
+
+    def test_an_unreadable_cover_is_skipped_with_its_own_reason(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset
+    ):
+        """A corrupt PNG and an empty file both refuse with 400 since #140, so the
+        bucket has to come from the cause rather than the status -- otherwise the
+        summary reports a truncated download as an empty one."""
+        _place_cover(accessory_root, make_asset(), PNG[:20] + b"\x00" * 64, ".png")
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
+        assert summary.skipped == {"unreadable image": 1}
+
+    def test_a_bomb_cover_is_skipped_with_its_own_reason(
+        self, db_session, store, accessory_root, poster_kind_id, make_asset
+    ):
+        """Likewise 413, which is now the byte cap or the pixel cap."""
+        _place_cover(accessory_root, make_asset(), _png_declaring(10_000, 6_000), ".png")
+        summary = run(db_session, store, accessory_root, poster_kind_id, dry_run=False)
+        assert summary.skipped == {"over the pixel cap": 1}
 
     def test_a_failed_insert_does_not_poison_the_rest_of_the_pass(
         self, db_session, store, accessory_root, poster_kind_id, make_asset, monkeypatch

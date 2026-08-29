@@ -1,8 +1,8 @@
 """Command-line entry point for the artwork dimensions pass.
 
-    uv run --extra dimensions artwork-dimensions              # dry run: report only
-    uv run --extra dimensions artwork-dimensions --apply --limit 20
-    uv run --extra dimensions artwork-dimensions --apply
+    uv run artwork-dimensions                     # dry run: report only
+    uv run artwork-dimensions --apply --limit 20
+    uv run artwork-dimensions --apply
 
 **Dry run is the default and ``--apply`` is required to write anything**, for the same
 reason as the backfill: a maintenance pass that writes by default is one keystroke from
@@ -25,7 +25,6 @@ from sqlalchemy.orm import sessionmaker
 from app.config import get_config
 
 from .dimensions import Summary, count_needing_dimensions, run
-from .measure import MISSING_PILLOW, pillow_missing
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -115,12 +114,6 @@ def main(argv: list[str] | None = None) -> int:
             problem, which is the same reasoning the backfill's exit code uses.
     """
     args = build_parser().parse_args(argv)
-
-    if pillow_missing():
-        # Refused up front rather than on the first file, so an operator does not
-        # discover it after opening a connection to production.
-        print(MISSING_PILLOW, file=sys.stderr)
-        return 2
 
     config = get_config()
 
