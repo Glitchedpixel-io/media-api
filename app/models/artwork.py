@@ -104,8 +104,13 @@ class ArtworkORM(Base):
     # roots differ, which is how `assets.path` already works.
     storage_path: Mapped[str] = mapped_column(Text, nullable=False)
     mime: Mapped[str] = mapped_column(Text, nullable=False)
-    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Not nullable since #143. There is no legitimate reason to store -- and later
+    # serve -- an image the API knows nothing about, and since #140 every write path
+    # measures the bytes, so a null is no longer reachable rather than merely
+    # undesirable. The 1,199 rows that predated the measurement were filled in by
+    # tools/artwork_dimensions (#115) before the constraint landed.
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
 
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -182,12 +187,15 @@ class ArtworkORM(Base):
             "(source_scheme_id IS NULL) = (source_external_id IS NULL)",
             name="ck_artwork_source_pair",
         ),
+        # The IS NULL branch these carried is gone with the nullability: a constraint
+        # that still tolerates a null it can no longer receive misleads the next
+        # reader about what the column allows.
         CheckConstraint(
-            "width IS NULL OR width > 0",
+            "width > 0",
             name="ck_artwork_valid_width",
         ),
         CheckConstraint(
-            "height IS NULL OR height > 0",
+            "height > 0",
             name="ck_artwork_valid_height",
         ),
     )
