@@ -297,6 +297,95 @@ class TestFallback:
 
 @pytest.mark.api
 @pytest.mark.integration
+class TestCuratedEdgesAreNotBorrowedAcross:
+    """Borrowing follows a child's home, never a curated list (#161).
+
+    A curated edge says nothing about where its child belongs, so an image taken
+    across one is arbitrary rather than representative -- "Films of 1974" would show
+    whichever unrelated member sorts first. Latent until #157 made the chain resolve
+    for real rows; every curated collection with members got an image the moment it did.
+    """
+
+    def test_a_curated_collection_does_not_borrow_from_its_members(self, client, world):
+        collection = world.title("Films of 1974", "collection")
+        member = world.title("Member", "movie")
+        world.contains_title(collection, member, membership=MembershipKind.curated)
+        world.art(EntityTypeEnum.title, member)
+
+        assert _poster(client, collection) is None
+
+    def test_an_intrinsic_collection_still_borrows(self, client, world):
+        """The other half of the same assertion: this is a restriction on curated
+        edges, not a retreat from borrowing."""
+        season = world.title("Season", "season")
+        episode = world.title("Episode", "episode")
+        world.contains_title(season, episode, membership=MembershipKind.intrinsic)
+        borrowed = world.art(EntityTypeEnum.title, episode)
+
+        assert _poster(client, season)["id"] == borrowed
+
+    def test_a_curated_collection_still_resolves_its_own_artwork(self, client, world):
+        """What makes the restriction safe rather than merely stricter: a curated list
+        can be given an image, and the seed is not filtered."""
+        collection = world.title("Films of 1974", "collection")
+        world.contains_title(collection, world.title("Member", "movie"))
+        own = world.art(EntityTypeEnum.title, collection)
+
+        assert _poster(client, collection)["id"] == own
+
+    def test_a_curated_edge_is_skipped_rather_than_stopping_the_walk(self, client, world):
+        """A curated entry sorting first must not shadow an intrinsic sibling behind
+        it -- the walk skips the edge, it does not give up at it."""
+        season = world.title("Season", "season")
+        guest = world.title("Guest", "movie")
+        episode = world.title("Episode", "episode")
+        world.contains_title(season, guest, order_key="a", membership=MembershipKind.curated)
+        world.contains_title(season, episode, order_key="b", membership=MembershipKind.intrinsic)
+        world.art(EntityTypeEnum.title, guest)
+        expected = world.art(EntityTypeEnum.title, episode)
+
+        assert _poster(client, season)["id"] == expected
+
+    def test_a_curated_edge_does_not_block_a_deeper_intrinsic_path(self, client, world):
+        """Depth is unaffected: an intrinsic chain still descends past a curated
+        sibling at the same level."""
+        collection = world.title("Collection", "collection")
+        listed = world.title("Listed", "movie")
+        season = world.title("Season", "season")
+        asset = world.asset()
+        world.contains_title(collection, listed, order_key="a", membership=MembershipKind.curated)
+        world.contains_title(collection, season, order_key="b", membership=MembershipKind.intrinsic)
+        world.contains_asset(season, asset)
+        world.art(EntityTypeEnum.title, listed)
+        deep = world.art(EntityTypeEnum.asset, asset)
+
+        assert _poster(client, collection)["id"] == deep
+
+    def test_a_title_reached_only_by_curated_edges_resolves_for_itself(self, client, world):
+        """The child of a curated edge is unaffected -- this restricts what a parent
+        may borrow, not what a member resolves."""
+        collection = world.title("Films of 1974", "collection")
+        member = world.title("Member", "movie")
+        world.contains_title(collection, member, membership=MembershipKind.curated)
+        own = world.art(EntityTypeEnum.title, member)
+
+        assert _poster(client, member)["id"] == own
+
+    def test_assets_under_a_curated_collection_are_not_borrowed_either(self, client, world):
+        """The recursive term carries asset rows too, so the predicate has to hold for
+        them on the same terms."""
+        collection = world.title("Films of 1974", "collection")
+        member = world.title("Member", "movie")
+        asset = world.asset()
+        world.contains_title(collection, member, membership=MembershipKind.curated)
+        world.contains_asset(member, asset)
+        world.art(EntityTypeEnum.asset, asset)
+
+        assert _poster(client, collection) is None
+
+
+@pytest.mark.api
+@pytest.mark.integration
 class TestGraphSafety:
     """The walk is over a DAG, and #88 leaves cycles unprevented."""
 
@@ -319,14 +408,23 @@ class TestGraphSafety:
         world.contains_title(b, a)
         assert _poster(client, a) is None
 
-    def test_a_shared_child_resolves_for_both_parents(self, client, world):
+    def test_a_shared_child_resolves_only_for_the_parent_that_owns_it(self, client, world):
         """A DAG, not a tree: one episode may sit under a season and a collection.
 
-        Which is the intrinsic/curated split #90 went on to name: the season is the
-        episode's home, the collection merely lists it. Resolution deliberately does not
-        care -- a curated list showing a poster drawn from what it lists is right, and
-        the membership rule that counts intrinsic edges only belongs to aggregates
-        (#96), not to artwork.
+        Which is the intrinsic/curated split #90 went on to name -- and, since
+        ``uq_one_intrinsic_parent``, the only shape a shared child can take: one home
+        and any number of lists. The season is the episode's home; the collection
+        merely lists it.
+
+        **This assertion is reversed from how it was first written.** It used to hold
+        that resolution deliberately did not care, on the grounds that a curated list
+        showing artwork drawn from what it lists is right. #161 is the decision that it
+        is not: a curated edge says nothing about where its child belongs, so the image
+        is arbitrary rather than representative, and the collection would wear it as its
+        own identity. The walk now follows intrinsic edges only.
+
+        What this class is really guarding is unchanged: a child reachable by two paths
+        does not break or double-count the walk.
         """
         season = world.title("Season", "season")
         collection = world.title("Collection", "collection")
@@ -336,7 +434,7 @@ class TestGraphSafety:
         shared = world.art(EntityTypeEnum.title, episode)
 
         assert _poster(client, season)["id"] == shared
-        assert _poster(client, collection)["id"] == shared
+        assert _poster(client, collection) is None
 
     def test_a_chain_deeper_than_the_cap_resolves_to_nothing(self, client, world):
         """The cap is a real limit, not decoration. Artwork below it is not found,
