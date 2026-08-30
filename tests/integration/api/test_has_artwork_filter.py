@@ -208,7 +208,7 @@ class TestTitles:
         """A title with no artwork of its own can still show a poster borrowed from its
         contents. This filter deliberately answers the first question, not the second --
         so a title holding nothing is `has_artwork=false` regardless of what
-        `include=poster` would resolve for it."""
+        `include=display_image` would resolve for it."""
         bare = make_title()
 
         body = client.get("/api/titles/", params={"has_artwork": "false"}).json()
