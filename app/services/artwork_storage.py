@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Protocol
@@ -198,7 +199,9 @@ class ArtworkStore:
         except UnreadableImage as exc:
             raise HTTPException(status_code=400, detail=UNREADABLE_IMAGE) from exc
 
-    def _stage(self, stream: BinaryIO) -> tuple[Path, StoredArtwork]:
+    def _stage(
+        self, stream: BinaryIO, accept: Callable[[StoredArtwork], None] | None = None
+    ) -> tuple[Path, StoredArtwork]:
         """Write a stream to a temporary file and describe what it turned out to be.
 
         Shared by :meth:`store` and :meth:`inspect` so the size cap, the format
@@ -238,7 +241,7 @@ class ArtworkStore:
 
             width, height = self._measure(tmp_path)
             relative = artwork_relative_path(digest, suffix)
-            return tmp_path, StoredArtwork(
+            described = StoredArtwork(
                 digest=digest,
                 suffix=suffix,
                 mime=mime,
@@ -248,11 +251,25 @@ class ArtworkStore:
                 storage_path=relative,
                 already_present=(self.root / relative).exists(),
             )
+
+            # The caller's last chance to refuse, and the only one that leaves nothing
+            # behind. Deleting a committed file is not a substitute: storage is content
+            # addressed and therefore deduplicated, so the file may already be the one
+            # another artwork row points at -- and two uploads of identical bytes race,
+            # so even a file this call appears to have written may already be shared.
+            # Refusing here means there is nothing to clean up rather than something to
+            # clean up carefully.
+            if accept is not None:
+                accept(described)
+
+            return tmp_path, described
         except BaseException:
             tmp_path.unlink(missing_ok=True)
             raise
 
-    def inspect(self, stream: BinaryIO) -> StoredArtwork:
+    def inspect(
+        self, stream: BinaryIO, accept: Callable[[StoredArtwork], None] | None = None
+    ) -> StoredArtwork:
         """Identify, measure and digest a stream without keeping anything.
 
         Answers "what would storing this produce, and would it be accepted?" -- which
@@ -274,11 +291,13 @@ class ArtworkStore:
         Raises:
             HTTPException: The same refusals :meth:`store` raises.
         """
-        tmp_path, described = self._stage(stream)
+        tmp_path, described = self._stage(stream, accept)
         tmp_path.unlink(missing_ok=True)
         return described
 
-    def store(self, stream: BinaryIO) -> StoredArtwork:
+    def store(
+        self, stream: BinaryIO, accept: Callable[[StoredArtwork], None] | None = None
+    ) -> StoredArtwork:
         """Digest a stream and write it under ARTWORK_ROOT.
 
         The file is written to a temporary name first and moved into place with
@@ -306,7 +325,7 @@ class ArtworkStore:
                 it exceeds ``MAX_ARTWORK_BYTES`` or ``MAX_IMAGE_PIXELS``, or 415 if
                 the bytes are not an image format artwork may be stored in.
         """
-        tmp_path, described = self._stage(stream)
+        tmp_path, described = self._stage(stream, accept)
         try:
             if described.already_present:
                 # Same digest means same bytes, so the file on disk is already

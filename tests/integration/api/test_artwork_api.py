@@ -24,11 +24,13 @@ from app.schemas import AssetCreateInternal, IdSchemeCreateInternal, TitleCreate
 from app.services.artwork_storage import MAX_ARTWORK_BYTES
 
 
-def _image_bytes(width: int = 40, height: int = 30, fmt: str = "JPEG") -> bytes:
-    """A real, decodable image.
+def _image_bytes(width: int = 600, height: int = 900, fmt: str = "JPEG") -> bytes:
+    """A real, decodable image, poster-shaped by default.
 
     The store measures every upload and refuses what it cannot read (#140), so a
-    plausible magic number with padding no longer gets through it.
+    plausible magic number with padding no longer gets through it. Since #153 it also
+    refuses a shape the declared kind forbids, so the default has to be a valid poster
+    -- 2:3 and clear of the width floor -- because that is what most of these upload.
     """
     buffer = io.BytesIO()
     Image.new("RGB", (width, height)).save(buffer, format=fmt)
@@ -254,7 +256,7 @@ class TestPrimary:
         poster = _upload(client, f"/api/titles/{title_id}/artwork", is_primary=True).json()
         backdrop = client.post(
             f"/api/titles/{title_id}/artwork",
-            files={"file": ("bd.png", PNG, "image/png")},
+            files={"file": ("bd.png", _image_bytes(1920, 1080, "PNG"), "image/png")},
             data={"artwork_kind": "backdrop", "is_primary": "true"},
         ).json()
 
@@ -375,11 +377,11 @@ class TestUploadFormValidation:
     def test_the_recorded_dimensions_are_measured_from_the_bytes(self, client, title_id):
         response = client.post(
             f"/api/titles/{title_id}/artwork",
-            files={"file": ("poster.jpg", _image_bytes(321, 123), "image/jpeg")},
+            files={"file": ("poster.jpg", _image_bytes(400, 600), "image/jpeg")},
             data={"artwork_kind": "poster"},
         )
         assert response.status_code == HTTPStatus.CREATED
-        assert (response.json()["width"], response.json()["height"]) == (321, 123)
+        assert (response.json()["width"], response.json()["height"]) == (400, 600)
 
     def test_submitted_dimensions_are_ignored_in_favour_of_the_real_ones(self, client, title_id):
         """The form no longer carries width or height, and FastAPI drops undeclared
@@ -388,11 +390,11 @@ class TestUploadFormValidation:
         size is a claim about a file the caller also controls (#141)."""
         response = client.post(
             f"/api/titles/{title_id}/artwork",
-            files={"file": ("poster.jpg", _image_bytes(321, 123), "image/jpeg")},
+            files={"file": ("poster.jpg", _image_bytes(400, 600), "image/jpeg")},
             data={"artwork_kind": "poster", "width": "1", "height": "1"},
         )
         assert response.status_code == HTTPStatus.CREATED
-        assert (response.json()["width"], response.json()["height"]) == (321, 123)
+        assert (response.json()["width"], response.json()["height"]) == (400, 600)
 
     def test_a_missing_kind_is_422(self, client, title_id):
         response = client.post(
@@ -401,3 +403,120 @@ class TestUploadFormValidation:
             data={},
         )
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.integration
+class TestShapeEnforcement:
+    """A declared kind whose shape the pixels contradict is refused (#153).
+
+    Shape is necessary but not sufficient: the caller says what the artwork is, and
+    this says whether the image can be that. Nothing infers a kind from pixels.
+    """
+
+    def test_a_landscape_image_is_not_a_poster(self, client, title_id):
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("wrong.jpg", _image_bytes(1920, 1080), "image/jpeg")},
+            data={"artwork_kind": "poster"},
+        )
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        assert "poster" in response.json()["detail"]
+
+    def test_the_refusal_names_the_expectation(self, client, title_id):
+        """A caller that is told only "no" cannot fix its request."""
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("wrong.jpg", _image_bytes(1920, 1080), "image/jpeg")},
+            data={"artwork_kind": "poster"},
+        )
+        detail = response.json()["detail"]
+        assert "1920x1080" in detail
+        assert "aspect ratio" in detail
+
+    def test_a_portrait_image_is_accepted_as_a_poster(self, client, title_id):
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("right.jpg", _image_bytes(600, 900), "image/jpeg")},
+            data={"artwork_kind": "poster"},
+        )
+        assert response.status_code == HTTPStatus.CREATED
+
+    def test_the_tolerance_admits_the_row_it_exists_for(self, client, title_id):
+        """499x500 is a real production cover, 0.2% off square. The tolerance exists
+        because of it, so a rule that refused it would be the wrong rule (#151)."""
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("cover.jpg", _image_bytes(499, 500), "image/jpeg")},
+            data={"artwork_kind": "cover_art"},
+        )
+        assert response.status_code == HTTPStatus.CREATED
+
+    def test_a_kind_with_no_target_ratio_accepts_any_shape(self, client, title_id):
+        """`thumbnail` holds both 16:9 and 4:3 real rows, so it constrains width only."""
+        for width, height in ((1280, 720), (640, 480)):
+            response = client.post(
+                f"/api/titles/{title_id}/artwork",
+                files={"file": ("t.jpg", _image_bytes(width, height), "image/jpeg")},
+                data={"artwork_kind": "thumbnail"},
+            )
+            assert response.status_code == HTTPStatus.CREATED, f"{width}x{height} refused"
+
+    def test_an_image_below_the_width_floor_is_refused(self, client, title_id):
+        """128x96 is the one stored row too small to be useful artwork of any kind."""
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("tiny.jpg", _image_bytes(128, 96), "image/jpeg")},
+            data={"artwork_kind": "thumbnail"},
+        )
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        assert "wide" in response.json()["detail"]
+
+    def test_a_refused_upload_leaves_nothing_on_disk(self, client, title_id, artwork_root):
+        """The constraint that shaped the design. Deleting a committed file is not a
+        substitute: content addressing means it may already be shared with another row,
+        so the refusal has to happen before anything is committed."""
+        before = sorted(p.name for p in artwork_root.rglob("*") if p.is_file())
+
+        client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("wrong.jpg", _image_bytes(1920, 1080), "image/jpeg")},
+            data={"artwork_kind": "poster"},
+        )
+
+        after = sorted(p.name for p in artwork_root.rglob("*") if p.is_file())
+        assert after == before
+        assert not list(artwork_root.rglob("*.part"))
+
+    def test_a_refusal_does_not_delete_a_file_another_row_shares(
+        self, client, title_id, artwork_root
+    ):
+        """Content addressing deduplicates, so the bytes a rejected upload carries may
+        already be the file a valid row points at. Cleaning up after the fact would
+        break that row; refusing before the commit cannot."""
+        payload = _image_bytes(1280, 720)
+        created = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("ok.jpg", payload, "image/jpeg")},
+            data={"artwork_kind": "thumbnail"},
+        ).json()
+        stored_path = artwork_root / created["storage_path"]
+        assert stored_path.is_file()
+
+        # The same bytes, now declared as something they cannot be.
+        client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("wrong.jpg", payload, "image/jpeg")},
+            data={"artwork_kind": "poster"},
+        )
+
+        assert stored_path.is_file(), "the rejected upload deleted a file in use"
+        assert client.get(f"/api/artwork/{created['id']}").status_code == HTTPStatus.OK
+
+    def test_an_unconstrained_kind_accepts_anything(self, client, title_id):
+        """`unknown` is the absence of a claim, so it cannot be contradicted."""
+        response = client.post(
+            f"/api/titles/{title_id}/artwork",
+            files={"file": ("odd.jpg", _image_bytes(1000, 137), "image/jpeg")},
+            data={"artwork_kind": "unknown"},
+        )
+        assert response.status_code == HTTPStatus.CREATED
