@@ -34,6 +34,111 @@ from .protocols import ArtworkKindRepository, ArtworkRepository
 #: depth is the dimension that multiplies.
 MAX_RESOLUTION_DEPTH = 8
 
+#: The containment edges a display image may be borrowed along.
+#:
+#: Defined once and used by both directions of the walk -- ``resolve_for_titles``
+#: descending to find a title's image, and ``titles_resolving_artwork`` ascending to
+#: find which titles have one. If those two disagreed about which edges count, the
+#: ``resolves_display_image`` filter would return titles whose image is null and omit
+#: titles that show one, which is a worse failure than not having the filter (#122).
+BORROWABLE = TitleContentORM.membership == MembershipKind.intrinsic
+
+
+def titles_resolving_artwork(
+    kind_ids: Sequence[int], max_depth: int = MAX_RESOLUTION_DEPTH
+) -> Select:
+    """Ids of every title that resolves artwork of any of ``kind_ids``.
+
+    The set ``resolve_for_titles`` would return something for, computed as a set rather
+    than per title, so it can be semi-joined against a listing (#122).
+
+    **Walks up, not down**, which is what makes it affordable as a filter. Descending
+    from the listing's candidates means walking the containment graph once per
+    candidate -- the shape #49 measured at 14.6s -- because the work scales with the
+    number of titles asked about. Ascending scales with the number of *artworks*
+    instead: the seed is the artwork table, and ``uq_one_intrinsic_parent`` allows a
+    title at most one intrinsic parent, so each step upward is a chain rather than a
+    fan-out. Assets are the one place it branches, since the same file may sit under
+    two cuts.
+
+    Measured at 102,500 containment rows against a 500-row page: 150ms ascending,
+    311ms descending, and 74ms for the ``include=display_image`` resolution the same
+    grid already pays for on the same page. At today's production shape it is 3.7ms.
+    So the filter is the same order of magnitude as the call it accompanies, which is
+    the bar #122 set. A materialised "resolved image" column maintained on write --
+    the alternative the issue names -- buys roughly one order of magnitude more and
+    costs a write path and a backfill; it is not needed at this size.
+
+    Both directions must agree, or the filter lies about the listing it filters. They
+    share ``BORROWABLE``, and ``TestFilterAgreesWithResolution`` asserts the agreement
+    on built data rather than trusting that they were written to match.
+
+    Args:
+        kind_ids: The artwork kinds that count as a display image, already resolved
+            from codes by the service, as everywhere else in this repository.
+        max_depth: How many levels of containment to ascend. The same cap the
+            descending walk applies, so the two see the same reachable set.
+
+    Returns:
+        Select: A one-column selectable of title ids, for use as a semi-join target.
+            Selects nothing when ``kind_ids`` is empty.
+    """
+    if not kind_ids:
+        return select(TitleORM.id).where(literal(False))
+
+    holders = (
+        select(ArtworkORM.entity_type, ArtworkORM.entity_id)
+        .where(ArtworkORM.artwork_kind_id.in_(kind_ids))
+        .where(ArtworkORM.is_primary.is_(True))
+        .distinct()
+        .cte("artwork_holders")
+    )
+
+    # Depth 0: a title holding its own artwork resolves for itself, which is the
+    # "own artwork wins" case arriving at the same answer from the other side.
+    own = select(
+        holders.c.entity_id.label("title_id"),
+        literal(0, Integer).label("depth"),
+        array([holders.c.entity_id]).label("seen"),
+    ).where(holders.c.entity_type == EntityTypeEnum.title)
+
+    # An asset is a leaf: its holders are the titles that directly contain it.
+    from_asset = (
+        select(
+            TitleContentORM.parent_title_id.label("title_id"),
+            literal(1, Integer).label("depth"),
+            array([TitleContentORM.parent_title_id]).label("seen"),
+        )
+        .select_from(holders)
+        .join(TitleContentORM, TitleContentORM.asset_id == holders.c.entity_id)
+        .where(holders.c.entity_type == EntityTypeEnum.asset)
+        .where(BORROWABLE)
+    )
+
+    # Wrapped in a subquery because a recursive CTE's seed has to be a single SELECT:
+    # SQLAlchemy refuses `union_all` onto a CTE whose element is already a compound.
+    seeds = own.union_all(from_asset).subquery("artwork_seed")
+    seed = select(seeds.c.title_id, seeds.c.depth, seeds.c.seen)
+
+    climb = seed.cte("artwork_climb", recursive=True)
+    # The same two guards the descending walk carries, for the same reason: the cap
+    # bounds legitimate depth and the path set bounds a cycle, which #88 leaves open.
+    step = (
+        select(
+            TitleContentORM.parent_title_id.label("title_id"),
+            (climb.c.depth + 1).label("depth"),
+            (climb.c.seen + array([TitleContentORM.parent_title_id])).label("seen"),
+        )
+        .select_from(climb)
+        .join(TitleContentORM, TitleContentORM.child_title_id == climb.c.title_id)
+        .where(BORROWABLE)
+        .where(climb.c.depth < max_depth)
+        .where(~climb.c.seen.contains(array([TitleContentORM.parent_title_id])))
+    )
+    climb = climb.union_all(step)
+
+    return select(climb.c.title_id).distinct()
+
 
 class SQLAlchemyArtworkKindRepository(SQLAlchemyBaseRepository, ArtworkKindRepository):
     """The artwork kinds an artwork can be categorised as.
@@ -354,7 +459,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
             .where(walk.c.title_id.isnot(None))
             .where(walk.c.depth < max_depth)
             # Borrow down a child's home, never across a curated list (#161).
-            .where(TitleContentORM.membership == MembershipKind.intrinsic)
+            .where(BORROWABLE)
             .where(~walk.c.seen.contains(array([TitleContentORM.child_title_id])))
         )
         walk = walk.union_all(step)

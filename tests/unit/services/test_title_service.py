@@ -179,7 +179,59 @@ class TestGetTitles:
         assert result is expected_response
         assert len(result.items) == 3
         assert result.page.next is None
-        repo.list_paged.assert_called_once_with(params)
+        # `None` for the display-image kinds: an ordinary page does not resolve the
+        # chain, so it does not pay for the lookup either (#122).
+        repo.list_paged.assert_called_once_with(params, None)
+
+    @pytest.mark.unit
+    def test_the_display_chain_is_resolved_only_when_the_filter_asks(self) -> None:
+        """`resolves_display_image` needs the chain as kind ids, so the service looks
+        them up and hands them down -- the same split `?kind=` uses on the artwork
+        routes, keeping the chain a service concern rather than a repository one."""
+        repo = create_autospec(TitleRepository, instance=True, spec_set=True)
+        repo.list_paged.return_value = PaginatedResponse(
+            items=[], page=PageInfo(next=None, prev=None)
+        )
+        kinds = _kind_repo(code="thumbnail")
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), kinds, _content_repo())
+        params = TitleListParams(resolves_display_image=False)
+
+        svc.get_titles(params)
+
+        repo.list_paged.assert_called_once_with(params, [7])
+        kinds.list_all.assert_called_once()
+
+    @pytest.mark.unit
+    def test_an_ordinary_page_never_touches_the_kind_repository(self) -> None:
+        """The other half of the same rule, asserted from the mock's side."""
+        repo = create_autospec(TitleRepository, instance=True, spec_set=True)
+        repo.list_paged.return_value = PaginatedResponse(
+            items=[], page=PageInfo(next=None, prev=None)
+        )
+        kinds = _kind_repo()
+        svc = TitleService(repo, _type_repo(), _artwork_repo(), kinds, _content_repo())
+
+        svc.get_titles(TitleListParams())
+
+        kinds.list_all.assert_not_called()
+
+    @pytest.mark.unit
+    def test_a_chain_kind_missing_from_the_lookup_table_is_skipped(self) -> None:
+        """Kinds are an editable lookup table. A filter that 500s because a row was
+        removed would be worse than one that ignores it, matching how the resolution
+        itself already treats a missing kind."""
+        repo = create_autospec(TitleRepository, instance=True, spec_set=True)
+        repo.list_paged.return_value = PaginatedResponse(
+            items=[], page=PageInfo(next=None, prev=None)
+        )
+        svc = TitleService(
+            repo, _type_repo(), _artwork_repo(), _kind_repo(code=None), _content_repo()
+        )
+        params = TitleListParams(resolves_display_image=True)
+
+        svc.get_titles(params)
+
+        repo.list_paged.assert_called_once_with(params, [])
 
     @pytest.mark.unit
     def test_get_titles_with_pagination(self) -> None:
@@ -195,7 +247,7 @@ class TestGetTitles:
 
         assert result.page.next == "next_cursor"
         assert result.page.prev == "prev_cursor"
-        repo.list_paged.assert_called_once_with(params)
+        repo.list_paged.assert_called_once_with(params, None)
 
     @pytest.mark.unit
     def test_get_titles_with_filters(self) -> None:
@@ -214,7 +266,7 @@ class TestGetTitles:
         result = svc.get_titles(params)
 
         assert result == repo.list_paged.return_value
-        repo.list_paged.assert_called_once_with(params)
+        repo.list_paged.assert_called_once_with(params, None)
 
     @pytest.mark.unit
     def test_get_titles_empty_result(self) -> None:

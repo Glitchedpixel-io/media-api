@@ -15,7 +15,23 @@ class TitleFilters(BaseModel):
             "Only titles carrying artwork of their own (true), or only those with none "
             "(false). This is not the same question as whether a title *shows* "
             "artwork: a title with no artwork of its own can still resolve some from "
-            "its contents, which `include=display_image` reports per row"
+            "its contents, which `include=display_image` reports per row. To ask that "
+            "question instead -- which is almost always the one a browse grid wants -- "
+            "use `resolves_display_image`"
+        ),
+    )
+    resolves_display_image: bool | None = Field(
+        None,
+        description=(
+            "Only titles that show an image (true), or only those that show none "
+            "(false) -- the holes in the grid. **Not the same question as "
+            "`has_artwork`**, and the two will disagree for most titles: "
+            "`has_artwork` asks whether a title carries artwork of its own, while "
+            "this asks whether `include=display_image` would resolve anything for "
+            "it, which includes artwork borrowed from its contents. A title with no "
+            "artwork of its own still shows one if any of its episodes or their "
+            "assets has one. Borrowing follows intrinsic containment only, so a "
+            "curated list resolves an image only if it has been given one directly"
         ),
     )
     library_root: bool | None = Field(
