@@ -2,7 +2,7 @@
 from collections.abc import Sequence
 
 from sqlakeyset import select_page
-from sqlalchemy import Integer, Text, func, literal, or_, select
+from sqlalchemy import Integer, Text, func, literal, select
 from sqlalchemy.sql import ColumnElement, Select
 from sqlalchemy.dialects.postgresql import array
 
@@ -146,11 +146,6 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
             stmt = stmt.where(ArtworkORM.artwork_kind_id == kind_id)
         if params.is_primary is not None:
             stmt = stmt.where(ArtworkORM.is_primary.is_(params.is_primary))
-        if params.missing_dimensions is not None:
-            missing = or_(ArtworkORM.width.is_(None), ArtworkORM.height.is_(None))
-            # `~missing` rather than "both are not null" spelled out again, so the two
-            # branches cannot drift into disagreeing about what "missing" means.
-            stmt = stmt.where(missing if params.missing_dimensions else ~missing)
 
         stmt = apply_ordering(stmt, ARTWORK_SORT, params.sort)
 

@@ -35,8 +35,8 @@ def make_artwork(db_session, artwork_kind_ids: dict[str, int]):
         entity_id: int | None = None,
         kind: str = "poster",
         is_primary: bool = True,
-        width: int | None = None,
-        height: int | None = None,
+        width: int = 640,
+        height: int = 960,
     ) -> int:
         counter["n"] += 1
         n = counter["n"]
@@ -156,46 +156,31 @@ class TestFilters:
 
         assert [item["id"] for item in body["items"]] == [asset_artwork]
 
-    def test_filters_by_missing_dimensions(self, client: TestClient, make_artwork):
-        """The query that makes a dimensions backfill expressible, per #115."""
-        without = make_artwork()
-        make_artwork(width=640, height=960)
-
-        body = client.get("/api/artwork", params={"missing_dimensions": "true"}).json()
-
-        assert [item["id"] for item in body["items"]] == [without]
-
-    def test_a_half_measured_row_counts_as_missing_dimensions(
-        self, client: TestClient, make_artwork
-    ):
-        """Width without height is not a usable size, so it belongs with the gaps."""
-        half = make_artwork(width=640, height=None)
-
-        body = client.get("/api/artwork", params={"missing_dimensions": "true"}).json()
-
-        assert [item["id"] for item in body["items"]] == [half]
-
-    def test_missing_dimensions_false_returns_only_fully_measured_rows(
-        self, client: TestClient, make_artwork
-    ):
-        make_artwork()
-        make_artwork(width=640, height=None)
-        measured = make_artwork(width=800, height=1200)
-
-        body = client.get("/api/artwork", params={"missing_dimensions": "false"}).json()
-
-        assert [item["id"] for item in body["items"]] == [measured]
-
     def test_filters_compose(self, client: TestClient, make_artwork):
-        make_artwork(kind="poster", width=1, height=1)
-        wanted = make_artwork(kind="poster")
-        make_artwork(kind="backdrop")
+        wanted = make_artwork(kind="poster", is_primary=True)
+        make_artwork(kind="poster", is_primary=False)
+        make_artwork(kind="backdrop", is_primary=True)
 
-        body = client.get(
-            "/api/artwork", params={"kind": "poster", "missing_dimensions": "true"}
-        ).json()
+        body = client.get("/api/artwork", params={"kind": "poster", "is_primary": "true"}).json()
 
         assert [item["id"] for item in body["items"]] == [wanted]
+
+    def test_missing_dimensions_is_no_longer_honoured(self, client: TestClient, make_artwork):
+        """The filter existed to make the #115 backfill expressible. Since #143 there
+        are no unmeasured rows for it to find, so it is gone.
+
+        Worth pinning the *shape* of its removal rather than just its absence: query
+        params reach the endpoint through `Depends()`, where FastAPI ignores what the
+        model does not declare, so `extra="forbid"` does not produce a 422 here. A
+        caller still sending it gets an unfiltered list rather than an error -- which
+        is the thing a consumer needs to be told, and is why this ships as a major.
+        """
+        make_artwork()
+        make_artwork()
+
+        body = client.get("/api/artwork", params={"missing_dimensions": "true"}).json()
+
+        assert len(body["items"]) == 2
 
     def test_an_unsupported_sort_field_is_422_not_500(self, client: TestClient):
         response = client.get("/api/artwork", params={"sort": "storage_path:asc"})

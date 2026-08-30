@@ -30,13 +30,6 @@ class ArtworkFilters(BaseModel):
             "alternatives (false)"
         ),
     )
-    missing_dimensions: bool | None = Field(
-        None,
-        description=(
-            "Only artwork with no width or height recorded (true), or only artwork "
-            "carrying both (false)"
-        ),
-    )
 
 
 class ArtworkListParams(KeysetPagination, ArtworkFilters):

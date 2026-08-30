@@ -22,7 +22,7 @@ from app.schemas import ArtworkCreateInternal, AssetCreateInternal
 from app.schemas.enums import EntityTypeEnum
 from app.services.artwork_storage import ArtworkStore
 from app.utils.images import measure
-from tools.artwork_dimensions.dimensions import count_needing_dimensions, run
+from tools.artwork_dimensions.dimensions import count_artwork, run
 
 
 def _image_bytes(width: int, height: int, fmt: str = "JPEG") -> bytes:
@@ -80,8 +80,11 @@ def make_artwork(db_session: Session, store: ArtworkStore, poster_kind_id: int):
                 artwork_kind_id=poster_kind_id,
                 storage_path=stored.storage_path,
                 mime=stored.mime,
-                width=None,
-                height=None,
+                # Deliberately wrong rather than absent. Since #143 a row cannot be
+                # unmeasured, so what this pass corrects is a bad measurement -- a
+                # 1x1 placeholder stands in for one.
+                width=1,
+                height=1,
                 is_primary=True,
                 source_scheme_id=None,
                 source_external_id=None,
@@ -121,7 +124,8 @@ class TestDryRun:
         summary = run(db_session, artwork_root, dry_run=True)
 
         assert summary.measured == 1
-        assert _row(db_session, artwork_id).width is None
+        row = _row(db_session, artwork_id)
+        assert (row.width, row.height) == (1, 1), "the wrong placeholder size is untouched"
 
     def test_a_dry_run_still_reports_what_it_could_not_read(
         self, db_session, artwork_root, make_artwork
@@ -148,41 +152,49 @@ class TestApply:
         row = _row(db_session, artwork_id)
         assert (row.width, row.height) == (1280, 720)
 
-    def test_rows_that_already_have_dimensions_are_not_visited(
-        self, db_session, artwork_root, make_artwork
-    ):
+    def test_it_corrects_a_wrong_measurement(self, db_session, artwork_root, make_artwork):
+        """What the pass is now for: a stored size that does not match the file."""
+        artwork_id = make_artwork(1280, 720)
+        assert (_row(db_session, artwork_id).width, _row(db_session, artwork_id).height) == (1, 1)
+
+        run(db_session, artwork_root, dry_run=False)
+
+        row = _row(db_session, artwork_id)
+        assert (row.width, row.height) == (1280, 720)
+
+    def test_every_row_is_visited_on_every_pass(self, db_session, artwork_root, make_artwork):
+        """There is no "outstanding" subset to walk any more -- #143 removed the nulls
+        that defined one, so a pass covers everything or it is not a recovery."""
         make_artwork(640, 960)
         run(db_session, artwork_root, dry_run=False)
 
         second = run(db_session, artwork_root, dry_run=False)
 
-        assert second.artwork_scanned == 0
-        assert second.measured == 0
+        assert second.artwork_scanned == 1
+        assert second.measured == 1
 
-    def test_remeasure_revisits_rows_that_already_have_dimensions(
-        self, db_session, artwork_root, make_artwork
-    ):
-        """The escape hatch for a pass that recorded something wrong."""
+    def test_a_repeated_pass_is_idempotent(self, db_session, artwork_root, make_artwork):
         artwork_id = make_artwork(1280, 720)
+
+        run(db_session, artwork_root, dry_run=False)
         run(db_session, artwork_root, dry_run=False)
 
-        summary = run(db_session, artwork_root, dry_run=False, remeasure=True)
-
-        assert summary.measured == 1
         row = _row(db_session, artwork_id)
         assert (row.width, row.height) == (1280, 720)
 
-    def test_only_the_outstanding_rows_are_visited_on_a_resumed_pass(
+    def test_a_limited_pass_resumes_from_the_start_of_the_set(
         self, db_session, artwork_root, make_artwork
     ):
+        """`--limit` no longer means "the rest next time": every pass starts at the
+        first row, because the set it walks no longer shrinks as it goes."""
         for _ in range(3):
             make_artwork()
 
         run(db_session, artwork_root, dry_run=False, limit=1)
         second = run(db_session, artwork_root, dry_run=False)
 
-        assert second.artwork_scanned == 2
-        assert second.measured == 2
+        assert second.artwork_scanned == 3
+        assert second.measured == 3
 
 
 @pytest.mark.integration
@@ -200,7 +212,8 @@ class TestResilience:
 
         assert summary.file_missing == 1
         assert summary.measured == 0
-        assert _row(db_session, artwork_id).width is None
+        # Left at the placeholder rather than guessed at.
+        assert _row(db_session, artwork_id).width == 1
 
     def test_one_unreadable_file_does_not_end_the_pass(
         self, db_session, artwork_root, make_artwork
@@ -240,7 +253,7 @@ class TestResilience:
 
         assert summary.failed == 1
         assert summary.measured == 1
-        assert _row(db_session, first).width is None
+        assert _row(db_session, first).width == 1, "the failed row keeps its old value"
         assert (_row(db_session, second).width, _row(db_session, second).height) == (300, 400)
 
 
@@ -294,10 +307,11 @@ class TestLimit:
 @pytest.mark.integration
 class TestCount:
 
-    def test_counts_only_rows_missing_a_dimension(self, db_session, artwork_root, make_artwork):
+    def test_counts_every_artwork_row(self, db_session, artwork_root, make_artwork):
+        """The count is the scope of a pass, and since #143 that is all of them."""
         make_artwork()
         make_artwork()
-        assert count_needing_dimensions(db_session) == 2
+        assert count_artwork(db_session) == 2
 
         run(db_session, artwork_root, dry_run=False, limit=1)
-        assert count_needing_dimensions(db_session) == 1
+        assert count_artwork(db_session) == 2

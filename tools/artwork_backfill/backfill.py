@@ -310,8 +310,10 @@ def _insert(session: Session, asset_id: int, kind_id: int, stored: StoredArtwork
             artwork_kind_id=kind_id,
             storage_path=stored.storage_path,
             mime=stored.mime,
-            width=None,
-            height=None,
+            # Measured by the store rather than left null, which is what every row
+            # this tool wrote before #140 had to be fixed up by a separate pass.
+            width=stored.width,
+            height=stored.height,
             # The only artwork this asset has, so it is the one to use. The pre-load
             # guarantees there is no incumbent primary of this kind to collide with.
             is_primary=True,

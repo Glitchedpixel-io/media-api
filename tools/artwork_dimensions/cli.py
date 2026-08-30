@@ -1,4 +1,9 @@
-"""Command-line entry point for the artwork dimensions pass.
+"""Command-line entry point for the artwork re-measurement pass.
+
+A recovery tool, not a backfill. Since #140 the API measures every upload, and #143
+made width and height NOT NULL, so there are no unmeasured rows left to find. This
+exists for the case where a stored measurement is believed wrong and every row needs
+deriving from its file again.
 
     uv run artwork-dimensions                     # dry run: report only
     uv run artwork-dimensions --apply --limit 20
@@ -24,7 +29,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import get_config
 
-from .dimensions import Summary, count_needing_dimensions, run
+from .dimensions import Summary, count_artwork, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,14 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Stop after attempting N rows, so a first real run is small enough to "
             "inspect. Counts attempts, not successes."
-        ),
-    )
-    parser.add_argument(
-        "--remeasure",
-        action="store_true",
-        help=(
-            "Also visit rows that already have dimensions, overwriting them. "
-            "Use when a previous pass recorded something wrong."
         ),
     )
     parser.add_argument(
@@ -97,7 +94,7 @@ def _render(summary: Summary) -> str:
         lines += [
             "",
             "  NOT A COMPLETE PASS: stopped at --limit with rows still unvisited.",
-            "  Re-run without --limit to finish; rows already measured are skipped.",
+            "  Re-run without --limit to cover every row.",
         ]
     if summary.dry_run:
         lines += ["", "  Re-run with --apply to write these."]
@@ -131,12 +128,10 @@ def main(argv: list[str] | None = None) -> int:
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     session = session_factory()
     try:
-        outstanding = count_needing_dimensions(session)
-        scope = (
-            "every artwork row" if args.remeasure else f"{outstanding} row(s) without dimensions"
-        )
+        total = count_artwork(session)
         print(
-            f"{'DRY RUN - ' if not args.apply else ''}" f"Measuring {scope} against {artwork_root}"
+            f"{'DRY RUN - ' if not args.apply else ''}"
+            f"Re-measuring {total} artwork row(s) against {artwork_root}"
         )
 
         summary = run(
@@ -144,7 +139,6 @@ def main(argv: list[str] | None = None) -> int:
             artwork_root,
             dry_run=not args.apply,
             limit=args.limit,
-            remeasure=args.remeasure,
             on_event=print if args.verbose else None,
         )
     finally:

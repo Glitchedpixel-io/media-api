@@ -1,18 +1,20 @@
-"""Fill in the pixel dimensions that existing artwork rows were created without.
+"""Re-derive every artwork row's pixel dimensions from the file it points at.
 
-``tools/artwork_backfill`` registers what it finds on disk and passes ``width=None,
-height=None`` -- it never opens the image to measure it. Uploads take the fields from
-the caller, so anything registered before callers started sending them has neither.
-The browse grid has no intrinsic size to lay out against for those rows.
+Originally (#115) this filled in rows created without dimensions: the backfill passed
+``width=None, height=None`` and uploads took the fields from the caller, so anything
+registered before callers sent them had neither. That gap is closed -- #140 made the
+API measure every upload, #141 made it record what it measured, and #143 made the
+columns NOT NULL -- so there is nothing left to fill.
+
+What remains is recovery. If a stored measurement is ever believed wrong, this derives
+all of them again from the stored files. The pass therefore visits every row; there is
+no "outstanding" subset to prefer, because one can no longer exist.
 
 **The walk is over artwork rows, not over assets.** The backfill's shape is one probe
 per asset, which is right for *finding* covers but wrong here: there are 13,329 assets
-and 1,194 artwork rows, so walking assets would spend more than 90% of the pass on
-entities that can never contribute. The correction is to iterate the thing being
+and roughly 1,200 artwork rows, so walking assets would spend more than 90% of the pass
+on entities that can never contribute. The correction is to iterate the thing being
 corrected.
-
-By default it visits only rows missing a dimension, so a re-run after a partial pass
-does the remainder rather than the lot.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import ArtworkORM
@@ -56,44 +58,34 @@ class Summary:
         return sum(self.skipped.values())
 
 
-def count_needing_dimensions(session: Session) -> int:
-    """How many artwork rows are missing at least one dimension.
+def count_artwork(session: Session) -> int:
+    """How many artwork rows a pass would visit.
+
+    Every row, because since #143 there are no unmeasured ones to single out.
 
     Args:
         session: The session to query through.
 
     Returns:
-        int: The number of rows a default pass would visit.
+        int: The number of rows a pass would visit.
     """
-    return len(
-        list(
-            session.scalars(
-                select(ArtworkORM.id).where(
-                    or_(ArtworkORM.width.is_(None), ArtworkORM.height.is_(None))
-                )
-            )
-        )
-    )
+    return len(list(session.scalars(select(ArtworkORM.id))))
 
 
-def _iter_artwork(
-    session: Session, *, remeasure: bool, after: int = 0
-) -> Iterator[tuple[int, str]]:
+def _iter_artwork(session: Session, *, after: int = 0) -> Iterator[tuple[int, str]]:
     """Yield ``(id, storage_path)`` for each artwork to visit, a batch at a time.
 
-    Keyset rather than OFFSET, and for a sharper reason than usual: the default
-    predicate is "has no width", which this pass *removes rows from as it goes*. An
-    offset-paged walk over a shrinking result set skips rows -- page 2 of a set that
-    lost 500 members is not the second 500 of the original. Walking forward by id is
-    unaffected, because a row that drops out of the filter is one already behind the
-    cursor.
+    Keyset rather than OFFSET. The original reason was that the pass removed rows from
+    its own predicate as it went, so an offset-paged walk over a shrinking result set
+    would skip rows; since #143 the predicate is "every row" and cannot shrink, but
+    keyset is still the right shape for a walk that commits as it goes and may be
+    resumed after an interruption.
 
     ``storage_path`` is selected alongside the id rather than fetched per row, which
     would double the query count for no benefit.
 
     Args:
         session: The session to query through.
-        remeasure: Visit every row, including those that already have dimensions.
         after: Resume from the first id greater than this.
 
     Yields:
@@ -107,8 +99,6 @@ def _iter_artwork(
             .order_by(ArtworkORM.id)
             .limit(_ID_BATCH)
         )
-        if not remeasure:
-            stmt = stmt.where(or_(ArtworkORM.width.is_(None), ArtworkORM.height.is_(None)))
 
         rows = list(session.execute(stmt))
         if not rows:
@@ -124,10 +114,14 @@ def run(
     *,
     dry_run: bool = True,
     limit: int = 0,
-    remeasure: bool = False,
     on_event: Callable[[str], None] | None = None,
 ) -> Summary:
-    """Measure each artwork's stored file and record its dimensions.
+    """Re-measure each artwork's stored file and record its dimensions.
+
+    A recovery pass, not a backfill. Since #140 the API measures every upload and #143
+    made the columns NOT NULL, so there are no unmeasured rows to find; this exists for
+    the case where a previous measurement is believed wrong and every row needs
+    deriving again.
 
     The file under ``ARTWORK_ROOT`` is measured rather than whatever the artwork was
     originally made from. The stored copy is what the row points at and what the API
@@ -150,7 +144,6 @@ def run(
         limit: Stop after attempting this many rows, or 0 for no limit. Counts every
             row whose file was opened and acted on -- measured, skipped or failed. Rows
             whose file is absent cost nothing and do not count against it.
-        remeasure: Visit rows that already carry dimensions, overwriting them.
         on_event: Optional ``callable(str)`` for per-row progress lines.
 
     Returns:
@@ -161,7 +154,7 @@ def run(
     emit = on_event
     attempted = 0
 
-    for artwork_id, storage_path in _iter_artwork(session, remeasure=remeasure):
+    for artwork_id, storage_path in _iter_artwork(session):
         summary.artwork_scanned += 1
 
         path = artwork_root / storage_path

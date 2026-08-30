@@ -81,8 +81,18 @@ class ArtworkAttrs(BaseModel):
         description="Path to the file relative to ARTWORK_ROOT, in the content-addressed layout",
     )
     mime: str = Field(..., title="MIME type", description="Media type of the file, e.g. image/jpeg")
-    width: int | None = Field(None, title="Width", description="Pixel width, when known", gt=0)
-    height: int | None = Field(None, title="Height", description="Pixel height, when known", gt=0)
+    width: int = Field(
+        ...,
+        title="Width",
+        description="Pixel width, measured from the file by the server",
+        gt=0,
+    )
+    height: int = Field(
+        ...,
+        title="Height",
+        description="Pixel height, measured from the file by the server",
+        gt=0,
+    )
     is_primary: bool = Field(
         False,
         title="Is Primary",
@@ -155,8 +165,8 @@ class ArtworkCreateInternal(BaseModel):
         ..., title="Storage Path", description="Path relative to ARTWORK_ROOT"
     )
     mime: str = Field(..., title="MIME type", description="Media type of the file")
-    width: int | None = Field(None, title="Width", description="Pixel width, when known")
-    height: int | None = Field(None, title="Height", description="Pixel height, when known")
+    width: int = Field(..., title="Width", description="Pixel width, measured from the file")
+    height: int = Field(..., title="Height", description="Pixel height, measured from the file")
     is_primary: bool = Field(False, title="Is Primary", description="Whether this is the primary")
     source_scheme_id: int | None = Field(
         None, title="Source Scheme ID", description="Source scheme"
