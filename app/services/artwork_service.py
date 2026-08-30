@@ -124,8 +124,17 @@ class ArtworkService:
         self.assets = assets
         self.store = store
 
-    def _resolve_kind_id(self, code: str) -> int:
-        """Resolve an artwork kind code to its ID.
+    def _resolve_kind(self, code: str) -> ArtworkKindRead:
+        """Resolve an artwork kind code to the kind itself.
+
+        Returns the whole record rather than the id because the shape constraints live
+        on it, and an upload needs both.
+
+        Args:
+            code: The kind code the caller declared.
+
+        Returns:
+            ArtworkKindRead: The matching kind.
 
         Raises:
             HTTPException: 422 if no kind carries that code.
@@ -136,7 +145,76 @@ class ArtworkService:
                 status_code=422,
                 detail=f"Unknown artwork kind '{code}'. See the artwork kinds endpoint.",
             )
-        return kind.id
+        return kind
+
+    def _resolve_kind_id(self, code: str) -> int:
+        """Resolve an artwork kind code to its ID.
+
+        Raises:
+            HTTPException: 422 if no kind carries that code.
+        """
+        return self._resolve_kind(code).id
+
+    @staticmethod
+    def _check_shape(kind: ArtworkKindRead, stored: StoredArtwork) -> None:
+        """Refuse an image whose shape contradicts the kind the caller declared.
+
+        Shape is **necessary but not sufficient** (#127): the client says what the
+        artwork is, and this says whether the pixels contradict that claim. Nothing
+        here infers a kind, which is why three kinds sharing a shape is not a problem
+        to solve.
+
+        A kind with no ``target_ratio`` has no shape expectation and passes any ratio --
+        the honest state for a transparent logo, for a thumbnail whose source decides
+        its shape, and for artwork nobody has classified. A ``target_ratio`` with a null
+        tolerance demands an exact match, which the seeded kinds never do but the API
+        permits.
+
+        **Called before the file is committed**, from ``ArtworkStore``'s acceptance
+        hook, so a refusal leaves nothing on disk. Deleting afterwards would not be
+        equivalent -- content addressing means the file may already be shared with
+        another row.
+
+        Args:
+            kind: The declared kind, carrying its shape constraints.
+            stored: What the store measured, not what the caller claimed.
+
+        Raises:
+            HTTPException: 422 if the image's shape is not permissible for the kind.
+        """
+        if kind.min_width is not None and stored.width < kind.min_width:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Artwork of kind '{kind.code}' must be at least {kind.min_width}px "
+                    f"wide; this image is {stored.width}x{stored.height}"
+                ),
+            )
+        if kind.max_width is not None and stored.width > kind.max_width:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Artwork of kind '{kind.code}' must be at most {kind.max_width}px "
+                    f"wide; this image is {stored.width}x{stored.height}"
+                ),
+            )
+
+        if kind.target_ratio is None:
+            return
+
+        ratio = stored.width / stored.height
+        tolerance = kind.ratio_tolerance or 0.0
+        # Relative to the target rather than absolute, so one tolerance means the same
+        # thing at 0.667 as it does at 1.778.
+        if abs(ratio - kind.target_ratio) / kind.target_ratio > tolerance:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Artwork of kind '{kind.code}' must have an aspect ratio near "
+                    f"{kind.target_ratio:.3f} (within {tolerance:.0%}); this image is "
+                    f"{stored.width}x{stored.height}, a ratio of {ratio:.3f}"
+                ),
+            )
 
     def _require_entity(self, entity_type: EntityTypeEnum, entity_id: int) -> None:
         """Confirm the entity this artwork claims to belong to exists.
@@ -230,6 +308,17 @@ class ArtworkService:
         measured. That is a guarantee in the signature rather than a rule someone has
         to remember, and it is the same line #139 and #141 drew at the API boundary.
 
+        **Shape is not checked here, and that is not an omission.** A shape refusal has
+        to happen before the bytes reach a content-addressed path, or there is a
+        committed file to delete -- and deleting it is unsafe, because content
+        addressing means it may already be shared with another row. So the check lives
+        in ``ArtworkStore``'s acceptance hook, which ``register_upload`` passes and
+        which runs while the file is still staged (#153). By the time a ``StoredArtwork``
+        exists, the decision has been made.
+
+        ``tools/artwork_backfill`` deliberately passes no such hook: it declares no kind
+        of its own to check against, which is what #154 makes explicit.
+
         ``is_primary`` is applied by promotion rather than written on the insert, for
         both callers. A second primary would collide with
         ``uq_artwork_one_primary_per_kind``, and promotion runs the demote-then-promote
@@ -319,14 +408,18 @@ class ArtworkService:
         # without touching the store. register_stored checks the entity again at the
         # point of insert; that is the invariant, this is the fail-fast.
         self._require_entity(entity_type, entity_id)
-        kind_id = self._resolve_kind_id(upload.artwork_kind)
+        kind = self._resolve_kind(upload.artwork_kind)
 
-        stored = self.store.store(stream)
+        # The shape check runs inside the store, after the bytes are measured and
+        # before they are moved to a content-addressed path, so a refusal leaves
+        # nothing behind. Passing it here rather than checking the result means there
+        # is never a committed file to clean up (#153).
+        stored = self.store.store(stream, accept=lambda s: self._check_shape(kind, s))
 
         return self.register_stored(
             entity_type,
             entity_id,
-            kind_id,
+            kind.id,
             stored,
             is_primary=upload.is_primary,
             source_scheme_id=upload.source_scheme_id,
