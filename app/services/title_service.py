@@ -11,6 +11,7 @@ from app.repositories import (
     TitleTypeRepository,
 )
 from app.schemas import (
+    ArtworkRead,
     PaginatedResponse,
     TitleCreateInternal,
     TitleCreatePublic,
@@ -22,10 +23,27 @@ from app.schemas import (
 )
 from app.services.errors import domain_error_detail, translate_repository_errors
 
-#: The `include=` token that asks for a resolved poster, and the artwork kind it
-#: resolves. A kind code rather than a hardcoded id: kinds are a lookup table (#41's
-#: lesson), so this has to be resolved at request time.
-POSTER_INCLUDE = "poster"
+#: The `include=` token that asks for a resolved display image.
+#:
+#: Named for what it is rather than what we wish it were. It used to be `poster`, and
+#: `poster` resolved only the poster kind -- but since #127 established that a poster is
+#: portrait, and this repository holds none, a strict poster token resolves nothing for
+#: every title. A field called `poster` carrying a 16:9 thumbnail asserts more than the
+#: data supports, which is the whole subject of #138; renaming it was cheaper than
+#: shipping a label that lies (#152).
+DISPLAY_IMAGE_INCLUDE = "display_image"
+
+#: Artwork kinds tried in order when resolving a title's display image.
+#:
+#: **Kind-major, not depth-major**, and the distinction is worth stating because both
+#: are defensible. A title's own thumbnail loses to a child's poster: they depict the
+#: same content either way, so the better artwork wins rather than the closer row. Within
+#: a single kind the existing rule still holds -- a title's own artwork beats anything
+#: beneath it -- so "own artwork wins" survives, scoped to the kind being tried.
+#:
+#: `logo` and `banner` are deliberately absent: neither is a thing to show in a grid
+#: slot, and falling back to one would be worse than the placeholder.
+DISPLAY_IMAGE_KINDS = ("poster", "cover_art", "thumbnail", "still", "backdrop")
 
 #: The `include=` token asking how many titles and assets each title directly holds.
 COUNTS_INCLUDE = "counts"
@@ -62,9 +80,9 @@ class TitleService:
             return False
         return token in {item.strip().lower() for item in include.split(",")}
 
-    def _wants_poster(self, include: str | None) -> bool:
-        """Whether this request asked for a resolved poster."""
-        return self._includes(include, POSTER_INCLUDE)
+    def _wants_display_image(self, include: str | None) -> bool:
+        """Whether this request asked for a resolved display image."""
+        return self._includes(include, DISPLAY_IMAGE_INCLUDE)
 
     def _attach_counts(self, titles: list[TitleReadExtended]) -> None:
         """Attach direct child and asset counts, in one query for the lot.
@@ -95,25 +113,46 @@ class TitleService:
             title.total_runtime = found.total_runtime if found else 0.0
             title.total_size = found.total_size if found else 0
 
-    def _attach_posters(self, titles: list[TitleReadExtended]) -> None:
-        """Resolve and attach a poster for each title, in one query for the lot.
+    def _attach_display_images(self, titles: list[TitleReadExtended]) -> None:
+        """Resolve and attach a display image for each title, in a few queries.
 
-        Deliberately one call for the whole page rather than one per title: this is the
-        endpoint #49 measured at 14.6s against 263ms once a per-row query crept into
-        it, and TestTitleListQueryCount holds the line.
+        Walks ``DISPLAY_IMAGE_KINDS`` in order, resolving each kind for the titles that
+        have not resolved yet, so the id list narrows as it goes and the loop stops as
+        soon as every title has something.
 
-        A missing `poster` kind is not an error. It means nobody has created that kind
-        in this database -- a lookup table can be edited -- and a grid rendering
-        placeholders is a better answer than a 500.
+        **The query count stays independent of page size**, which is the property that
+        matters: one lookup for the kinds plus at most one resolution per kind, never
+        one per row. `GET /api/titles/` caps at 500 rows, and a resolution walk
+        evaluated per row is #49 again -- 14.6s at the cap against 263ms without it.
+        `TestTitleListQueryCount` holds that line and is why this narrows the id list
+        rather than resolving every kind for every title.
+
+        The kinds are read in one call rather than looked up per code, so adding a kind
+        to the chain costs a resolution rather than a resolution plus a lookup.
+
+        A kind in the chain that no longer exists is skipped, not an error: kinds are a
+        lookup table and a row can be edited away, and a grid rendering placeholders is
+        a better answer than a 500.
         """
         if not titles:
             return
-        kind = self.artwork_kind_repo.get_by_code(POSTER_INCLUDE)
-        if kind is None:
-            return
-        resolved = self.artwork_repo.resolve_for_titles([t.id for t in titles], kind.id)
+
+        by_code = {kind.code: kind.id for kind in self.artwork_kind_repo.list_all()}
+        remaining = [title.id for title in titles]
+        resolved: dict[int, ArtworkRead] = {}
+
+        for code in DISPLAY_IMAGE_KINDS:
+            if not remaining:
+                break
+            kind_id = by_code.get(code)
+            if kind_id is None:
+                continue
+            found = self.artwork_repo.resolve_for_titles(remaining, kind_id)
+            resolved.update(found)
+            remaining = [title_id for title_id in remaining if title_id not in found]
+
         for title in titles:
-            title.poster = resolved.get(title.id)
+            title.display_image = resolved.get(title.id)
 
     @translate_repository_errors
     def get_titles(
@@ -126,8 +165,8 @@ class TitleService:
         as a 500: `normalize_sort` raises `EnumViolation`, which this maps.
         """
         page = self.repository.list_paged(params)
-        if self._wants_poster(params.include):
-            self._attach_posters(page.items)
+        if self._wants_display_image(params.include):
+            self._attach_display_images(page.items)
         if self._includes(params.include, COUNTS_INCLUDE):
             self._attach_counts(page.items)
         if self._includes(params.include, TOTALS_INCLUDE):
@@ -147,7 +186,7 @@ class TitleService:
         if title is None:
             raise HTTPException(status_code=404, detail="Title not found")
         extended = TitleReadExtended(**title.model_dump())
-        self._attach_posters([extended])
+        self._attach_display_images([extended])
         # Counts and totals are resolved unconditionally here, for the same reason the
         # poster is: `include` exists to avoid doing work per row across a 500-row
         # page, and one row costs one extra query either way. A detail view is also

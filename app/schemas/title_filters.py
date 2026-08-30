@@ -13,9 +13,9 @@ class TitleFilters(BaseModel):
         None,
         description=(
             "Only titles carrying artwork of their own (true), or only those with none "
-            "(false). This is not the same question as whether a title *shows* a "
-            "poster: a title with no artwork of its own can still resolve one from its "
-            "contents, which `include=poster` reports per row"
+            "(false). This is not the same question as whether a title *shows* "
+            "artwork: a title with no artwork of its own can still resolve some from "
+            "its contents, which `include=display_image` reports per row"
         ),
     )
     library_root: bool | None = Field(
@@ -68,8 +68,8 @@ class TitleListParams(KeysetPagination, TitleFilters):
     include: str | None = Field(
         None,
         description=(
-            "Comma-separated optional resources to include: `poster` for a resolved "
-            "poster, `counts` for `child_count` and `asset_count`, `totals` for "
+            "Comma-separated optional resources to include: `display_image` for the "
+            "artwork to show, `counts` for `child_count` and `asset_count`, `totals` for "
             "`total_runtime` and `total_size`. Each is a single extra query for the "
             "whole page. Fields not asked for come back null, which is distinct from "
             "a count of 0"

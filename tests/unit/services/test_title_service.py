@@ -40,10 +40,10 @@ from tests.factories import TitleReadFactory
 
 
 def _artwork_repo(resolved: dict[int, object] | None = None):
-    """An artwork repository that resolves posters.
+    """An artwork repository that resolves display images.
 
     Defaults to resolving nothing, so tests that are not about artwork do not have to
-    care -- `get_title` attaches a poster on every call now.
+    care -- `get_title` attaches a display image on every call now.
     """
     repo = create_autospec(ArtworkRepository, instance=True, spec_set=True)
     repo.resolve_for_titles.return_value = resolved or {}
@@ -51,11 +51,14 @@ def _artwork_repo(resolved: dict[int, object] | None = None):
 
 
 def _kind_repo(code: str | None = "poster"):
-    """An artwork kind repository resolving `poster`, or nothing when code is None."""
+    """An artwork kind repository carrying one kind, or none when code is None.
+
+    Read through `list_all` rather than per-code lookups since #152: the display image
+    walks a chain of kinds, and one call for the lot keeps the query count independent
+    of how long that chain grows.
+    """
     repo = create_autospec(ArtworkKindRepository, instance=True, spec_set=True)
-    repo.get_by_code.return_value = (
-        ArtworkKindRead(id=7, code=code, label="Poster") if code else None
-    )
+    repo.list_all.return_value = [ArtworkKindRead(id=7, code=code, label="Poster")] if code else []
     return repo
 
 

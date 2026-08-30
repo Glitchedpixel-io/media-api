@@ -1,8 +1,11 @@
-"""Integration tests for a title's resolved poster (issue #105).
+"""Integration tests for a title's resolved display image (#105, #152).
 
-The rule: a title uses its own primary artwork; failing that it borrows from the first
-entry of its contents, in `order_key` order, recursing into child titles. A title with
-nothing beneath it resolves to nothing.
+The rule, per kind: a title uses its own primary artwork; failing that it borrows from
+the first entry of its contents, in `order_key` order, recursing into child titles. A
+title with nothing beneath it resolves to nothing.
+
+Since #152 that runs over a chain of kinds rather than `poster` alone, so a title shows
+the best artwork it actually has and reports which kind it turned out to be.
 
 Two things get asserted hardest here, because they are the ones a correctness test
 cannot see: that resolution costs the same number of queries whatever the page size,
@@ -72,6 +75,7 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
     class World:
         poster_kind = artwork_kind_ids["poster"]
         backdrop_kind = artwork_kind_ids["backdrop"]
+        logo_kind = artwork_kind_ids["logo"]
 
         def title(self, name: str = "T", code: str = "movie") -> int:
             return titles.create(
@@ -165,7 +169,7 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
 def _poster(client: TestClient, title_id: int) -> dict | None:
     response = client.get(f"/api/titles/{title_id}")
     assert response.status_code == HTTPStatus.OK, response.text
-    return response.json()["poster"]
+    return response.json()["display_image"]
 
 
 @pytest.mark.api
@@ -193,10 +197,18 @@ class TestOwnArtworkWins:
         world.art(EntityTypeEnum.title, title, primary=False)
         assert _poster(client, title) is None
 
-    def test_another_kind_is_not_resolved_as_a_poster(self, client, world):
+    def test_another_kind_is_resolved_but_reports_what_it_is(self, client, world):
+        """Since #152 the chain falls back past `poster`, so a title with only a
+        backdrop shows it rather than a placeholder. The field is `display_image` and
+        not `poster` precisely so this is not a lie: the caller reads `artwork_kind` to
+        find out what it actually got, and can lay it out accordingly."""
         title = world.title()
         world.art(EntityTypeEnum.title, title, kind_id=world.backdrop_kind)
-        assert _poster(client, title) is None
+
+        resolved = _poster(client, title)
+
+        assert resolved is not None
+        assert resolved["artwork_kind"] == "backdrop"
 
 
 @pytest.mark.api
@@ -348,22 +360,22 @@ class TestListEndpoint:
         world.art(EntityTypeEnum.title, title)
 
         items = client.get("/api/titles/").json()["items"]
-        assert all(item["poster"] is None for item in items)
+        assert all(item["display_image"] is None for item in items)
 
     def test_include_poster_populates_it(self, client, world):
         title = world.title()
         artwork_id = world.art(EntityTypeEnum.title, title)
 
-        items = client.get("/api/titles/?include=poster").json()["items"]
-        assert [i["poster"]["id"] for i in items if i["id"] == title] == [artwork_id]
+        items = client.get("/api/titles/?include=display_image").json()["items"]
+        assert [i["display_image"]["id"] for i in items if i["id"] == title] == [artwork_id]
 
-    def test_include_poster_combines_with_other_inclusions(self, client, world):
+    def test_include_display_image_combines_with_other_inclusions(self, client, world):
         title = world.title()
         world.art(EntityTypeEnum.title, title)
 
-        items = client.get("/api/titles/?include=tags,poster").json()["items"]
+        items = client.get("/api/titles/?include=tags,display_image").json()["items"]
         row = next(i for i in items if i["id"] == title)
-        assert row["poster"] is not None
+        assert row["display_image"] is not None
         assert row["tags"] == []
 
     def test_the_list_resolves_the_same_way_the_detail_does(self, client, world):
@@ -372,14 +384,14 @@ class TestListEndpoint:
         world.contains_title(season, episode)
         world.art(EntityTypeEnum.title, episode)
 
-        items = client.get("/api/titles/?include=poster").json()["items"]
-        listed = next(i for i in items if i["id"] == season)["poster"]
+        items = client.get("/api/titles/?include=display_image").json()["items"]
+        listed = next(i for i in items if i["id"] == season)["display_image"]
         assert listed == _poster(client, season)
 
-    def test_titles_without_a_poster_are_null_not_missing(self, client, world):
+    def test_titles_without_artwork_are_null_not_missing(self, client, world):
         world.title()
-        items = client.get("/api/titles/?include=poster").json()["items"]
-        assert all("poster" in item for item in items)
+        items = client.get("/api/titles/?include=display_image").json()["items"]
+        assert all("display_image" in item for item in items)
 
 
 @pytest.mark.api
@@ -400,12 +412,12 @@ class TestTitleListQueryCount:
         counts: dict[int, int] = {}
         for limit in (2, 6):
             with _statements_touching(_test_engine, "artwork") as statements:
-                response = client.get(f"/api/titles/?include=poster&limit={limit}")
+                response = client.get(f"/api/titles/?include=display_image&limit={limit}")
             assert response.status_code == HTTPStatus.OK
             items = response.json()["items"]
             assert len(items) == limit
             # The field must actually be populated, or the count proves nothing.
-            assert all(item["poster"] for item in items)
+            assert all(item["display_image"] for item in items)
             counts[limit] = len(statements)
 
         assert counts[2] == counts[6], (
@@ -425,7 +437,7 @@ class TestTitleListQueryCount:
             world.art(EntityTypeEnum.asset, asset)
 
         with _statements_touching(_test_engine, "artwork") as statements:
-            response = client.get("/api/titles/?include=poster&limit=12")
+            response = client.get("/api/titles/?include=display_image&limit=12")
         assert response.status_code == HTTPStatus.OK
         assert len(statements) <= 2, f"expected one resolution query, got {len(statements)}"
 
@@ -437,3 +449,55 @@ class TestTitleListQueryCount:
         with _statements_touching(_test_engine, "artwork_walk") as statements:
             client.get("/api/titles/")
         assert statements == []
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestKindFallbackChain:
+    """#152: resolution walks a chain of kinds rather than demanding a poster.
+
+    Necessary because #127 established that a poster is portrait and this catalogue
+    holds none, so a strict poster resolves nothing for every title -- the grid would
+    have gone from showing the wrong images to showing none at all.
+    """
+
+    def test_a_poster_wins_over_a_lesser_kind(self, client, world):
+        title = world.title()
+        world.art(EntityTypeEnum.title, title, kind_id=world.backdrop_kind)
+        poster = world.art(EntityTypeEnum.title, title)
+
+        assert _poster(client, title)["id"] == poster
+
+    def test_a_lesser_kind_resolves_when_no_poster_exists(self, client, world):
+        title = world.title()
+        backdrop = world.art(EntityTypeEnum.title, title, kind_id=world.backdrop_kind)
+
+        assert _poster(client, title)["id"] == backdrop
+
+    def test_the_kind_is_reported_so_a_client_can_lay_it_out(self, client, world):
+        """The reason the field is not called `poster`. A caller cannot reserve the
+        right box without knowing what shape it is about to receive."""
+        title = world.title()
+        world.art(EntityTypeEnum.title, title, kind_id=world.backdrop_kind)
+
+        assert _poster(client, title)["artwork_kind"] == "backdrop"
+
+    def test_a_childs_better_kind_beats_the_parents_worse_one(self, client, world):
+        """Kind-major, not depth-major, and the trade-off is deliberate: both depict the
+        same content, so the better artwork wins rather than the closer row. Within a
+        single kind the parent still beats the child -- see TestOwnArtworkWins."""
+        season = world.title("Season", "season")
+        episode = world.title("Episode", "episode")
+        world.contains_title(season, episode)
+        world.art(EntityTypeEnum.title, season, kind_id=world.backdrop_kind)
+        childs_poster = world.art(EntityTypeEnum.title, episode)
+
+        assert _poster(client, season)["id"] == childs_poster
+
+    def test_a_kind_outside_the_chain_is_not_resolved(self, client, world):
+        """`logo` is not something to show in a grid slot, so falling back to one would
+        be worse than the placeholder."""
+        title = world.title()
+        world.art(EntityTypeEnum.title, title, kind_id=world.logo_kind)
+
+        assert _poster(client, title) is None

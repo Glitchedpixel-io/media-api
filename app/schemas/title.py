@@ -84,14 +84,17 @@ class TitleRead(TitleAttrs, IDMixin):
 
 
 class TitleReadExtended(TitleRead):
-    poster: ArtworkRead | None = Field(
+    display_image: ArtworkRead | None = Field(
         None,
-        title="Poster",
+        title="Display Image",
         description=(
-            "The poster to show for this title, resolved from the title's own artwork "
-            "or, failing that, borrowed from the first entry of its contents. Null "
-            "when the title has none and nothing beneath it does either, and also when "
-            "`include=poster` was not requested -- ask for it to tell the two apart."
+            "The artwork to show for this title, resolved from the title's own artwork "
+            "or, failing that, borrowed from the first entry of its contents. Not "
+            "necessarily a poster: the best available kind is used, so read "
+            "`artwork_kind` on the result before assuming a shape. Null when the title "
+            "has none and nothing beneath it does either, and also when "
+            "`include=display_image` was not requested -- ask for it to tell the two "
+            "apart."
         ),
     )
     tags: list[TagRead] | None = Field(
