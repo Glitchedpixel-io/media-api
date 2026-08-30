@@ -85,9 +85,9 @@ class TestCreateTitleContent:
         call_args = title_content_service_mock.insert_positioned.call_args[0]
         assert call_args[0] == 10  # parent_title_id
         assert isinstance(call_args[1], TitleContentInsert)
-        # Check position kwarg
+        # Check anchor kwarg
         call_kwargs = title_content_service_mock.insert_positioned.call_args[1]
-        assert call_kwargs["position"] == "end"
+        assert call_kwargs["anchor"] == "end"
 
     @pytest.mark.unit
     @pytest.mark.api
@@ -240,7 +240,7 @@ class TestCreateTitleContentPositioned:
 
         assert response.status_code == HTTPStatus.CREATED
         call_kwargs = title_content_service_mock.insert_positioned.call_args[1]
-        assert call_kwargs["position"] == "start"
+        assert call_kwargs["anchor"] == "start"
 
     @pytest.mark.unit
     @pytest.mark.api
@@ -296,7 +296,7 @@ class TestReorderTitleContent:
         assert response.status_code == HTTPStatus.OK
         title_content_service_mock.reorder_content.assert_called_once()
         call_kwargs = title_content_service_mock.reorder_content.call_args[1]
-        assert call_kwargs["position"] == "start"
+        assert call_kwargs["anchor"] == "start"
 
     @pytest.mark.unit
     @pytest.mark.api

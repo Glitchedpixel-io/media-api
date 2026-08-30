@@ -49,7 +49,7 @@ def test_create_get_exists_and_list_with_children(bundle):
                 "label": "Child Title",
             }
         ),
-        position="start",
+        anchor="start",
     )
     assert c1 is not None and bundle.title_contents.exists(c1.id)
 
@@ -63,7 +63,7 @@ def test_create_get_exists_and_list_with_children(bundle):
                 "label": "Asset",
             }
         ),
-        position="end",
+        anchor="end",
     )
     assert c2 is not None and bundle.title_contents.exists(c2.id)
 
@@ -89,17 +89,17 @@ def test_positioning_and_reorder(bundle):
     r1 = bundle.title_contents.create_positioned(
         parent.id,
         TitleContentInsert.model_validate({"kind": "asset", "asset_id": a1.id}),
-        position="end",
+        anchor="end",
     )
     r2 = bundle.title_contents.create_positioned(
         parent.id,
         TitleContentInsert.model_validate({"kind": "asset", "asset_id": a2.id}),
-        position="end",
+        anchor="end",
     )
     r3 = bundle.title_contents.create_positioned(
         parent.id,
         TitleContentInsert.model_validate({"kind": "asset", "asset_id": a3.id}),
-        position="end",
+        anchor="end",
     )
     assert r1 and r2 and r3
 
@@ -109,7 +109,7 @@ def test_positioning_and_reorder(bundle):
     assert ids() == [r1.id, r2.id, r3.id]
 
     # Move r3 to the start
-    bundle.title_contents.reorder(parent.id, r3.id, position="start")
+    bundle.title_contents.reorder(parent.id, r3.id, anchor="start")
     assert ids() == [r3.id, r1.id, r2.id]
 
     # Move r1 after r2 (end)
@@ -124,6 +124,160 @@ def test_positioning_and_reorder(bundle):
         before_id=r2.id,
     )
     assert ids() == [r3.id, r4.id, r2.id, r1.id]
+
+
+# --- Position invariants (#128) -----------------------------------------------
+#
+# `position` promises to be contiguous, zero-based and ascending within a parent. These
+# assert that promise across the operations that can break it. The key-based scheme
+# these replaced could not keep an equivalent promise: it ran out of room between two
+# neighbours after about five front-insertions and rewrote the whole list to recover,
+# and 7 of 60 randomised moves failed outright on its unique constraint.
+
+
+def _positions(bundle, parent_id: int) -> list[int]:
+    return [row.position for row in bundle.title_contents.list_title_content(parent_id)]
+
+
+def _add(bundle, parent_id: int, **kwargs):
+    asset = bundle.assets.create(AssetCreateFactory())
+    return bundle.title_contents.create_positioned(
+        parent_id,
+        TitleContentInsert.model_validate({"kind": "asset", "asset_id": asset.id}),
+        **kwargs,
+    )
+
+
+@pytest.mark.contract
+def test_repeated_insertion_at_the_front_never_runs_out_of_room(bundle):
+    """Twelve front-insertions, where the old scheme exhausted its key space at five."""
+    parent = bundle.titles.create(TitleCreateFactory())
+
+    expected = []
+    for _ in range(12):
+        expected.insert(0, _add(bundle, parent.id, anchor="start").id)
+
+    rows = bundle.title_contents.list_title_content(parent.id)
+    assert [row.id for row in rows] == expected
+    assert [row.position for row in rows] == list(range(12))
+
+
+@pytest.mark.contract
+def test_randomised_moves_keep_the_list_well_formed(bundle):
+    """Sixty arbitrary moves, after each of which the list must still be a list.
+
+    Seeded rather than property-based: the point is a fixed, reproducible sequence that
+    exercises every anchor against a real database, not a search for new inputs.
+    """
+    import random
+
+    rng = random.Random(11)
+    parent = bundle.titles.create(TitleCreateFactory())
+    for _ in range(10):
+        _add(bundle, parent.id, anchor="end")
+
+    for _ in range(60):
+        rows = bundle.title_contents.list_title_content(parent.id)
+        mover = rng.choice(rows)
+        target = rng.choice([row for row in rows if row.id != mover.id])
+        placement = rng.choice(
+            [
+                {"before_id": target.id},
+                {"after_id": target.id},
+                {"anchor": "start"},
+                {"anchor": "end"},
+            ]
+        )
+        bundle.title_contents.reorder(parent.id, mover.id, **placement)
+
+        after = bundle.title_contents.list_title_content(parent.id)
+        assert [row.position for row in after] == list(range(10))
+        assert {row.id for row in after} == {row.id for row in rows}
+
+
+@pytest.mark.contract
+def test_deleting_an_entry_closes_the_gap(bundle):
+    parent = bundle.titles.create(TitleCreateFactory())
+    first, second, third = (_add(bundle, parent.id, anchor="end") for _ in range(3))
+
+    bundle.title_contents.delete_title_content(second.id)
+
+    rows = bundle.title_contents.list_title_content(parent.id)
+    assert [row.id for row in rows] == [first.id, third.id]
+    assert [row.position for row in rows] == [0, 1]
+
+
+@pytest.mark.contract
+def test_moving_an_entry_to_another_parent_renumbers_both(bundle):
+    """The parent being left has to close its gap, not just the one being joined."""
+    source = bundle.titles.create(TitleCreateFactory())
+    destination = bundle.titles.create(TitleCreateFactory())
+    first, second, third = (_add(bundle, source.id, anchor="end") for _ in range(3))
+    resident = _add(bundle, destination.id, anchor="end")
+
+    bundle.title_contents.reorder(destination.id, first.id, anchor="start")
+
+    remaining = bundle.title_contents.list_title_content(source.id)
+    assert [row.id for row in remaining] == [second.id, third.id]
+    assert [row.position for row in remaining] == [0, 1]
+
+    joined = bundle.title_contents.list_title_content(destination.id)
+    assert [row.id for row in joined] == [first.id, resident.id]
+    assert [row.position for row in joined] == [0, 1]
+
+
+@pytest.mark.contract
+def test_dropping_an_entry_onto_itself_leaves_it_alone(bundle):
+    """A drag that ends where it started. The old scheme squeezed a new key in anyway."""
+    parent = bundle.titles.create(TitleCreateFactory())
+    first, second, third = (_add(bundle, parent.id, anchor="end") for _ in range(3))
+
+    bundle.title_contents.reorder(parent.id, second.id, before_id=second.id)
+
+    rows = bundle.title_contents.list_title_content(parent.id)
+    assert [row.id for row in rows] == [first.id, second.id, third.id]
+    assert [row.position for row in rows] == [0, 1, 2]
+
+
+@pytest.mark.contract
+def test_a_neighbour_from_another_parent_does_not_move_the_entry(bundle):
+    """An id that is not in this list cannot say where in it to land."""
+    parent = bundle.titles.create(TitleCreateFactory())
+    elsewhere = bundle.titles.create(TitleCreateFactory())
+    first, second = (_add(bundle, parent.id, anchor="end") for _ in range(2))
+    stranger = _add(bundle, elsewhere.id, anchor="end")
+
+    bundle.title_contents.reorder(parent.id, second.id, before_id=stranger.id)
+
+    rows = bundle.title_contents.list_title_content(parent.id)
+    assert [row.id for row in rows] == [first.id, second.id]
+    assert [row.position for row in rows] == [0, 1]
+
+
+@pytest.mark.contract
+def test_patching_an_entry_to_another_parent_renumbers_both(bundle):
+    """The patch path moves rows between parents too, and must keep both contiguous.
+
+    `TitleContentService.update_title_content` sets `parent_title_id` from the URL on
+    every patch, so this reaches the same place `reorder` does without going through it.
+    """
+    source = bundle.titles.create(TitleCreateFactory())
+    destination = bundle.titles.create(TitleCreateFactory())
+    first, second = (_add(bundle, source.id, anchor="end") for _ in range(2))
+    resident = _add(bundle, destination.id, anchor="end")
+
+    bundle.title_contents.update(
+        first.id,
+        TitleContentUpdateInternal.model_validate({"parent_title_id": destination.id}),
+    )
+
+    remaining = bundle.title_contents.list_title_content(source.id)
+    assert [row.id for row in remaining] == [second.id]
+    assert [row.position for row in remaining] == [0]
+
+    joined = bundle.title_contents.list_title_content(destination.id)
+    assert [row.id for row in joined] == [resident.id, first.id]
+    assert [row.position for row in joined] == [0, 1]
 
 
 # --- Constraint and domain-specific errors ------------------------------------
@@ -175,8 +329,7 @@ def test_check_and_notnull_violations(bundle):
             ),
         )
 
-    # NotNull: order_key is required on raw create via update path
-    # Here we perform an update to null the order_key to trigger NOT NULL
+    # NotNull: position is required, so nulling it through the update path raises
     a = bundle.assets.create(AssetCreateFactory())
     r = bundle.title_contents.create_positioned(
         parent.id,
@@ -185,7 +338,7 @@ def test_check_and_notnull_violations(bundle):
     assert r is not None
     with pytest.raises(NotNullViolation):
         bundle.title_contents.update(
-            r.id, TitleContentUpdateInternal.model_validate({"order_key": None})
+            r.id, TitleContentUpdateInternal.model_validate({"position": None})
         )
 
 
@@ -335,7 +488,7 @@ def _contains_title(bundle, parent, child, membership="intrinsic"):
                 "membership": membership,
             }
         ),
-        position="end",
+        anchor="end",
     )
 
 
@@ -345,7 +498,7 @@ def _contains_asset(bundle, parent, asset):
         TitleContentInsert.model_validate(
             {"kind": "asset", "asset_id": asset.id, "child_title_id": None}
         ),
-        position="end",
+        anchor="end",
     )
 
 

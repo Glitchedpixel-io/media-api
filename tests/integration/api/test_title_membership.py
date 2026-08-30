@@ -178,8 +178,8 @@ class TestOneIntrinsicParent:
         first, second, child = make_title(), make_title(), make_title()
         db_session.execute(
             text(
-                "INSERT INTO title_contents (parent_title_id, kind, child_title_id, order_key) "
-                "VALUES (:p, 'title', :c, 'UA')"
+                "INSERT INTO title_contents (parent_title_id, kind, child_title_id, position) "
+                "VALUES (:p, 'title', :c, 0)"
             ),
             {"p": first, "c": child},
         )
@@ -189,8 +189,8 @@ class TestOneIntrinsicParent:
             db_session.execute(
                 text(
                     "INSERT INTO title_contents "
-                    "(parent_title_id, kind, child_title_id, order_key) "
-                    "VALUES (:p, 'title', :c, 'UB')"
+                    "(parent_title_id, kind, child_title_id, position) "
+                    "VALUES (:p, 'title', :c, 0)"
                 ),
                 {"p": second, "c": child},
             )
@@ -202,8 +202,8 @@ class TestOneIntrinsicParent:
         parent, child = make_title(), make_title()
         db_session.execute(
             text(
-                "INSERT INTO title_contents (parent_title_id, kind, child_title_id, order_key) "
-                "VALUES (:p, 'title', :c, 'UA')"
+                "INSERT INTO title_contents (parent_title_id, kind, child_title_id, position) "
+                "VALUES (:p, 'title', :c, 0)"
             ),
             {"p": parent, "c": child},
         )

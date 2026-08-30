@@ -1,7 +1,7 @@
 """Integration tests for a title's resolved display image (#105, #152).
 
 The rule, per kind: a title uses its own primary artwork; failing that it borrows from
-the first entry of its contents, in `order_key` order, recursing into child titles. A
+the first entry of its contents, in `position` order, recursing into child titles. A
 title with nothing beneath it resolves to nothing.
 
 Since #152 that runs over a chain of kinds rather than `poster` alone, so a title shows
@@ -99,17 +99,17 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
                 )
             ).id
 
-        def _next_key(self, parent: int) -> str:
-            """A distinct order_key per entry, since uq_parent_order forbids reuse."""
-            keys.setdefault(parent, 0)
+        def _next_position(self, parent: int) -> int:
+            """The next free position under this parent, appending as callers expect."""
+            keys.setdefault(parent, -1)
             keys[parent] += 1
-            return f"m{keys[parent]:03d}"
+            return keys[parent]
 
         def contains_title(
             self,
             parent: int,
             child: int,
-            order_key: str | None = None,
+            position: int | None = None,
             membership: MembershipKind = MembershipKind.intrinsic,
         ) -> None:
             contents.create(
@@ -120,11 +120,11 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
                     asset_id=None,
                     label=None,
                     membership=membership,
-                    order_key=order_key or self._next_key(parent),
+                    position=position if position is not None else self._next_position(parent),
                 )
             )
 
-        def contains_asset(self, parent: int, asset_id: int, order_key: str | None = None) -> None:
+        def contains_asset(self, parent: int, asset_id: int, position: int | None = None) -> None:
             contents.create(
                 TitleContentCreateInternal(
                     parent_title_id=parent,
@@ -132,7 +132,7 @@ def world(db_session: Session, title_type_ids: dict[str, int], artwork_kind_ids:
                     child_title_id=None,
                     asset_id=asset_id,
                     label=None,
-                    order_key=order_key or self._next_key(parent),
+                    position=position if position is not None else self._next_position(parent),
                 )
             )
 
@@ -259,14 +259,14 @@ class TestFallback:
 
         assert _poster(client, collection)["id"] == nearer
 
-    def test_order_key_decides_between_siblings(self, client, world):
+    def test_position_decides_between_siblings(self, client, world):
         """ "The first entry of its contents" has to mean the list's own order, which
-        is order_key -- not insertion order and not id order."""
+        is position -- not insertion order and not id order."""
         season = world.title("Season", "season")
         second = world.title("Second", "episode")
         first = world.title("First", "episode")
-        world.contains_title(season, second, order_key="z")
-        world.contains_title(season, first, order_key="a")
+        world.contains_title(season, second, position=1)
+        world.contains_title(season, first, position=0)
         world.art(EntityTypeEnum.title, second)
         expected = world.art(EntityTypeEnum.title, first)
 
@@ -288,8 +288,8 @@ class TestFallback:
         season = world.title("Season", "season")
         empty = world.title("Empty", "episode")
         stocked = world.title("Stocked", "episode")
-        world.contains_title(season, empty, order_key="a")
-        world.contains_title(season, stocked, order_key="b")
+        world.contains_title(season, empty, position=0)
+        world.contains_title(season, stocked, position=1)
         expected = world.art(EntityTypeEnum.title, stocked)
 
         assert _poster(client, season)["id"] == expected
@@ -339,8 +339,8 @@ class TestCuratedEdgesAreNotBorrowedAcross:
         season = world.title("Season", "season")
         guest = world.title("Guest", "movie")
         episode = world.title("Episode", "episode")
-        world.contains_title(season, guest, order_key="a", membership=MembershipKind.curated)
-        world.contains_title(season, episode, order_key="b", membership=MembershipKind.intrinsic)
+        world.contains_title(season, guest, position=0, membership=MembershipKind.curated)
+        world.contains_title(season, episode, position=1, membership=MembershipKind.intrinsic)
         world.art(EntityTypeEnum.title, guest)
         expected = world.art(EntityTypeEnum.title, episode)
 
@@ -353,8 +353,8 @@ class TestCuratedEdgesAreNotBorrowedAcross:
         listed = world.title("Listed", "movie")
         season = world.title("Season", "season")
         asset = world.asset()
-        world.contains_title(collection, listed, order_key="a", membership=MembershipKind.curated)
-        world.contains_title(collection, season, order_key="b", membership=MembershipKind.intrinsic)
+        world.contains_title(collection, listed, position=0, membership=MembershipKind.curated)
+        world.contains_title(collection, season, position=1, membership=MembershipKind.intrinsic)
         world.contains_asset(season, asset)
         world.art(EntityTypeEnum.title, listed)
         deep = world.art(EntityTypeEnum.asset, asset)

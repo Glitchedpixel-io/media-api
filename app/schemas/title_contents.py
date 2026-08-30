@@ -44,10 +44,14 @@ class TitleContentCreateInternal(TitleContentInsert):
         title="Parent Title ID",
         description="ID of the parent Title to which this piece of content belongs",
     )
-    order_key: str = Field(
+    position: int = Field(
         ...,
-        title="Order Key",
-        description="Lexicographically sortable key controlling this item's position within its parent's ordered content list",
+        title="Position",
+        description=(
+            "This item's place in its parent's ordered content list: zero-based, "
+            "contiguous and ascending. Positions are assigned by the API, so a move "
+            "renumbers the rows it displaces; they are not stable identifiers."
+        ),
     )
 
 
@@ -63,7 +67,7 @@ class TitleContentRead(TitleContentCreateInternal, IDMixin):
 #
 # Absence is the enforcement. TitleContentAttrs forbids extra fields, so a PATCH
 # carrying `membership` is rejected by the schema with a 422 before any service code
-# runs, rather than being silently ignored. `order_key` is kept out of reach the same
+# runs, rather than being silently ignored. `position` is kept out of reach the same
 # way -- reordering has its own endpoint.
 TitleContentPatchPublic = make_partial_model(TitleContentAttrs, name="TitleContentPatchPublic")
 

@@ -2,7 +2,7 @@
 from collections.abc import Sequence
 
 from sqlakeyset import select_page
-from sqlalchemy import Integer, Text, func, literal, select
+from sqlalchemy import Integer, func, literal, select
 from sqlalchemy.sql import ColumnElement, Select
 from sqlalchemy.dialects.postgresql import array
 
@@ -367,7 +367,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         """Resolve each title's artwork of a kind, falling back to its contents.
 
         A title uses its own primary artwork if it has one. Otherwise it borrows from
-        the first entry of its contents, in ``order_key`` order, recursing into child
+        the first entry of its contents, in ``position`` order, recursing into child
         titles -- so a season with no poster shows its first episode's, and an episode
         with none shows its asset's. A title with nothing beneath it resolves to
         nothing, which is the browse grid's placeholder case rather than an error.
@@ -387,7 +387,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         **Only intrinsic edges are walked.** A curated edge says nothing about where
         its child belongs -- that is the whole point of the distinction #90 drew -- so
         borrowing an image across one would give "Films of 1974" the identity of
-        whichever unrelated member happens to sort first by ``order_key``, and the grid
+        whichever unrelated member happens to sort first by ``position``, and the grid
         would present that as the collection's own. A title reached only through
         curated edges therefore resolves to nothing and gets the placeholder, which is
         the same answer this already gives a title with no contents, and the correct
@@ -399,7 +399,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         than merely stricter.
 
         The predicate needs no index of its own. It filters rows the join has already
-        fetched, and the parent-side indexes (``uq_parent_order``,
+        fetched, and the parent-side indexes (``uq_parent_position``,
         ``uq_parent_child_title_once``) select one parent's contents, which is 35 rows
         at the measured widest. ``ix_title_contents_child_membership`` does not serve
         this walk at all, being keyed on ``child_title_id`` while this joins on
@@ -428,18 +428,20 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         # Depth 0: each requested title, standing for itself, so its own artwork wins
         # before anything beneath it is considered.
         #
-        # `ord` accumulates the order_key of each edge taken, which is what makes
-        # "the first entry of its contents" mean the same thing at every level. Its
-        # element type carries collation="C" to match `title_contents.order_key`:
-        # that column is deliberately C-collated so LexoRank keys order bytewise, and
-        # a recursive CTE whose seed and recursive terms disagree on collation is
-        # rejected outright by Postgres.
+        # `ord` accumulates the position of each edge taken, which is what makes
+        # "the first entry of its contents" mean the same thing at every level.
+        #
+        # An integer array, so the comparison at the bottom is numeric. The text keys
+        # this replaced (#128) needed an explicit collation="C" element type to match
+        # the column's, because a recursive CTE whose seed and recursive terms disagree
+        # on collation is rejected outright by Postgres -- a hazard that simply does not
+        # arise for integers.
         seed = select(
             TitleORM.id.label("root_id"),
             TitleORM.id.label("title_id"),
             literal(None, Integer).label("asset_id"),
             literal(0, Integer).label("depth"),
-            array([], type_=Text(collation="C")).label("ord"),
+            array([], type_=Integer).label("ord"),
             array([TitleORM.id]).label("seen"),
         ).where(TitleORM.id.in_(title_ids))
 
@@ -450,7 +452,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
                 TitleContentORM.child_title_id.label("title_id"),
                 TitleContentORM.asset_id.label("asset_id"),
                 (walk.c.depth + 1).label("depth"),
-                (walk.c.ord + array([TitleContentORM.order_key])).label("ord"),
+                (walk.c.ord + array([TitleContentORM.position])).label("ord"),
                 (walk.c.seen + array([TitleContentORM.child_title_id])).label("seen"),
             )
             .select_from(walk)

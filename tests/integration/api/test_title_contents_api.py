@@ -56,7 +56,7 @@ class TestTitleContentsAPI:
             title_content_repository.create_positioned(
                 parent_title_id=created_other_title.id,
                 title_content=TitleContentInsert(kind=ContentKind.asset, asset_id=asset_id),
-                position="start",
+                anchor="start",
             )
 
         # Act
@@ -91,7 +91,7 @@ class TestTitleContentsAPI:
             content_item = title_content_repository.create_positioned(
                 parent_title_id=title_id,
                 title_content=TitleContentInsert(kind=ContentKind.asset, asset_id=asset_id),
-                position="end",
+                anchor="end",
             )
             ids.append(content_item.id)
 

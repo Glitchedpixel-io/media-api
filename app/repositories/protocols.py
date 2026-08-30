@@ -181,16 +181,8 @@ class TitleContentRepository(Protocol):
     def get_parents_of_title(self, title_id: int) -> list[TitleContentReadParent]: ...
     def intrinsic_parent_edge_id(self, child_title_id: int) -> int | None: ...
 
-    # New: ordering helpers
-    def compute_new_order_key(
-        self,
-        parent_title_id: int,
-        *,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        position: str | None = None,
-    ) -> str: ...
-
+    # Ordering. `anchor` is "start" or "end"; it is named that rather than `position`
+    # so it cannot be read as the integer column of the same name.
     def reorder(
         self,
         parent_title_id: int,
@@ -198,7 +190,7 @@ class TitleContentRepository(Protocol):
         *,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead | None: ...
 
     def create_positioned(
@@ -208,7 +200,7 @@ class TitleContentRepository(Protocol):
         *,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead | None: ...
 
 

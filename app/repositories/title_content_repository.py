@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import Integer, delete, func, literal, select
+from sqlalchemy import Integer, func, literal, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import selectinload
 
@@ -18,8 +18,6 @@ from app.schemas import (
     TitleContentUpdateInternal,
     TitleMediaTotals,
 )
-from app.utils.order_key import DIGITS, between, head, tail
-
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import NotFoundError
 from .protocols import TitleContentRepository
@@ -30,6 +28,45 @@ from .protocols import TitleContentRepository
 #: same graph and a guard that stops shallower than a reader would let through exactly
 #: the cycles that reader can still reach.
 MAX_CONTAINMENT_DEPTH = 8
+
+
+def target_index(
+    ordered_ids: Sequence[int],
+    *,
+    before_id: int | None = None,
+    after_id: int | None = None,
+    anchor: str | None = None,
+) -> int | None:
+    """Where in ``ordered_ids`` a row should land, given a positioning request.
+
+    Pure, and deliberately so: this is the whole of the positioning logic, and it is
+    worth being able to test it without a database. ``ordered_ids`` is the list *as it
+    will be without the row being placed*, so a move is "remove, then insert here" and
+    the returned index needs no correction for the mover's own former slot.
+
+    Args:
+        ordered_ids: The parent's rows in position order, excluding the row being
+            placed.
+        before_id: Land immediately before this row.
+        after_id: Land immediately after this row.
+        anchor: ``"start"`` or ``"end"``. Any other value is ignored, which is how the
+            router's free-form query parameter has always behaved.
+
+    Returns:
+        int | None: The index to insert at, or None if ``before_id``/``after_id`` named
+            a row that is not in this list -- a row of some other parent, or the row
+            being placed named as its own neighbour. Callers decide what that means,
+            because the sensible answer differs between an insert and a move.
+    """
+    if anchor == "start":
+        return 0
+    if anchor == "end":
+        return len(ordered_ids)
+    if before_id is not None:
+        return ordered_ids.index(before_id) if before_id in ordered_ids else None
+    if after_id is not None:
+        return ordered_ids.index(after_id) + 1 if after_id in ordered_ids else None
+    return len(ordered_ids)
 
 
 class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRepository):
@@ -107,7 +144,7 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         stmt = (
             select(TitleContentORM)
             .where(TitleContentORM.parent_title_id == parent_title_id)
-            .order_by(TitleContentORM.order_key)
+            .order_by(TitleContentORM.position)
         )
         if include_children:
             stmt = stmt.options(selectinload(TitleContentORM.asset)).options(
@@ -126,19 +163,55 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         if not orm:
             raise NotFoundError
 
+        source_parent_id = orm.parent_title_id
+
         # Update only fields that were actually provided by the caller
         update_data = update.model_dump(exclude_unset=True)  # type: ignore
 
         for key, value in update_data.items():
             setattr(orm, key, value)
 
+        # A patch that repoints the row at a different parent moves it between two
+        # ordered lists, and both have to stay contiguous afterwards. The row keeps no
+        # meaningful place in a list it has just joined, so it appends.
+        #
+        # Worth doing here rather than only in `reorder`: the service sets
+        # `parent_title_id` on *every* patch, from the URL, so this path can move a row
+        # without ever calling the one that knows about ordering. Under the previous
+        # scheme the row simply carried its old key across, which was harmless only
+        # because nothing required those keys to mean anything.
+        if orm.parent_title_id != source_parent_id:
+            self._safe_flush()
+            lists = self._locked_lists({source_parent_id, orm.parent_title_id})
+            self._renumber([row for row in lists[source_parent_id] if row.id != orm.id])
+            self._renumber([row for row in lists[orm.parent_title_id] if row.id != orm.id] + [orm])
+
         self._safe_commit()
         self.db.refresh(orm)
         return TitleContentRead.model_validate(orm, from_attributes=True)
 
     def delete_title_content(self, title_content_id: int) -> None:
-        stmt = delete(TitleContentORM).where(TitleContentORM.id == title_content_id)
-        self.db.execute(stmt)
+        """Remove an entry and close the gap it leaves in its parent's list.
+
+        Renumbering on delete is what a scheme of contiguous positions costs that a
+        sparse key does not. Skipping it would not misorder anything -- the survivors
+        still sort correctly around the hole -- but it would make ``position`` a number
+        that only sometimes means "the nth entry", and being able to read it as exactly
+        that is the point of #128.
+
+        Args:
+            title_content_id: The entry to remove. Unknown ids are a no-op, as before.
+        """
+        orm = self.db.get(TitleContentORM, title_content_id)
+        if orm is None:
+            return
+        parent_title_id = orm.parent_title_id
+        self.db.delete(orm)
+        # Flushed explicitly rather than left to autoflush, which the session factory
+        # disables: the renumber below reads the list back, and it has to read it
+        # without the row that is on its way out.
+        self._safe_flush()
+        self._renumber(self._locked_lists({parent_title_id})[parent_title_id])
         self._safe_commit()
 
     def get_titles_with_asset(self, asset_id: int) -> list[TitleContentReadParent]:
@@ -168,7 +241,7 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
 
         The upward counterpart of :meth:`get_titles_with_asset`, and deliberately the
         same shape: the edge itself plus its parent, so a caller gets the ``label`` and
-        ``order_key`` this title carries *within* that parent rather than just the
+        ``position`` this title carries *within* that parent rather than just the
         parent's identity.
 
         Immediate parents only. An ancestor walk is a different question, and a
@@ -213,157 +286,51 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
             .limit(1)
         )
 
-    # ---- Ordering helpers -------------------------------------------------
-    def _get_order_key(self, content_id: int) -> str | None:
-        row = self.db.get(TitleContentORM, content_id)
-        return row.order_key if row else None
+    # ---- Ordering ----------------------------------------------------------
+    def _locked_lists(self, parent_title_ids: set[int]) -> dict[int, list[TitleContentORM]]:
+        """Each named parent's rows in position order, locked for the transaction.
 
-    def _get_prev_next_keys(
-        self,
-        parent_title_id: int,
-        *,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        position: str | None = None,
-    ) -> tuple[str | None, str | None]:
-        """Compute neighbor keys for positioning under a parent.
+        ``FOR UPDATE`` because every write below is read-modify-write over a whole
+        list: two concurrent moves under one parent would otherwise both renumber from
+        the same starting picture and the second would undo the first. The previous
+        key-based scheme took no lock at all and raced the same way, less visibly.
 
-        Returns (prev_key, next_key) where new key must satisfy prev < key < next.
+        Both parents of a cross-parent move are locked by **one** statement, so the
+        rows are always taken in a single deterministic order and two opposing moves
+        cannot deadlock against each other.
+
+        Args:
+            parent_title_ids: The parents whose lists are about to be rewritten.
+
+        Returns:
+            dict[int, list[TitleContentORM]]: Parent id -> its rows, ascending by
+                position. A parent with no contents maps to an empty list.
         """
-        if position == "start":
-            # before first
-            first = self.db.scalars(
-                select(TitleContentORM)
-                .where(TitleContentORM.parent_title_id == parent_title_id)
-                .order_by(TitleContentORM.order_key.asc())
-                .limit(1)
-            ).first()
-            return (None, first.order_key if first else None)
-        if position == "end":
-            last = self.db.scalars(
-                select(TitleContentORM)
-                .where(TitleContentORM.parent_title_id == parent_title_id)
-                .order_by(TitleContentORM.order_key.desc())
-                .limit(1)
-            ).first()
-            return (last.order_key if last else None, None)
-        if before_id is not None:
-            next_key = self._get_order_key(before_id)
-            # prev is the immediate predecessor of before_id within the same parent
-            prev_row = self.db.scalars(
-                select(TitleContentORM)
-                .where(TitleContentORM.parent_title_id == parent_title_id)
-                .where(TitleContentORM.order_key < next_key)
-                .order_by(TitleContentORM.order_key.desc())
-                .limit(1)
-            ).first()
-            return (prev_row.order_key if prev_row else None, next_key)
-        if after_id is not None:
-            prev_key = self._get_order_key(after_id)
-            next_row = self.db.scalars(
-                select(TitleContentORM)
-                .where(TitleContentORM.parent_title_id == parent_title_id)
-                .where(TitleContentORM.order_key > prev_key)
-                .order_by(TitleContentORM.order_key.asc())
-                .limit(1)
-            ).first()
-            return (prev_key, next_row.order_key if next_row else None)
-        # default to end
-        last = self.db.scalars(
-            select(TitleContentORM)
-            .where(TitleContentORM.parent_title_id == parent_title_id)
-            .order_by(TitleContentORM.order_key.desc())
-            .limit(1)
-        ).first()
-        return (last.order_key if last else None, None)
-
-    # ---- Rebalancing -------------------------------------------------------
-    @staticmethod
-    def _to_base36(n: int, width: int = 4) -> str:
-        if n == 0:
-            s = "0"
-        else:
-            s = ""
-            x = n
-            while x > 0:
-                x, r = divmod(x, 36)
-                s = DIGITS[r] + s
-        return s.rjust(width, "0")
-
-    def _rebalance(self, parent_title_id: int, width: int = 4) -> None:
+        lists: dict[int, list[TitleContentORM]] = {pid: [] for pid in parent_title_ids}
         rows = self.db.scalars(
             select(TitleContentORM)
-            .where(TitleContentORM.parent_title_id == parent_title_id)
-            .order_by(TitleContentORM.order_key.asc())
+            .where(TitleContentORM.parent_title_id.in_(sorted(parent_title_ids)))
+            .order_by(TitleContentORM.parent_title_id, TitleContentORM.position)
+            .with_for_update()
         ).all()
-        n = len(rows)
-        if n == 0:
-            return
-        max_value = 36**width - 1
-        step = max(1, max_value // (n + 1))
-        for idx, row in enumerate(rows, start=1):
-            row.order_key = self._to_base36(idx * step, width)
-        self._safe_commit()
+        for row in rows:
+            lists[row.parent_title_id].append(row)
+        return lists
 
-    def compute_new_order_key(
-        self,
-        parent_title_id: int,
-        *,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        position: str | None = None,
-    ) -> str:
-        prev_key, next_key = self._get_prev_next_keys(
-            parent_title_id,
-            before_id=before_id,
-            after_id=after_id,
-            position=position,
-        )
+    @staticmethod
+    def _renumber(rows: Sequence[TitleContentORM]) -> None:
+        """Assign contiguous positions 0..n-1 in the order given.
 
-        def _valid_between(k: str) -> bool:
-            if prev_key is not None and not (prev_key < k):
-                return False
-            if next_key is not None and not (k < next_key):
-                return False
-            # Ensure uniqueness within this parent
-            exists = self.db.scalar(
-                select(func.count())
-                .select_from(TitleContentORM)
-                .where(TitleContentORM.parent_title_id == parent_title_id)
-                .where(TitleContentORM.order_key == k)
-            )
-            return (exists or 0) == 0
+        Rows already holding their target position are left untouched, so an
+        append -- the overwhelmingly common write, and the only one production has
+        ever performed -- dirties exactly one row rather than the whole list.
 
-        # First attempt
-        if prev_key is None and next_key is None:
-            k = head(None)
-        elif prev_key is None:
-            k = head(next_key)
-        elif next_key is None:
-            k = tail(prev_key)
-        else:
-            k = between(prev_key, next_key)
-
-        if _valid_between(k):
-            return k
-
-        # Rebalance and try again once
-        self._rebalance(parent_title_id)
-        prev_key, next_key = self._get_prev_next_keys(
-            parent_title_id,
-            before_id=before_id,
-            after_id=after_id,
-            position=position,
-        )
-        if prev_key is None and next_key is None:
-            return head(None)
-        if prev_key is None:
-            k2 = head(next_key)
-        elif next_key is None:
-            k2 = tail(prev_key)
-        else:
-            k2 = between(prev_key, next_key)
-        return k2
+        Args:
+            rows: The parent's rows in their intended final order.
+        """
+        for index, row in enumerate(rows):
+            if row.position != index:
+                row.position = index
 
     def reorder(
         self,
@@ -372,19 +339,56 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         *,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead | None:
-        orm = self.db.get(TitleContentORM, title_content_id)
+        """Move a row to a new place in ``parent_title_id``'s list.
+
+        The row is taken out of the list, an index is chosen against what remains, and
+        the list is renumbered around it. Expressing a move that way is what makes the
+        awkward cases fall out for free: dropping an item back where it already was, or
+        onto either end, is arithmetic on a list rather than a search for a gap that may
+        not exist.
+
+        ``parent_title_id`` is applied to the row, so this also moves an entry between
+        parents. When it does, the parent being left is renumbered too -- contiguous
+        positions have to stay contiguous on both sides, which a scheme built on gaps
+        never had to care about.
+
+        Args:
+            parent_title_id: The parent the row should belong to afterwards.
+            title_content_id: The row to move.
+            before_id: Place it immediately before this row.
+            after_id: Place it immediately after this row.
+            anchor: ``"start"`` or ``"end"``.
+
+        Returns:
+            TitleContentRead | None: The moved row, or None if no such row exists.
+        """
+        orm = self.db.get(TitleContentORM, title_content_id, with_for_update=True)
         if not orm:
             return None
-        new_key = self.compute_new_order_key(
-            parent_title_id,
+
+        source_parent_id = orm.parent_title_id
+        lists = self._locked_lists({source_parent_id, parent_title_id})
+
+        remaining = [row for row in lists[parent_title_id] if row.id != title_content_id]
+        index = target_index(
+            [row.id for row in remaining],
             before_id=before_id,
             after_id=after_id,
-            position=position,
+            anchor=anchor,
         )
-        orm.order_key = new_key
+        if index is None:
+            # The neighbour named is not in this list -- another parent's row, or this
+            # row offered as its own neighbour. Leave the entry where it is rather than
+            # flinging it to the end on what is most likely a caller's mistake.
+            index = min(orm.position, len(remaining))
+
         orm.parent_title_id = parent_title_id
+        self._renumber(remaining[:index] + [orm] + remaining[index:])
+        if source_parent_id != parent_title_id:
+            self._renumber([row for row in lists[source_parent_id] if row.id != title_content_id])
+
         self._safe_commit()
         self.db.refresh(orm)
         return TitleContentRead.model_validate(orm)
@@ -396,25 +400,47 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         *,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead | None:
-        # Compute a new key and create a proper TitleContentCreate
-        new_key = self.compute_new_order_key(
-            parent_title_id,
+        """Add a row to ``parent_title_id``'s list at the requested place.
+
+        Args:
+            parent_title_id: The parent to add the row under.
+            title_content: The entry to create.
+            before_id: Place it immediately before this row.
+            after_id: Place it immediately after this row.
+            anchor: ``"start"`` or ``"end"``. Absent, the row is appended, which is what
+                ``POST /api/titles/{id}/contents`` asks for.
+
+        Returns:
+            TitleContentRead | None: The created row.
+        """
+        rows = self._locked_lists({parent_title_id})[parent_title_id]
+        index = target_index(
+            [row.id for row in rows],
             before_id=before_id,
             after_id=after_id,
-            position=position,
+            anchor=anchor,
         )
-        to_create = TitleContentCreateInternal(
+        if index is None:
+            # An unknown neighbour cannot mean "leave it where it is" for a row that has
+            # no place yet, so a new entry appends.
+            index = len(rows)
+
+        orm = TitleContentORM(
             parent_title_id=parent_title_id,
             kind=title_content.kind,
             child_title_id=title_content.child_title_id,
             asset_id=title_content.asset_id,
             label=title_content.label,
             membership=title_content.membership,
-            order_key=new_key,
+            position=index,
         )
-        return self.create(to_create)
+        self.db.add(orm)
+        self._renumber(rows[:index] + [orm] + rows[index:])
+        self._safe_commit()
+        self.db.refresh(orm)
+        return TitleContentRead.model_validate(orm)
 
     def counts_for_titles(self, title_ids: Sequence[int]) -> dict[int, TitleContentCounts]:
         """Count the titles and assets each title directly contains.

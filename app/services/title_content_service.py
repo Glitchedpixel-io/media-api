@@ -159,7 +159,7 @@ class TitleContentService:
         *,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead:
         if not self.title_repository.exists(parent_title_id):
             raise HTTPException(status_code=404, detail="Title not found")
@@ -170,7 +170,7 @@ class TitleContentService:
             insert,
             before_id=before_id,
             after_id=after_id,
-            position=position,
+            anchor=anchor,
         )
 
     def get_title_content(self, parent_title_id: int) -> list[TitleContentReadExtended]:
@@ -219,7 +219,7 @@ class TitleContentService:
         title_content_id: int,
         before_id: int | None = None,
         after_id: int | None = None,
-        position: str | None = None,
+        anchor: str | None = None,
     ) -> TitleContentRead:
         if not self.title_repository.exists(parent_title_id):
             raise HTTPException(status_code=404, detail="Title not found")
@@ -229,7 +229,7 @@ class TitleContentService:
                 title_content_id,
                 before_id=before_id,
                 after_id=after_id,
-                position=position,
+                anchor=anchor,
             )
         except NotFoundError as e:
             raise HTTPException(status_code=404, detail="Title Content not found") from e

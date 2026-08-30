@@ -72,12 +72,13 @@ def tag_title(db_session):
 @pytest.fixture
 def contain(db_session):
     repo = SQLAlchemyTitleContentRepository(db_session)
-    counter = {"n": 0}
+    positions: dict[int, int] = {}
 
     def _contain(
         parent_id: int, child_id: int, membership: MembershipKind = MembershipKind.intrinsic
     ) -> int:
-        counter["n"] += 1
+        next_position = positions.get(parent_id, -1) + 1
+        positions[parent_id] = next_position
         return repo.create(
             TitleContentCreateInternal(
                 parent_title_id=parent_id,
@@ -86,7 +87,7 @@ def contain(db_session):
                 asset_id=None,
                 label=None,
                 membership=membership,
-                order_key=f"U{counter['n']:05d}",
+                position=next_position,
             )
         ).id
 

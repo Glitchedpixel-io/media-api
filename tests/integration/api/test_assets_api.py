@@ -1027,12 +1027,12 @@ class TestAssetsAPIBusinessLogic:
         title_content_repository.create_positioned(
             parent_title_id=created_title1.id,
             title_content=TitleContentInsert(kind=ContentKind.asset, asset_id=asset_id),
-            position="start",
+            anchor="start",
         )
         title_content_repository.create_positioned(
             parent_title_id=created_title2.id,
             title_content=TitleContentInsert(kind=ContentKind.asset, asset_id=asset_id),
-            position="start",
+            anchor="start",
         )
 
         # Act
