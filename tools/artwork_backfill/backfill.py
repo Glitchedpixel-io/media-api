@@ -24,10 +24,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import ArtworkORM, AssetORM
-from app.repositories.artwork_repository import SQLAlchemyArtworkRepository
+from app.repositories.artwork_repository import (
+    SQLAlchemyArtworkKindRepository,
+    SQLAlchemyArtworkRepository,
+)
 from app.repositories.errors import UniqueViolation
-from app.schemas import ArtworkCreateInternal
+from app.repositories.media_repository import SQLAlchemyMediaRepository
+from app.repositories.title_repository import SQLAlchemyTitleRepository
 from app.schemas.enums import EntityTypeEnum
+from app.services.artwork_service import ArtworkService
 from app.services.artwork_storage import (
     NOT_AN_IMAGE,
     TOO_MANY_PIXELS,
@@ -194,6 +199,15 @@ def run(
         Summary: What the pass found and did.
     """
     summary = Summary(dry_run=dry_run)
+    # Built here rather than taken as a parameter so every caller gets the same wiring
+    # -- the point of #142 is that there is no second way to write an artwork row.
+    service = ArtworkService(
+        SQLAlchemyArtworkRepository(session),
+        SQLAlchemyArtworkKindRepository(session),
+        SQLAlchemyTitleRepository(session),
+        SQLAlchemyMediaRepository(session),
+        store,
+    )
     already = _assets_with_artwork(session, kind_id)
     emit = on_event
     attempted = 0
@@ -245,7 +259,7 @@ def run(
                 emit(f"asset {asset_id}: would register {cover.name} -> {stored.storage_path}")
         else:
             try:
-                _insert(session, asset_id, kind_id, stored)
+                _insert(service, asset_id, kind_id, stored)
             except UniqueViolation:
                 # Another writer got there between the pre-load and now, or the same
                 # digest is already registered for this asset. Either way the row
@@ -295,32 +309,34 @@ _BY_STATUS = {
 }
 
 
-def _insert(session: Session, asset_id: int, kind_id: int, stored: StoredArtwork) -> None:
-    """Write one artwork row, committing it on its own.
+def _insert(service: ArtworkService, asset_id: int, kind_id: int, stored: StoredArtwork) -> None:
+    """Register one artwork row through the service, committing it on its own.
+
+    **Through the service rather than straight at the repository**, which is the whole
+    of #142. This tool used to build the row itself, so it was the one write path with
+    no validation in front of it -- and that is how #138 happened: it asserted a kind
+    nothing checked, and wrote null dimensions for a year of rows. Anything the service
+    learns to check from now on applies here without anyone remembering to add it.
+
+    ``register_stored`` takes the ``StoredArtwork`` rather than loose values, so the
+    file's path, type and dimensions cannot be anything but what the store measured.
 
     Committed per row rather than per pass so an interrupted run keeps everything it
     had already done and a resumed run skips it. A single transaction over 13,329
     assets would lose all of it to one failure at the end.
     """
-    repo = SQLAlchemyArtworkRepository(session)
-    repo.create(
-        ArtworkCreateInternal(
-            entity_type=EntityTypeEnum.asset,
-            entity_id=asset_id,
-            artwork_kind_id=kind_id,
-            storage_path=stored.storage_path,
-            mime=stored.mime,
-            # Measured by the store rather than left null, which is what every row
-            # this tool wrote before #140 had to be fixed up by a separate pass.
-            width=stored.width,
-            height=stored.height,
-            # The only artwork this asset has, so it is the one to use. The pre-load
-            # guarantees there is no incumbent primary of this kind to collide with.
-            is_primary=True,
-            source_scheme_id=None,
-            source_external_id=None,
-            # Nothing is known about where these came from beyond "it was on disk",
-            # and inventing a provenance would be worse than recording none.
-            source_url=None,
-        )
+    service.register_stored(
+        EntityTypeEnum.asset,
+        asset_id,
+        kind_id,
+        stored,
+        # The only artwork this asset has, so it is the one to use. Applied by
+        # promotion inside the service rather than written on the insert, so it does
+        # not depend on the pre-load having ruled out an incumbent.
+        is_primary=True,
+        # Nothing is known about where these came from beyond "it was on disk", and
+        # inventing a provenance would be worse than recording none.
+        source_scheme_id=None,
+        source_external_id=None,
+        source_url=None,
     )

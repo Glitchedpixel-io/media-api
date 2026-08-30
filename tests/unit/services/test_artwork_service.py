@@ -25,7 +25,6 @@ from app.repositories.protocols import (
     TitleRepository,
 )
 from app.schemas import (
-    ArtworkCreatePublic,
     ArtworkKindCreatePublic,
     ArtworkKindPatchPublic,
     ArtworkKindRead,
@@ -39,6 +38,22 @@ from app.services import ArtworkKindService, ArtworkService, ArtworkStore, Store
 PATH_A = "ab/12/" + "ab12" + "0" * 60 + ".jpg"
 
 POSTER = ArtworkKindRead(id=7, code="poster", label="Poster", description=None)
+
+
+def _stored(**overrides) -> StoredArtwork:
+    """What the store hands back. Its four measured fields are the only source
+    register_stored will accept for them, which is the point of #142."""
+    defaults = dict(
+        digest="ab12" + "0" * 60,
+        suffix=".jpg",
+        mime="image/jpeg",
+        size=1234,
+        width=1000,
+        height=1500,
+        storage_path=PATH_A,
+        already_present=False,
+    )
+    return StoredArtwork(**{**defaults, **overrides})
 
 
 def _read(**overrides) -> ArtworkRead:
@@ -112,18 +127,6 @@ def _upload(**overrides) -> ArtworkUploadForm:
     return ArtworkUploadForm(**{**defaults, **overrides})
 
 
-def _create_payload(**overrides) -> ArtworkCreatePublic:
-    defaults = dict(
-        artwork_kind="poster",
-        storage_path=PATH_A,
-        mime="image/jpeg",
-        width=1000,
-        height=1500,
-        is_primary=False,
-    )
-    return ArtworkCreatePublic(**{**defaults, **overrides})
-
-
 @pytest.mark.unit
 class TestEntityIntegrity:
     """The check no foreign key can perform."""
@@ -131,23 +134,33 @@ class TestEntityIntegrity:
     def test_create_against_a_missing_title_is_404(self, service, titles, repo):
         titles.exists.return_value = False
         with pytest.raises(HTTPException) as exc:
-            service.create_artwork(EntityTypeEnum.title, 42, _create_payload())
+            service.register_stored(EntityTypeEnum.title, 42, POSTER.id, _stored())
         assert exc.value.status_code == 404
         repo.create.assert_not_called()
 
     def test_create_against_a_missing_asset_is_404(self, service, assets, repo):
         assets.exists.return_value = False
         with pytest.raises(HTTPException) as exc:
-            service.create_artwork(EntityTypeEnum.asset, 42, _create_payload())
+            service.register_stored(EntityTypeEnum.asset, 42, POSTER.id, _stored())
         assert exc.value.status_code == 404
         repo.create.assert_not_called()
 
     def test_the_entity_type_selects_which_repository_is_asked(self, service, titles, assets, repo):
         """A title id checked against assets would pass for the wrong reason."""
         repo.create.return_value = _read()
-        service.create_artwork(EntityTypeEnum.title, 42, _create_payload())
-        titles.exists.assert_called_once_with(42)
+        service.register_stored(EntityTypeEnum.title, 42, POSTER.id, _stored())
+        titles.exists.assert_called_with(42)
         assets.exists.assert_not_called()
+
+    def test_an_upload_checks_the_entity_before_writing_any_bytes(self, service, titles, store):
+        """Checked twice on the upload path, deliberately. This one is the fail-fast:
+        without it the store writes a file for an entity that does not exist, and the
+        404 from register_stored leaves it orphaned under ARTWORK_ROOT. The check
+        inside register_stored is the invariant at the point of insert."""
+        titles.exists.return_value = False
+        with pytest.raises(HTTPException):
+            service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
+        store.store.assert_not_called()
 
     def test_listing_for_a_missing_entity_is_404(self, service, titles):
         titles.exists.return_value = False
@@ -160,22 +173,26 @@ class TestEntityIntegrity:
 class TestKindResolution:
 
     def test_the_code_is_translated_to_an_id_before_persisting(self, service, repo):
+        """Resolution happens on the upload path. register_stored takes an id that is
+        already resolved, which is why the backfill -- which knows its kind up front --
+        does not pay for a lookup per row."""
         repo.create.return_value = _read()
-        service.create_artwork(EntityTypeEnum.title, 42, _create_payload())
+        service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
 
         internal = repo.create.call_args.args[0]
         assert internal.artwork_kind_id == POSTER.id
         # The persistence model forbids extras, so a leaked code would have raised.
         assert not hasattr(internal, "artwork_kind")
 
-    def test_an_unknown_kind_is_422_not_500(self, service, kinds, repo):
+    def test_an_unknown_kind_is_422_not_500(self, service, kinds, repo, store):
         """A caller's bad kind code is a client error. Collapsing it into something
         that maps to 500 is what CLAUDE.md warns QuietClientErrorRoute cannot undo."""
         kinds.get_by_code.return_value = None
         with pytest.raises(HTTPException) as exc:
-            service.create_artwork(EntityTypeEnum.title, 42, _create_payload())
+            service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))
         assert exc.value.status_code == 422
         repo.create.assert_not_called()
+        store.store.assert_not_called(), "the kind is settled before any bytes are written"
 
     def test_filtering_a_list_by_an_unknown_kind_is_422(self, service, kinds):
         kinds.get_by_code.return_value = None
@@ -259,28 +276,28 @@ class TestProvenanceValidation:
 
     def test_a_scheme_without_an_id_is_rejected(self):
         with pytest.raises(ValueError):
-            _create_payload(source_scheme_id=1)
+            _read(source_scheme_id=1)
 
     def test_an_id_without_a_scheme_is_rejected(self):
         with pytest.raises(ValueError):
-            _create_payload(source_external_id="abc123")
+            _read(source_external_id="abc123")
 
     def test_both_together_are_accepted(self):
-        payload = _create_payload(source_scheme_id=1, source_external_id="abc123")
+        payload = _read(source_scheme_id=1, source_external_id="abc123")
         assert payload.source_scheme_id == 1
 
     def test_neither_is_accepted(self):
         """What the #104 backfill registers for a cover simply found on disk."""
-        assert _create_payload().source_scheme_id is None
+        assert _read().source_scheme_id is None
 
     def test_a_source_url_alone_is_fine(self):
-        payload = _create_payload(source_url="https://example.com/poster.jpg")
+        payload = _read(source_url="https://example.com/poster.jpg")
         assert payload.source_url == "https://example.com/poster.jpg"
 
     @pytest.mark.parametrize("field", ["width", "height"])
     def test_dimensions_must_be_positive(self, field):
         with pytest.raises(ValueError):
-            _create_payload(**{field: 0})
+            _read(**{field: 0})
 
 
 @pytest.mark.unit
@@ -450,7 +467,9 @@ class TestRegisterUpload:
     ):
         repo.create.return_value = _read(entity_type=EntityTypeEnum.asset)
         service.register_upload(EntityTypeEnum.asset, 42, _upload(), io.BytesIO(b"x"))
-        assets.exists.assert_called_once_with(42)
+        # Called twice by design -- fail-fast before the write, invariant at the
+        # insert. What matters is that the *asset* repository is the one asked.
+        assets.exists.assert_called_with(42)
         titles.exists.assert_not_called()
 
 
