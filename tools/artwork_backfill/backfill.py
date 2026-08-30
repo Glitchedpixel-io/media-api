@@ -11,6 +11,10 @@ recursion, and an unexpected directory in the store cannot lead anywhere. #54 wa
 uncapped recursive walk over the inbox; this avoids the shape rather than capping it.
 A cover whose asset row has since been deleted is skipped by construction, which is
 correct -- there is nothing to attach it to.
+
+**What it registers is ``unknown``, not a guess.** A file found on disk arrives with no
+declaring client, and ``cover.*`` is a filename convention that says nothing about what
+the image is. Asserting a kind it cannot substantiate is exactly what produced #138.
 """
 
 from __future__ import annotations
@@ -42,9 +46,22 @@ from app.services.artwork_storage import (
 )
 from app.utils.paths import accessory_relative_path
 
-#: The artwork kind a `cover.*` file represents. The producing runners write one image
-#: per asset and it is the poster in every case.
-COVER_KIND = "poster"
+#: The artwork kind a `cover.*` file is registered as.
+#:
+#: `unknown`, because **this tool has no declaring client** (#154). Everywhere else the
+#: caller says what the artwork is and the server checks the pixels do not contradict it
+#: (#127, #153). Here there is nobody to ask: a file is found on disk, and `cover.*` is a
+#: filename convention that says nothing about what the image is.
+#:
+#: It used to say `poster`, on the stated grounds that "the producing runners write one
+#: image per asset and it is the poster in every case". It is the poster in **zero**
+#: cases -- all 1,200 rows measured landscape or square -- and that unverified assertion
+#: is #138. Recording the absence of a claim is the honest answer; inferring a kind from
+#: shape is not available, because #127 settled that shape is necessary but not
+#: sufficient.
+#:
+#: An operator who does know can still say so with `--kind`.
+COVER_KIND = "unknown"
 
 #: Suffixes a cover may carry, in the order they are tried. The first four are what
 #: the producing runners actually write; the last two are accepted because the store
@@ -108,8 +125,21 @@ def _iter_asset_ids(session: Session, after: int = 0) -> Iterator[int]:
         cursor = ids[-1]
 
 
-def _assets_with_artwork(session: Session, kind_id: int) -> set[int]:
-    """Every asset id that already has artwork of this kind.
+def _assets_with_artwork(session: Session) -> set[int]:
+    """Every asset id that already has artwork of any kind.
+
+    **Any kind, not the kind being registered** (#154). Scoped to one kind, this missed
+    an asset whose cover had since been reclassified -- #155 moves every row off the
+    kind this tool wrote -- so the next pass would re-store the same file and re-attempt
+    the insert for every one of them. The row is refused by
+    ``uq_artwork_entity_storage_path`` either way, so this is an optimisation rather
+    than the correctness guard, but "already has artwork" is the question actually being
+    asked: this tool exists to give artwork to assets that have none.
+
+    The cost is that an asset carrying unrelated artwork -- an uploaded logo, say --
+    never has its cover registered. That is an acceptable trade for a maintenance pass
+    whose whole purpose is filling gaps, and an operator can still force a specific kind
+    with ``--kind``.
 
     Collected in one query rather than asked per asset. At 13,329 assets a per-asset
     existence check is 13,329 round trips, which at the measured 26ms baseline is most
@@ -117,16 +147,14 @@ def _assets_with_artwork(session: Session, kind_id: int) -> set[int]:
 
     Args:
         session: The session to query through.
-        kind_id: The artwork kind to look for.
 
     Returns:
-        set[int]: Asset ids already carrying that kind of artwork.
+        set[int]: Asset ids already carrying artwork.
     """
     return set(
         session.scalars(
             select(ArtworkORM.entity_id).where(
                 ArtworkORM.entity_type == EntityTypeEnum.asset,
-                ArtworkORM.artwork_kind_id == kind_id,
             )
         )
     )
@@ -191,7 +219,7 @@ def run(
         limit: Stop after attempting this many candidates, or 0 for no limit. Counts
             every asset whose cover was opened and acted on -- registered, failed, or
             found already present -- not successful registrations alone. Assets with
-            no cover, and those the pre-load already knows are covered, are skipped
+            no cover, and those the pre-load already knows carry artwork, are skipped
             before any work happens and do not count against it.
         on_event: Optional ``callable(str)`` for per-asset progress lines.
 
@@ -208,7 +236,7 @@ def run(
         SQLAlchemyMediaRepository(session),
         store,
     )
-    already = _assets_with_artwork(session, kind_id)
+    already = _assets_with_artwork(session)
     emit = on_event
     attempted = 0
 
