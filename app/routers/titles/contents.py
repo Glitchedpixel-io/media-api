@@ -74,7 +74,7 @@ def link_title_contents(
     contents: TitleContentInsert,
     service: TitleContentService = Depends(get_title_content_service),
 ) -> TitleContentRead:
-    return service.insert_positioned(parent_title_id, contents, position="end")
+    return service.insert_positioned(parent_title_id, contents, anchor="end")
 
 
 @router.patch(
@@ -138,12 +138,14 @@ def create_title_content_positioned(
     position: str | None = Query(None, description="Special position: 'start' or 'end'"),
     service: TitleContentService = Depends(get_title_content_service),
 ) -> TitleContentRead:
+    # The query parameter keeps its name; below this line the anchor is called `anchor`,
+    # so it cannot be confused with the integer `position` a row now carries.
     return service.insert_positioned(
         parent_title_id,
         payload,
         before_id=before_id,
         after_id=after_id,
-        position=position,
+        anchor=position,
     )
 
 
@@ -170,5 +172,5 @@ def reorder_title_content(
         title_content_id=title_contents_id,
         before_id=before_id,
         after_id=after_id,
-        position=position,
+        anchor=position,
     )

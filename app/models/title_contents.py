@@ -12,7 +12,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -63,11 +62,14 @@ class TitleContentORM(Base):
     # UI-friendly label for the line item
     label: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # LexoRank-style key; ensure bytewise/lexicographic ordering (optional: collation="C")
-    order_key: Mapped[str] = mapped_column(
-        Text().with_variant(postgresql.TEXT(collation="C"), "postgresql"),
-        nullable=False,
-    )
+    # This entry's place in its parent's list: contiguous, zero-based, ascending.
+    #
+    # Contiguous integers rather than a sparse or fractional key, because the lists are
+    # small and the values are read by people. Children per parent measure at a median
+    # of 1, a p95 of 2 and a maximum of 35, so renumbering a whole list on a move is at
+    # most 35 rows -- while a gapped or fractional scheme buys its O(1) writes at the
+    # cost of values nobody can read, which is what #128 replaced.
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Optional relationships (no back_populates to keep this drop-in)
     parent_title: Mapped[TitleORM] = relationship("TitleORM", foreign_keys=[parent_title_id])
@@ -77,8 +79,22 @@ class TitleContentORM(Base):
     )
 
     __table_args__ = (
-        # Each parent list must not reuse the same order_key
-        UniqueConstraint("parent_title_id", "order_key", name="uq_parent_order"),
+        # Each parent list must not reuse the same position.
+        #
+        # DEFERRABLE INITIALLY DEFERRED because a move renumbers the list in place, and
+        # every intermediate state of that renumber has two rows sharing a position.
+        # Checking per-statement would reject the shuffle itself; checking at commit
+        # asks the question that actually matters -- is the list well-formed now.
+        #
+        # Deferred, not dropped. The guard has to hold against a writer that never goes
+        # near the service layer, which this table demonstrably has (#125).
+        UniqueConstraint(
+            "parent_title_id",
+            "position",
+            name="uq_parent_position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         # Enforce “exactly one target” matches the discriminator
         CheckConstraint(
             "("

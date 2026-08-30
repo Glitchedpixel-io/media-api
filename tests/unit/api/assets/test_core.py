@@ -341,7 +341,7 @@ class TestGetAssetTitles:
             TitleContentReadParent(
                 id=1,
                 parent_title_id=10,
-                order_key="A",
+                position=0,
                 kind=ContentKind.asset,
                 child_title_id=None,
                 asset_id=42,
@@ -351,7 +351,7 @@ class TestGetAssetTitles:
             TitleContentReadParent(
                 id=2,
                 parent_title_id=20,
-                order_key="B",
+                position=0,
                 kind=ContentKind.asset,
                 child_title_id=None,
                 asset_id=42,

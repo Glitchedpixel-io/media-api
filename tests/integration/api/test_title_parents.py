@@ -43,7 +43,7 @@ def make_title(db_session, title_type_ids: dict[str, int]):
 def contain(db_session):
     """Create a parent -> child containment edge directly."""
     repo = SQLAlchemyTitleContentRepository(db_session)
-    counter = {"n": 0}
+    positions: dict[int, int] = {}
 
     def _contain(
         parent_id: int,
@@ -51,7 +51,8 @@ def contain(db_session):
         label: str | None = None,
         membership: MembershipKind = MembershipKind.intrinsic,
     ) -> int:
-        counter["n"] += 1
+        next_position = positions.get(parent_id, -1) + 1
+        positions[parent_id] = next_position
         return repo.create(
             TitleContentCreateInternal(
                 parent_title_id=parent_id,
@@ -60,7 +61,7 @@ def contain(db_session):
                 asset_id=None,
                 label=label,
                 membership=membership,
-                order_key="U" + "U" * counter["n"],
+                position=next_position,
             )
         ).id
 
@@ -91,7 +92,7 @@ class TestParents:
         body = client.get(f"/api/titles/{child}/parents").json()
 
         assert body[0]["label"] == "Episode 1"
-        assert body[0]["order_key"]
+        assert body[0]["position"] == 0
         assert body[0]["child_title_id"] == child
 
     def test_a_root_title_has_no_parents(self, client: TestClient, make_title):
@@ -178,7 +179,7 @@ class TestParents:
                 child_title_id=None,
                 asset_id=asset_id,
                 label=None,
-                order_key="UU",
+                position=0,
             )
         )
 

@@ -242,7 +242,7 @@ class TestTitlesAPI:
         assert "asset_id" in r and r["asset_id"] == asset_id
         assert "child_title_id" in r and r["child_title_id"] is None
         assert "label" in r and r["label"] is None
-        assert "order_key" in r and r["order_key"] is not None
+        assert "position" in r and r["position"] == 0
 
         # Verify database persistence
         db_session.commit()
@@ -252,7 +252,7 @@ class TestTitlesAPI:
         assert (
             content_record
             and content_record.parent_title_id == title_id
-            and content_record.order_key == r["order_key"]
+            and content_record.position == r["position"]
         )
 
     @pytest.mark.parametrize("title_type", [code for code, _ in DEFAULT_TITLE_TYPES])

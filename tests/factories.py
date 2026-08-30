@@ -213,7 +213,7 @@ def get_title_reference_creation_json(tr: TitleReferenceRead) -> dict:
 
 def get_title_content_creation_json(tc: TitleContentRead) -> dict:
     return TitleContentInsert(
-        **tc.model_dump(exclude={"id", "parent_title_id", "order_key"})
+        **tc.model_dump(exclude={"id", "parent_title_id", "position"})
     ).model_dump(mode="json", by_alias=True, exclude_none=True)
 
 
@@ -399,7 +399,7 @@ class TitleContentReadFactory(factory.Factory):
 
     id = factory.Faker("pyint")
     parent_title_id = factory.Faker("pyint")
-    order_key = "U"
+    position = 0
     kind = ContentKind.asset
     child_title_id = None
     asset_id = factory.Faker("pyint")

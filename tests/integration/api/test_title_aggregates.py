@@ -102,11 +102,11 @@ def world(db_session: Session, title_type_ids: dict[str, int]):
                 )
             ).id
 
-        def _next_key(self, parent: int) -> str:
-            """A distinct order_key per entry, since uq_parent_order forbids reuse."""
-            keys.setdefault(parent, 0)
+        def _next_position(self, parent: int) -> int:
+            """The next free position under this parent, appending as callers expect."""
+            keys.setdefault(parent, -1)
             keys[parent] += 1
-            return f"m{keys[parent]:03d}"
+            return keys[parent]
 
         def contains_title(
             self,
@@ -122,7 +122,7 @@ def world(db_session: Session, title_type_ids: dict[str, int]):
                     asset_id=None,
                     label=None,
                     membership=membership,
-                    order_key=self._next_key(parent),
+                    position=self._next_position(parent),
                 )
             )
 
@@ -134,7 +134,7 @@ def world(db_session: Session, title_type_ids: dict[str, int]):
                     child_title_id=None,
                     asset_id=asset_id,
                     label=None,
-                    order_key=self._next_key(parent),
+                    position=self._next_position(parent),
                 )
             )
 

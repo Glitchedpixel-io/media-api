@@ -40,10 +40,11 @@ def make_title(db_session, title_type_ids: dict[str, int]):
 def contain(db_session):
     """Create a parent -> child containment edge directly, bypassing the service."""
     repo = SQLAlchemyTitleContentRepository(db_session)
-    counter = {"n": 0}
+    positions: dict[int, int] = {}
 
     def _contain(parent_id: int, child_id: int) -> int:
-        counter["n"] += 1
+        next_position = positions.get(parent_id, -1) + 1
+        positions[parent_id] = next_position
         return repo.create(
             TitleContentCreateInternal(
                 parent_title_id=parent_id,
@@ -51,7 +52,7 @@ def contain(db_session):
                 child_title_id=child_id,
                 asset_id=None,
                 label=None,
-                order_key="U" + "U" * counter["n"],
+                position=next_position,
             )
         ).id
 

@@ -39,6 +39,24 @@ class SQLAlchemyBaseRepository:
             self.db.rollback()
             raise map_sqla_error(e) from e
 
+    def _safe_flush(self) -> None:
+        """Flush pending changes, mapping database errors the way ``_safe_commit`` does.
+
+        Needed wherever a write has to reach the database *before* the transaction ends
+        -- reading a list back after a delete, say. Without it the same constraint
+        violation surfaces as a raw ``IntegrityError`` from the flush rather than the
+        mapped repository error every caller above is written against, purely because
+        of where in the unit of work it was noticed.
+
+        :raises IntegrityError: If the flush violates a database integrity constraint.
+        :raises DataError: If the flush fails due to invalid data.
+        """
+        try:
+            self.db.flush()
+        except (IntegrityError, DataError) as e:
+            self.db.rollback()
+            raise map_sqla_error(e) from e
+
     @staticmethod
     def _to_cursor(marker: Marker | None) -> str | None:
         return serialize_bookmark(marker) if marker is not None else None

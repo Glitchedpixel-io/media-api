@@ -50,7 +50,7 @@ class TestInsertPositioned:
         svc = TitleContentService(t_repo, c_repo, m_repo)
 
         insert = TitleContentInsert(child_title_id=10, kind=ContentKind.title)
-        result = svc.insert_positioned(5, insert, position="end")
+        result = svc.insert_positioned(5, insert, anchor="end")
 
         assert result is created_content
         assert result.id == 100
@@ -58,7 +58,7 @@ class TestInsertPositioned:
         assert result.child_title_id == 10
         t_repo.exists.assert_called_once_with(5)
         c_repo.create_positioned.assert_called_once_with(
-            5, insert, before_id=None, after_id=None, position="end"
+            5, insert, before_id=None, after_id=None, anchor="end"
         )
 
     @pytest.mark.unit
@@ -81,7 +81,7 @@ class TestInsertPositioned:
 
         assert result is created_content
         c_repo.create_positioned.assert_called_once_with(
-            5, insert, before_id=3, after_id=None, position=None
+            5, insert, before_id=3, after_id=None, anchor=None
         )
 
     @pytest.mark.unit
@@ -104,7 +104,7 @@ class TestInsertPositioned:
 
         assert result is created_content
         c_repo.create_positioned.assert_called_once_with(
-            5, insert, before_id=None, after_id=7, position=None
+            5, insert, before_id=None, after_id=7, anchor=None
         )
 
     @pytest.mark.unit
@@ -515,7 +515,7 @@ class TestReorderContent:
         assert result is reordered_content
         assert result.id == 77
         t_repo.exists.assert_called_once_with(4)
-        c_repo.reorder.assert_called_once_with(4, 77, before_id=None, after_id=2, position=None)
+        c_repo.reorder.assert_called_once_with(4, 77, before_id=None, after_id=2, anchor=None)
 
     @pytest.mark.unit
     def test_reorder_content_success_with_before_id(self) -> None:
@@ -535,7 +535,7 @@ class TestReorderContent:
         result = svc.reorder_content(4, title_content_id=77, before_id=5)
 
         assert result is reordered_content
-        c_repo.reorder.assert_called_once_with(4, 77, before_id=5, after_id=None, position=None)
+        c_repo.reorder.assert_called_once_with(4, 77, before_id=5, after_id=None, anchor=None)
 
     @pytest.mark.unit
     def test_reorder_content_success_with_position(self) -> None:
@@ -552,12 +552,10 @@ class TestReorderContent:
         c_repo.reorder.return_value = reordered_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
 
-        result = svc.reorder_content(4, title_content_id=77, position="start")
+        result = svc.reorder_content(4, title_content_id=77, anchor="start")
 
         assert result is reordered_content
-        c_repo.reorder.assert_called_once_with(
-            4, 77, before_id=None, after_id=None, position="start"
-        )
+        c_repo.reorder.assert_called_once_with(4, 77, before_id=None, after_id=None, anchor="start")
 
     @pytest.mark.unit
     def test_reorder_content_parent_title_not_found(self) -> None:
@@ -615,7 +613,7 @@ class TestReorderContent:
         svc = TitleContentService(t_repo, c_repo, m_repo)
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.reorder_content(4, title_content_id=99, position="start")
+            svc.reorder_content(4, title_content_id=99, anchor="start")
 
         assert exc_info.value.status_code == 404
         assert "Title Content not found" in exc_info.value.detail
@@ -730,7 +728,7 @@ class TestGetTitlesWithAsset:
             TitleContentReadParent(
                 id=1,
                 parent_title_id=10,
-                order_key="A",
+                position=0,
                 kind=ContentKind.asset,
                 child_title_id=None,
                 asset_id=42,
@@ -740,7 +738,7 @@ class TestGetTitlesWithAsset:
             TitleContentReadParent(
                 id=2,
                 parent_title_id=20,
-                order_key="B",
+                position=0,
                 kind=ContentKind.asset,
                 child_title_id=None,
                 asset_id=42,
