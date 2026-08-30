@@ -24,6 +24,7 @@ from app.repositories.protocols import (
     MediaRepository,
     TitleRepository,
 )
+from app.models import DEFAULT_ARTWORK_KINDS
 from app.schemas import (
     ArtworkKindCreatePublic,
     ArtworkKindPatchPublic,
@@ -592,3 +593,81 @@ class TestUploadDimensionsComeFromTheStore:
         for field in ("width", "height"):
             with pytest.raises(ValueError):
                 _upload(**{field: 900})
+
+
+@pytest.mark.unit
+class TestKindShapeDefinition:
+    """A kind's shape is a constraint the server checks a declared kind against, never a
+    way to infer one (#127). These pin the definition; #153 enforces it."""
+
+    def test_a_kind_may_expect_no_shape_at_all(self):
+        """Null is the honest answer for a transparent logo and for unclassified
+        artwork -- not a gap waiting to be filled."""
+        kind = ArtworkKindCreatePublic(code="logo", label="Logo")
+        assert kind.target_ratio is None
+        assert kind.min_width is None
+
+    def test_a_tolerance_without_a_target_is_rejected(self):
+        """It has nothing to be a tolerance of."""
+        with pytest.raises(ValueError) as exc:
+            ArtworkKindCreatePublic(code="x", label="X", ratio_tolerance=0.02)
+        assert "target_ratio" in str(exc.value)
+
+    def test_a_width_range_that_admits_nothing_is_rejected(self):
+        with pytest.raises(ValueError):
+            ArtworkKindCreatePublic(code="x", label="X", min_width=900, max_width=100)
+
+    @pytest.mark.parametrize("field", ["target_ratio", "min_width", "max_width"])
+    def test_non_positive_shape_values_are_rejected(self, field):
+        with pytest.raises(ValueError):
+            ArtworkKindCreatePublic(code="x", label="X", **{field: 0})
+
+
+@pytest.mark.unit
+class TestSeededKinds:
+    """The seed carries the decision from #127, including which numbers are measured."""
+
+    def test_the_new_kinds_are_seeded(self):
+        codes = {seed.code for seed in DEFAULT_ARTWORK_KINDS}
+        assert {"cover_art", "unknown"} <= codes
+
+    def test_unknown_expects_no_shape(self):
+        """It is the absence of a claim about the artwork, not a claim about its shape.
+        A constraint here would refuse the very rows it exists to hold."""
+        unknown = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == "unknown")
+        assert (unknown.target_ratio, unknown.min_width, unknown.max_width) == (None, None, None)
+
+    def test_thumbnail_expects_no_ratio(self):
+        """It holds both 16:9 and 4:3 real rows. No tolerance admitting 1.333 alongside
+        1.778 would mean anything, so width alone constrains it."""
+        thumbnail = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == "thumbnail")
+        assert thumbnail.target_ratio is None
+        assert thumbnail.min_width == 320
+
+    def test_the_cover_art_tolerance_admits_the_row_it_exists_for(self):
+        """499x500 is a real production cover, 0.2% off square. A zero-tolerance rule
+        would misfile it, which is the whole argument for the column."""
+        cover = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == "cover_art")
+        assert cover.target_ratio is not None and cover.ratio_tolerance is not None
+        deviation = abs((499 / 500) - cover.target_ratio) / cover.target_ratio
+        assert deviation <= cover.ratio_tolerance
+
+    def test_the_poster_tolerance_admits_theatrical_art(self):
+        """27:40 (0.675) is a legitimate poster shape, not only the 2:3 of the common
+        sizes, so a tolerance tight enough to exclude it would be wrong."""
+        poster = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == "poster")
+        assert poster.target_ratio is not None and poster.ratio_tolerance is not None
+        deviation = abs((27 / 40) - poster.target_ratio) / poster.target_ratio
+        assert deviation <= poster.ratio_tolerance
+
+    def test_the_thumbnail_floor_excludes_the_row_that_justifies_it(self):
+        """128x96 is the one stored row too small to be useful artwork of any kind."""
+        thumbnail = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == "thumbnail")
+        assert thumbnail.min_width is not None and thumbnail.min_width > 128
+
+    @pytest.mark.parametrize("code", ["poster", "backdrop", "still", "cover_art"])
+    def test_a_kind_with_a_target_also_carries_a_tolerance(self, code):
+        """An exact-match ratio rule refuses real files; every target needs a tolerance."""
+        seed = next(s for s in DEFAULT_ARTWORK_KINDS if s.code == code)
+        assert seed.target_ratio is not None
+        assert seed.ratio_tolerance is not None and seed.ratio_tolerance > 0

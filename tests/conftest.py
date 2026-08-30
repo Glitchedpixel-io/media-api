@@ -171,7 +171,7 @@ def seed_artwork_kinds(session: Session) -> None:
     Args:
         session: The session to seed through.
     """
-    session.add_all(ArtworkKindORM(code=code, label=label) for code, label in DEFAULT_ARTWORK_KINDS)
+    session.add_all(ArtworkKindORM(**seed._asdict()) for seed in DEFAULT_ARTWORK_KINDS)
     session.commit()
 
 
