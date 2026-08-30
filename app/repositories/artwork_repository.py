@@ -18,7 +18,7 @@ from app.schemas import (
     ArtworkUpdateInternal,
     PaginatedResponse,
 )
-from app.schemas.enums import EntityTypeEnum
+from app.schemas.enums import EntityTypeEnum, MembershipKind
 
 from ..utils.sorting import apply_ordering
 
@@ -279,10 +279,34 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         one. Either guard alone is insufficient; the cap bounds legitimate depth, the
         path set bounds illegitimate repetition.
 
-        Every containment edge is walked. Once #90 distinguishes intrinsic from curated
-        containment, only intrinsic edges should be followed -- a curated collection
-        borrowing its poster from an unrelated member is probably wrong -- but that
-        distinction does not exist yet, and inventing it here would guess at it.
+        **Only intrinsic edges are walked.** A curated edge says nothing about where
+        its child belongs -- that is the whole point of the distinction #90 drew -- so
+        borrowing an image across one would give "Films of 1974" the identity of
+        whichever unrelated member happens to sort first by ``order_key``, and the grid
+        would present that as the collection's own. A title reached only through
+        curated edges therefore resolves to nothing and gets the placeholder, which is
+        the same answer this already gives a title with no contents, and the correct
+        one for a list nobody has given an image to (#161).
+
+        This restricts *borrowing*, not a title's own artwork: the seed is unfiltered,
+        so a curated collection that has been given its own primary artwork still
+        resolves it. Being able to say so is what makes the restriction safe rather
+        than merely stricter.
+
+        The predicate needs no index of its own. It filters rows the join has already
+        fetched, and the parent-side indexes (``uq_parent_order``,
+        ``uq_parent_child_title_once``) select one parent's contents, which is 35 rows
+        at the measured widest. ``ix_title_contents_child_membership`` does not serve
+        this walk at all, being keyed on ``child_title_id`` while this joins on
+        ``parent_title_id`` -- worth stating because its name suggests otherwise.
+
+        Measured at 102,500 containment rows (17,500 of them curated), resolving a
+        full 500-row page: 75.3ms against a 75.2ms baseline that walked every edge, so
+        the restriction is free. A page of nothing but curated lists drops from 59.0ms
+        to 19.2ms, because the walk now stops at the first edge instead of descending
+        the whole list. That page also went from resolving 500 of 500 to 0 of 500,
+        which is the bug rather than a regression: every one of those images was
+        arbitrary.
 
         Args:
             title_ids: The titles to resolve for. An empty sequence issues no query.
@@ -329,6 +353,8 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
             # Only titles have contents; an asset row is a leaf.
             .where(walk.c.title_id.isnot(None))
             .where(walk.c.depth < max_depth)
+            # Borrow down a child's home, never across a curated list (#161).
+            .where(TitleContentORM.membership == MembershipKind.intrinsic)
             .where(~walk.c.seen.contains(array([TitleContentORM.child_title_id])))
         )
         walk = walk.union_all(step)
