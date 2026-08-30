@@ -13,7 +13,6 @@ from app.repositories import (
 )
 from app.schemas import (
     ArtworkCreateInternal,
-    ArtworkCreatePublic,
     ArtworkKindCreateInternal,
     ArtworkKindCreatePublic,
     ArtworkKindPatchPublic,
@@ -27,7 +26,7 @@ from app.schemas import (
     PaginatedResponse,
 )
 from app.schemas.enums import EntityTypeEnum
-from app.services.artwork_storage import ArtworkStore
+from app.services.artwork_storage import ArtworkStore, StoredArtwork
 from app.services.errors import translate_repository_errors
 
 
@@ -205,19 +204,78 @@ class ArtworkService:
         return self.repo.get_primary(entity_type, entity_id, self._resolve_kind_id(kind))
 
     @translate_repository_errors
-    def create_artwork(
-        self, entity_type: EntityTypeEnum, entity_id: int, artwork: ArtworkCreatePublic
+    def register_stored(
+        self,
+        entity_type: EntityTypeEnum,
+        entity_id: int,
+        artwork_kind_id: int,
+        stored: StoredArtwork,
+        *,
+        is_primary: bool = False,
+        source_scheme_id: int | None = None,
+        source_external_id: str | None = None,
+        source_url: str | None = None,
     ) -> ArtworkRead:
+        """Register a file the store has already accepted.
+
+        **The one place an artwork row is born.** Both the upload endpoint and
+        ``tools/artwork_backfill`` come through here, which is the point: #138 was
+        caused by two write paths where only one was validated, and the backfill --
+        the unvalidated one -- asserted a kind nothing checked and wrote null
+        dimensions for a year's worth of rows.
+
+        Taking a ``StoredArtwork`` rather than four loose values is what makes that
+        stick. ``storage_path``, ``mime``, ``width`` and ``height`` cannot be supplied
+        by a caller at all; they can only come from bytes the store has sniffed and
+        measured. That is a guarantee in the signature rather than a rule someone has
+        to remember, and it is the same line #139 and #141 drew at the API boundary.
+
+        ``is_primary`` is applied by promotion rather than written on the insert, for
+        both callers. A second primary would collide with
+        ``uq_artwork_one_primary_per_kind``, and promotion runs the demote-then-promote
+        path instead. The backfill previously wrote ``is_primary=True`` directly and
+        was correct only because its pre-load guaranteed no incumbent; going through
+        ``set_primary`` makes it correct whether or not that guarantee holds.
+
+        Args:
+            entity_type: Whether this artwork belongs to a title or an asset.
+            entity_id: ID of that title or asset.
+            artwork_kind_id: ID of the artwork's kind, already resolved.
+            stored: What the store produced. The only source of the file's identity,
+                type and dimensions.
+            is_primary: Make this the artwork for its entity and kind.
+            source_scheme_id: ID scheme this came from, paired with the external ID.
+            source_external_id: Identifier within that scheme.
+            source_url: Where it was fetched from, if anywhere.
+
+        Returns:
+            ArtworkRead: The registered artwork.
+
+        Raises:
+            HTTPException: 404 if the entity does not exist, 409 if this entity
+                already has this exact file.
+        """
         self._require_entity(entity_type, entity_id)
-        payload = artwork.model_dump()
-        kind_code = payload.pop("artwork_kind")
-        internal = ArtworkCreateInternal(
-            entity_type=entity_type,
-            entity_id=entity_id,
-            artwork_kind_id=self._resolve_kind_id(kind_code),
-            **payload,
+
+        created = self.repo.create(
+            ArtworkCreateInternal(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                artwork_kind_id=artwork_kind_id,
+                storage_path=stored.storage_path,
+                mime=stored.mime,
+                width=stored.width,
+                height=stored.height,
+                is_primary=False,
+                source_scheme_id=source_scheme_id,
+                source_external_id=source_external_id,
+                source_url=source_url,
+            )
         )
-        return self.repo.create(internal)
+
+        if is_primary:
+            return self.repo.set_primary(created.id)
+        return created
 
     @translate_repository_errors
     def register_upload(
@@ -257,39 +315,24 @@ class ArtworkService:
                 the size or pixel cap, 415 for one that is not an image, and 409 if
                 this entity already has this exact file.
         """
+        # Checked before a byte is written, so an unknown entity or kind is settled
+        # without touching the store. register_stored checks the entity again at the
+        # point of insert; that is the invariant, this is the fail-fast.
         self._require_entity(entity_type, entity_id)
         kind_id = self._resolve_kind_id(upload.artwork_kind)
 
         stored = self.store.store(stream)
 
-        created = self.repo.create(
-            ArtworkCreateInternal(
-                entity_type=entity_type,
-                entity_id=entity_id,
-                artwork_kind_id=kind_id,
-                # Every one of these comes from the bytes rather than the request.
-                # A caller-supplied size is a claim about a file the caller also
-                # controls, which is the same reason the mime is sniffed rather than
-                # read off the upload (#141).
-                storage_path=stored.storage_path,
-                mime=stored.mime,
-                width=stored.width,
-                height=stored.height,
-                # Never set on the insert. A second primary would collide with
-                # uq_artwork_one_primary_per_kind and surface as a 409 for what the
-                # caller reasonably means: "make this the poster". Promoting after the
-                # insert runs the demote-then-promote path instead, which is what they
-                # asked for and is already covered by the repository's contract tests.
-                is_primary=False,
-                source_scheme_id=upload.source_scheme_id,
-                source_external_id=upload.source_external_id,
-                source_url=upload.source_url,
-            )
+        return self.register_stored(
+            entity_type,
+            entity_id,
+            kind_id,
+            stored,
+            is_primary=upload.is_primary,
+            source_scheme_id=upload.source_scheme_id,
+            source_external_id=upload.source_external_id,
+            source_url=upload.source_url,
         )
-
-        if upload.is_primary:
-            return self.repo.set_primary(created.id)
-        return created
 
     @translate_repository_errors(not_found_message="Artwork not found")
     def update_artwork(

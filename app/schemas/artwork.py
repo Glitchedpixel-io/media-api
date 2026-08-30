@@ -62,7 +62,16 @@ ArtworkKindUpdateInternal = make_partial_model(
 
 
 class ArtworkAttrs(BaseModel):
-    """The public shape of an artwork, where the kind is identified by its code."""
+    """The **read** shape of an artwork, where the kind is identified by its code.
+
+    Base of ``ArtworkRead`` and nothing else, deliberately. It carries the four fields
+    the server establishes from the bytes -- ``storage_path``, ``mime``, ``width`` and
+    ``height`` -- so anything inheriting it to build a *request* model accepts them by
+    accident. That is exactly how they reached PATCH before #139, and why
+    ``ArtworkPatchPublic`` is declared standalone and ``ArtworkCreatePublic`` is gone
+    (#142). ``tests/unit/api/test_openapi_artwork_request_fields.py`` fails if it
+    happens again.
+    """
 
     model_config = {"from_attributes": True, "extra": "forbid"}
 
@@ -136,10 +145,6 @@ class ArtworkAttrs(BaseModel):
         return self
 
 
-class ArtworkCreatePublic(ArtworkAttrs):
-    pass
-
-
 class ArtworkCreateInternal(BaseModel):
     """The persistence shape of an artwork, where the kind is a foreign key.
 
@@ -192,7 +197,7 @@ class ArtworkRead(ArtworkAttrs, IDMixin):
 class ArtworkPatchPublic(BaseModel):
     """What a client may change about an artwork after it was uploaded.
 
-    Deliberately **not** a partial of ``ArtworkCreatePublic``, and the distinction is
+    Deliberately **not** a partial of the read model, and the distinction is
     the point of the model: ``storage_path``, ``mime``, ``width`` and ``height`` are
     established by the server from the bytes it received, so a client able to rewrite
     them could undo every check ``ArtworkStore`` performs. That store sniffs magic
