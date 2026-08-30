@@ -113,6 +113,18 @@ class TitleService:
             title.total_runtime = found.total_runtime if found else 0.0
             title.total_size = found.total_size if found else 0
 
+    def _display_image_kind_ids(self) -> list[int]:
+        """The display chain, resolved from codes to ids.
+
+        The chain is the service's to define, so the code -> id lookup happens here and
+        the repository is handed ids -- the same split the artwork routes use for
+        `?kind=`. A code with no row is skipped rather than raising, matching
+        `_attach_display_images`: a kind can be edited out of the lookup table, and a
+        filter that 500s because of it would be worse than one that ignores it.
+        """
+        by_code = {kind.code: kind.id for kind in self.artwork_kind_repo.list_all()}
+        return [by_code[code] for code in DISPLAY_IMAGE_KINDS if code in by_code]
+
     def _attach_display_images(self, titles: list[TitleReadExtended]) -> None:
         """Resolve and attach a display image for each title, in a few queries.
 
@@ -163,8 +175,14 @@ class TitleService:
 
         Decorated so an unsupported `sort` field becomes a 422 rather than escaping
         as a 500: `normalize_sort` raises `EnumViolation`, which this maps.
+
+        The display chain is resolved to kind ids only when `resolves_display_image`
+        asks for it, so an ordinary page does not pay for the lookup (#122).
         """
-        page = self.repository.list_paged(params)
+        kind_ids = (
+            self._display_image_kind_ids() if params.resolves_display_image is not None else None
+        )
+        page = self.repository.list_paged(params, kind_ids)
         if self._wants_display_image(params.include):
             self._attach_display_images(page.items)
         if self._includes(params.include, COUNTS_INCLUDE):

@@ -1,4 +1,6 @@
 # app/repositories/title_repository.py
+from collections.abc import Sequence
+
 from sqlakeyset import select_page
 from sqlalchemy import exists, select
 from sqlalchemy.orm import contains_eager, selectinload
@@ -16,6 +18,7 @@ from app.schemas import (
 )
 
 from ..utils.sorting import apply_ordering
+from .artwork_repository import titles_resolving_artwork
 from .base_repository import SQLAlchemyBaseRepository
 from .errors import EnumViolation, NotFoundError
 from .protocols import TitleRepository
@@ -43,7 +46,11 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
     def exists(self, title_id: int) -> bool:
         return self.db.get(TitleORM, title_id) is not None
 
-    def list_paged(self, params: TitleListParams) -> PaginatedResponse[TitleReadExtended]:
+    def list_paged(
+        self,
+        params: TitleListParams,
+        display_image_kind_ids: Sequence[int] | None = None,
+    ) -> PaginatedResponse[TitleReadExtended]:
         """List titles, filtered and keyset-paginated.
 
         **The query the library grid issues** is
@@ -81,10 +88,11 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
             stmt = stmt.where(TitleORM.name.ilike(f"%{params.name}%"))
         if params.has_artwork is not None:
             # Artwork the title holds *itself*, which is not the same question as
-            # whether the grid shows it a poster -- a title with none of its own can
-            # still resolve one from its contents (#110). That resolution is a
-            # recursive walk, so expressing it as a filter is a separate piece of work
-            # rather than another branch here.
+            # whether the grid shows it an image -- a title with none of its own can
+            # still resolve one from its contents (#110). `resolves_display_image`
+            # below is that other question; the two are kept as separate filters
+            # rather than one, because both are worth asking and neither implies the
+            # other.
             #
             # Correlated EXISTS rather than a join, so a title holding several artworks
             # is still returned once and `limit` stays a cap on titles.
@@ -93,6 +101,31 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
                 ArtworkORM.entity_id == TitleORM.id,
             )
             stmt = stmt.where(has_artwork if params.has_artwork else ~has_artwork)
+
+        if params.resolves_display_image is not None:
+            # "Which titles are holes in the grid?" -- the question `has_artwork`
+            # looked like it answered and does not (#122). A semi-join against the
+            # same walk `include=display_image` resolves with, so the filter and the
+            # field agree by construction rather than by being written to match.
+            #
+            # The kinds arrive already resolved to ids, as on the artwork routes: the
+            # display chain is the service's to define, and a repository that reached
+            # for it would put a service constant behind a database query.
+            #
+            # `IN (subquery)` rather than a correlated EXISTS, deliberately. The walk
+            # does not depend on the outer row, so this lets the planner evaluate it
+            # once for the page instead of once per candidate row -- which is the
+            # whole reason the filter is affordable. Written as a correlated EXISTS it
+            # would be #49 again.
+            # The `false` direction compiles to `NOT IN (subquery)`, which returns no
+            # rows *at all* if the subquery ever yields a NULL rather than excluding
+            # that row. Every column the walk selects is NOT NULL today, so it cannot;
+            # `test_the_two_directions_partition_the_library` is what would catch it
+            # if a future change made one nullable, because the two sides would stop
+            # summing to the library.
+            resolving = titles_resolving_artwork(display_image_kind_ids or [])
+            predicate = TitleORM.id.in_(resolving)
+            stmt = stmt.where(predicate if params.resolves_display_image else ~predicate)
 
         if params.library_root is not None:
             # The library grid's every-load filter. Served by `ix_titles_library_root_id`
