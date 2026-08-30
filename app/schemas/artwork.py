@@ -23,6 +23,52 @@ class ArtworkKindAttrs(BaseModel):
     description: str | None = Field(
         None, title="Description", description="Helpful information about when to use this kind"
     )
+    target_ratio: float | None = Field(
+        None,
+        title="Target Ratio",
+        description=(
+            "Expected width divided by height, or null when this kind expects no "
+            "particular shape"
+        ),
+        gt=0,
+    )
+    ratio_tolerance: float | None = Field(
+        None,
+        title="Ratio Tolerance",
+        description=(
+            "Permitted deviation from target_ratio, relative to it: a ratio passes when "
+            "abs(actual - target) / target <= tolerance"
+        ),
+        ge=0,
+    )
+    min_width: int | None = Field(
+        None, title="Minimum Width", description="Smallest acceptable pixel width", gt=0
+    )
+    max_width: int | None = Field(
+        None, title="Maximum Width", description="Largest acceptable pixel width", gt=0
+    )
+
+    @model_validator(mode="after")
+    def shape_fields_are_coherent(self) -> ArtworkKindAttrs:
+        """Reject a shape definition that cannot be applied.
+
+        A tolerance without a target has nothing to be a tolerance *of*, and a width
+        range whose floor exceeds its ceiling admits nothing. Both are caught here so
+        the caller gets a validation error naming the fields rather than a kind that
+        silently refuses every upload once #153 enforces it.
+
+        Returns:
+            ArtworkKindAttrs: This model, unchanged.
+
+        Raises:
+            ValueError: If a tolerance has no target, or min_width exceeds max_width.
+        """
+        if self.ratio_tolerance is not None and self.target_ratio is None:
+            raise ValueError("ratio_tolerance has no meaning without target_ratio")
+        if self.min_width is not None and self.max_width is not None:
+            if self.min_width > self.max_width:
+                raise ValueError("min_width cannot exceed max_width")
+        return self
 
     @field_validator("code")
     @classmethod
