@@ -58,6 +58,10 @@ artwork-backfill = "tools.artwork_backfill.cli:main"
 # rows registered before anything measured them -- rows that predate #140, when the
 # API began measuring every upload itself. Also re-measures after a bad pass.
 artwork-dimensions = "tools.artwork_dimensions.cli:main"
+# The artwork reclassification pass (tools/artwork_reclassify). Moves the rows the
+# backfill mislabelled onto the kinds their measured sizes say they are (#138), once
+# #127 settled what those kinds mean. One-shot, dry-run by default.
+artwork-reclassify = "tools.artwork_reclassify.cli:main"
 
 [project.entry-points."media_api.orchestration_providers"]
 prefect = "app.orchestration.prefect:PrefectProvider"
