@@ -23,7 +23,7 @@ from app.schemas import (
 
 from ..utils.sorting import apply_ordering
 from .base_repository import SQLAlchemyBaseRepository
-from .errors import NotFoundError
+from .errors import EnumViolation, NotFoundError
 from .protocols import MediaRepository
 
 
@@ -112,12 +112,26 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
 
         # tag filtering
         if params.tag_ids:
-            # get the list of tags to match, discarding empty tags and duplicates
-            tags = set(
-                int(tag)
-                for tag in [tag.strip().lower() for tag in params.tag_ids.split(",")]
-                if tag and len(tag) > 0
-            )
+            # Parsed here, and a bad value raised as EnumViolation, because that is the
+            # one route to a 422 for this endpoint: `params` is built by FastAPI through
+            # `Depends()`, where a pydantic validator's error escapes as a 500 rather
+            # than being collected into a request-validation response. `get_assets`
+            # already maps EnumViolation to 422, which is how an unsupported `sort`
+            # field reaches the caller.
+            #
+            # Unguarded, `int()` raised ValueError straight out of the repository and
+            # `?tag_ids=abc` was served as a 500 -- and, being a 500, was recorded as a
+            # Logfire issue that `QuietClientErrorRoute` had nothing to work with, since
+            # it only converts a status that is already correct (#132). The identical
+            # parse on GET /api/titles/ was guarded this way in #131.
+            try:
+                tags = {
+                    int(tag) for tag in (tag.strip() for tag in params.tag_ids.split(",")) if tag
+                }
+            except ValueError as e:
+                raise EnumViolation(
+                    f"tag_ids must be a comma-separated list of integers: {params.tag_ids!r}"
+                ) from e
             if tags:
                 stmt = (
                     stmt.join(AssetTagORM, AssetTagORM.asset_id == AssetORM.id)
