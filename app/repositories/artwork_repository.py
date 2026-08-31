@@ -2,7 +2,7 @@
 from collections.abc import Sequence
 
 from sqlakeyset import select_page
-from sqlalchemy import Integer, func, literal, select
+from sqlalchemy import Integer, case, func, literal, select
 from sqlalchemy.sql import ColumnElement, Select
 from sqlalchemy.dialects.postgresql import array
 
@@ -362,9 +362,12 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         self._safe_commit()
 
     def resolve_for_titles(
-        self, title_ids: Sequence[int], kind_id: int, max_depth: int = MAX_RESOLUTION_DEPTH
+        self,
+        title_ids: Sequence[int],
+        kind_ids: Sequence[int],
+        max_depth: int = MAX_RESOLUTION_DEPTH,
     ) -> dict[int, ArtworkRead]:
-        """Resolve each title's artwork of a kind, falling back to its contents.
+        """Resolve each title's display artwork, falling back to its contents.
 
         A title uses its own primary artwork if it has one. Otherwise it borrows from
         the first entry of its contents, in ``position`` order, recursing into child
@@ -413,16 +416,34 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         which is the bug rather than a regression: every one of those images was
         arbitrary.
 
+        **One query for the whole chain**, not one per kind. The kinds are a precedence
+        order -- poster, then cover art, and so on -- and this used to be walked by
+        calling the method once per kind until every title had resolved. That is five
+        recursive walks, and a title with no artwork (most of them) never resolves and
+        pays all five. On a 500-row page the cost amortises; on ``GET /api/titles/{id}``
+        there is one row to amortise across, which is #168: nine queries for one title,
+        six of them recursive.
+
+        Precedence is expressed as a rank inside the walk instead, so the ordering is
+        ``(kind_rank, depth, ord)``. That is the same answer the loop produced, and the
+        order of the two leading terms matters: **kind beats depth**. A title whose deep
+        descendant has a poster resolves to that poster rather than to its own cover
+        art, because the loop tried poster across the whole walk before considering
+        cover art. Ordering by depth first would silently change which image a title
+        shows.
+
         Args:
             title_ids: The titles to resolve for. An empty sequence issues no query.
-            kind_id: The artwork kind to resolve, e.g. the id of ``poster``.
+            kind_ids: Artwork kind ids **in precedence order**, most preferred first.
+                An empty sequence issues no query. The caller resolves codes to ids;
+                see ``TitleService._display_image_kind_ids``.
             max_depth: How many levels of containment to descend.
 
         Returns:
             dict[int, ArtworkRead]: Title id -> resolved artwork, omitting titles that
                 resolved to nothing.
         """
-        if not title_ids:
+        if not title_ids or not kind_ids:
             return {}
 
         # Depth 0: each requested title, standing for itself, so its own artwork wins
@@ -469,11 +490,24 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         # Two index-friendly joins unioned, rather than one join with an OR across
         # entity_type: an OR cannot use ix_artwork_entity_kind_primary, and this read
         # exists to be cheap.
+        # The precedence order, as a sortable rank. `else_` cannot be reached -- the
+        # predicate below admits only these kinds -- but a CASE without one yields NULL,
+        # which sorts last ascending and would be indistinguishable from the least
+        # preferred kind if that ever stopped being true.
+        kind_rank = case(
+            *[
+                (ArtworkORM.artwork_kind_id == kind_id, rank)
+                for rank, kind_id in enumerate(kind_ids)
+            ],
+            else_=len(kind_ids),
+        ).label("kind_rank")
+
         def _matches(entity_type: EntityTypeEnum, column: ColumnElement[int | None]) -> Select:
             return (
                 select(
                     walk.c.root_id,
                     ArtworkORM.id.label("artwork_id"),
+                    kind_rank,
                     walk.c.depth,
                     walk.c.ord,
                 )
@@ -482,7 +516,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
                     ArtworkORM,
                     (ArtworkORM.entity_type == entity_type) & (ArtworkORM.entity_id == column),
                 )
-                .where(ArtworkORM.artwork_kind_id == kind_id)
+                .where(ArtworkORM.artwork_kind_id.in_(kind_ids))
                 .where(ArtworkORM.is_primary.is_(True))
             )
 
@@ -491,10 +525,17 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
             .union_all(_matches(EntityTypeEnum.asset, walk.c.asset_id))
             .subquery("artwork_matches")
         )
+        # `kind_rank` leads `depth` deliberately: see the note in the docstring about
+        # kind beating depth. Swapping them changes which image a title shows.
         nearest = (
             select(matches.c.root_id, matches.c.artwork_id)
             .distinct(matches.c.root_id)
-            .order_by(matches.c.root_id, matches.c.depth, matches.c.ord)
+            .order_by(
+                matches.c.root_id,
+                matches.c.kind_rank,
+                matches.c.depth,
+                matches.c.ord,
+            )
             .subquery("artwork_nearest")
         )
 

@@ -599,3 +599,54 @@ class TestKindFallbackChain:
         world.art(EntityTypeEnum.title, title, kind_id=world.logo_kind)
 
         assert _poster(client, title) is None
+
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestDisplayImageChainQueryCount:
+    """#168: the chain costs one walk, not one walk per kind.
+
+    `TestTitleListQueryCount` above does not reach this. Its titles resolve on the
+    *first* kind, so the old implementation stopped after one walk and the count looked
+    right. The expensive shape is a title that resolves late or not at all: the old
+    loop then ran a separate recursive walk for every kind in the chain before giving
+    up. On a 500-row page that amortises; on a detail read there is one row to amortise
+    across, which is how one title came to cost nine queries, six of them recursive.
+
+    Matched on `artwork_walk` -- the CTE's own name -- so this counts resolution walks
+    specifically rather than every statement that mentions artwork.
+    """
+
+    def test_a_title_that_resolves_nothing_still_costs_one_walk(self, client, world, _test_engine):
+        title = world.title()
+
+        with _statements_touching(_test_engine, "artwork_walk") as statements:
+            response = client.get(f"/api/titles/{title}")
+
+        assert response.status_code == HTTPStatus.OK
+        assert response.json()["display_image"] is None, "nothing should resolve here"
+        assert len(statements) == 1, (
+            f"expected one resolution walk for the whole chain, got {len(statements)}; "
+            "a walk per kind is the #168 regression"
+        )
+
+    def test_the_last_kind_in_the_chain_costs_no_more_than_the_first(
+        self, client, world, _test_engine
+    ):
+        """The old loop's cost depended on how far down the chain a title resolved."""
+        first = world.title()
+        world.art(EntityTypeEnum.title, first)
+        last = world.title()
+        world.art(EntityTypeEnum.title, last, kind_id=world.backdrop_kind)
+
+        counts: dict[str, int] = {}
+        for label, title_id in (("first", first), ("last", last)):
+            with _statements_touching(_test_engine, "artwork_walk") as statements:
+                response = client.get(f"/api/titles/{title_id}")
+            assert response.status_code == HTTPStatus.OK
+            assert response.json()["display_image"] is not None
+            counts[label] = len(statements)
+
+        assert counts["first"] == counts["last"] == 1, (
+            "resolution cost still depends on where in the chain a title resolves: " f"{counts}"
+        )
