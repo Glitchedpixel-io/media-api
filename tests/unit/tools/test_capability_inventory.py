@@ -1596,3 +1596,91 @@ def test_an_index_method_survives_a_json_round_trip() -> None:
 def test_a_json_written_before_the_method_existed_still_loads() -> None:
     payload = {"name": "ix_titles_name", "table": "titles", "columns": ["name"], "unique": False}
     assert load._index(payload).method == "btree"
+
+
+# --------------------------------------------------------------------------
+# Trigram coverage (#171)
+# --------------------------------------------------------------------------
+
+
+def _trigram_lookup() -> IndexLookup:
+    return IndexLookup(
+        (
+            IndexInfo(
+                name="ix_titles_name_trgm",
+                table="titles",
+                columns=("name",),
+                unique=False,
+                method="gin",
+                ops=("gin_trgm_ops",),
+            ),
+        )
+    )
+
+
+def test_a_substring_match_is_served_by_a_trigram_index() -> None:
+    """The report used to recommend adding an index that already existed."""
+    covered, index, note = _trigram_lookup().judge("titles", "name", "ilike_contains")
+    assert covered is True
+    assert index == "ix_titles_name_trgm"
+    assert "three characters or more" in note
+
+
+def test_a_suffix_match_is_served_by_a_trigram_index() -> None:
+    covered, index, _ = _trigram_lookup().judge("titles", "name", "ilike_suffix")
+    assert covered is True
+    assert index == "ix_titles_name_trgm"
+
+
+def test_a_column_without_a_trigram_index_keeps_the_old_advice() -> None:
+    """`tags.name` genuinely has none, and its wording must not change."""
+    lookup = IndexLookup(
+        (IndexInfo(name="ix_tags_name", table="tags", columns=("name",), unique=False),)
+    )
+    covered, index, note = lookup.judge("tags", "name", "ilike_contains")
+    assert covered is False
+    assert index is None
+    assert "a trigram index would be needed" in note
+
+
+def test_a_gin_index_that_is_not_a_trigram_index_does_not_serve_a_substring_match() -> None:
+    """A GIN index over jsonb serves containment and nothing resembling a LIKE.
+
+    Deciding this from the index's name would be guessing, which is the failure this
+    area keeps repeating; it is decided from the recorded operator class.
+    """
+    lookup = IndexLookup(
+        (
+            IndexInfo(
+                name="ix_assets_metadata_gin",
+                table="assets",
+                columns=("metadata",),
+                unique=False,
+                method="gin",
+                ops=("jsonb_path_ops",),
+            ),
+        )
+    )
+    covered, index, _ = lookup.judge("assets", "metadata", "ilike_contains")
+    assert covered is False
+    assert index is None
+
+
+def test_the_operator_classes_are_read_from_the_models() -> None:
+    trigram = {
+        i.name: i.ops for i in indexes.from_metadata() if i.method == "gin" and i.source == "models"
+    }
+    assert trigram, "the schema declares GIN indexes and they must carry their opclass"
+    assert all(any(o.endswith("trgm_ops") for o in ops) for ops in trigram.values())
+
+
+def test_operator_classes_survive_a_json_round_trip() -> None:
+    payload = {
+        "name": "ix_titles_name_trgm",
+        "table": "titles",
+        "columns": ["name"],
+        "unique": False,
+        "method": "gin",
+        "ops": ["gin_trgm_ops"],
+    }
+    assert load._index(payload).ops == ("gin_trgm_ops",)

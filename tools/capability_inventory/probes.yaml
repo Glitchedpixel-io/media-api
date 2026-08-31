@@ -243,7 +243,13 @@ probes:
   - name: assets-broadest-filter
     path: /api/assets/
     query: {limit: 50, path_part: "e"}
-    note: substring filter matching almost everything; sequential scan by construction
+    note: >-
+      substring filter matching almost everything; sequential scan by construction.
+      One character on purpose, and it is the reason this does not contradict the
+      coverage row above: `ix_assets_path_trgm` serves this filter from three
+      characters up, and a pattern shorter than that contains no whole trigram, so
+      the planner cannot use it. This measures that floor rather than the ordinary
+      case
 
   - name: titles-name-substring
     path: /api/titles/
