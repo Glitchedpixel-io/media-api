@@ -79,9 +79,15 @@ variables:
   # The title with the most children, so the "4000-item case" is measured rather
   # than assumed. Resolved by asking for the largest collection the API exposes.
   # `/api/transform_requests/{request_id}` names its path parameter `request_id`.
+  #
+  # Resolved with `actioned=true` rather than by taking the lowest id. The
+  # detail route does not care either way, but `/logs` checks `actioned` before
+  # it does anything and 409s otherwise -- which is why that endpoint had never
+  # once been measured. One variable serves both probes, and a placeholder has
+  # to be spelled as the route declares it, so this is where the choice is made.
   request_id:
     from_endpoint: /api/transform_requests
-    query: {limit: 1, sort: "id:asc"}
+    query: {limit: 1, sort: "id:desc", actioned: true}
     pick: items.0.id
   stream_id:
     from_endpoint: /api/streams
@@ -152,19 +158,48 @@ probes:
     path: /api/titles/
     query: {limit: 50}
 
-  # -- isolating poster resolution ---------------------------------------
-  # `include=poster` returns the same rows as `titles-page-1` with one field
-  # added, so the difference between the two probes is the resolution and
-  # nothing else -- the same isolation the assets N+1 pair below uses.
+  # -- isolating display-image resolution --------------------------------
+  # This pair used to be `titles-page-1` against the same request with
+  # `include=poster`, on the theory that the second measured resolution and the
+  # first did not. It measured nothing: the two returned byte-identical
+  # payloads, because `display_image` resolves by default and is not gated by
+  # `include=`, so `include=poster` is a no-op. Both probes timed the same work
+  # and the difference between them was noise being read as a signal.
   #
-  # It is worth isolating because resolving a poster is not a per-row column
-  # read: when a title has no artwork of its own the service walks its contents
-  # to a bounded depth. The scaling probe says whether that walk is charged per
-  # row of the page or once for the lot.
-  - name: titles-page-1-with-poster
+  # The real distinction is whether a row resolves a display image, which
+  # `resolves_display_image` (#122) asks directly. `has_artwork` looks like the
+  # same question and is not: it asks whether a title holds artwork *itself*,
+  # and on this library the answer is no for every single title -- all 1,205
+  # artwork rows hang off assets, so `has_artwork=true` returns an empty page.
+  # A pair built on it would measure a zero-row response against a full one,
+  # which is the same "measures nothing" failure as the `include=poster` pair it
+  # replaced. `has_artwork=true` is kept below as a one-row finding rather than
+  # as half of a timing pair.
+  - name: titles-resolving-page-1
     path: /api/titles/
-    query: {limit: 50, include: "poster"}
-    note: first screen a browse grid would issue, with a poster per title
+    query: {limit: 50, resolves_display_image: true}
+    note: >-
+      the hit path -- 50 rows that each resolve a display image, every one of
+      them borrowed from a contained asset. Pairs with
+      `titles-not-resolving-page-1`, and the gap between them is what the walk
+      costs when it fails.
+
+  - name: titles-not-resolving-page-1
+    path: /api/titles/
+    query: {limit: 50, resolves_display_image: false}
+    note: >-
+      the miss path -- rows where the walk ascends to its depth cap and finds
+      nothing. 181 of 1,136 library roots are in this state, and every one of
+      them is a hole in the grid that needs the typographic treatment.
+
+  - name: titles-owning-artwork
+    path: /api/titles/
+    query: {limit: 50, has_artwork: true}
+    note: >-
+      not a timing measurement -- a recorded fact. This returns an empty page
+      on the whole library: no Title holds artwork of its own, so every image
+      the grid shows is borrowed from an asset through the resolution chain.
+      A design that assumes a title can own its poster has nothing behind it.
 
   - name: titles-poster-scaling-200-rows
     path: /api/titles/
@@ -177,22 +212,22 @@ probes:
   # oldest titles, which predate the covers, so every row walks its contents to
   # the depth limit and comes back empty. That is the *miss* path, and it is the
   # expensive one worth having -- but on its own it says nothing about what a
-  # grid full of posters costs. Sorting newest-first hits instead of misses, and
-  # the two together bracket the endpoint.
+  # grid full of posters costs, on a different slice of the library than the
+  # `has_artwork` pair above.
   #
-  # Sort is the only lever available for this: neither listing can filter on
-  # having artwork, so there is no way to ask for resolvable rows directly.
+  # This was also a pair with `include=poster`, and was wrong for the same
+  # reason: `include=poster` changes nothing, so the two probes returned
+  # identical bytes and the commentary claiming one measured resolution and the
+  # other did not described something that never happened. What is left is a
+  # single honest measurement of the newest page, kept because sort order
+  # changes which rows are fetched and therefore what the resolution finds.
   - name: titles-newest-page
     path: /api/titles/
     query: {limit: 50, sort: "id:desc"}
-    note: baseline for the pair below -- same rows, no resolution
-
-  - name: titles-newest-page-with-poster
-    path: /api/titles/
-    query: {limit: 50, sort: "id:desc", include: "poster"}
     note: >-
-      poster resolution where it finds a row for most of the page; the gap from
-      `titles-newest-page` is the hit path, against the miss path measured above
+      the newest page, which a "recently added" view would issue. Compare
+      against `titles-page-1` for the effect of sort order, and against the
+      `has_artwork` pair above for the cost of resolution itself.
 
   - name: tags-page-1
     path: /api/tags
@@ -465,9 +500,33 @@ probes:
   - name: title-references
     path: /api/titles/{title_id}/references
 
+  # The log viewer is the first thing anyone opens when a transform fails, so
+  # this endpoint sits on the critical path of the Operations surface. It had
+  # never been measured: `request_id` resolves to the lowest-numbered request,
+  # which is not actioned, and the endpoint 409s before doing any work.
+  #
+  # It is also not what it looks like. `/logs` is not a database collection --
+  # `TransformRequestService.get_transform_request_logs` delegates to
+  # `ProviderRegistry.fetch_logs`, which for the Prefect provider is an HTTP
+  # round-trip to the orchestration backend with `limit=self._log_limit`
+  # (default 100). So there is no "largest log in the data" to select for, the
+  # response *is* capped, and the cost is an external call rather than a query.
+  # The webhook provider and any unparseable transform type return `[]`.
+  #
+  # What can be measured is the endpoint doing its work: an actioned request,
+  # which is the precondition the service checks first. If the orchestration
+  # backend is unreachable from the probed instance the result is recorded as a
+  # failure with that reason, which is the honest outcome rather than a fast
+  # success against an empty list.
   - name: transform-request-logs
     path: /api/transform_requests/{request_id}/logs
-    note: uncapped; the collection size behind it was never measured
+    note: >-
+      an external round-trip to the orchestration backend, not a database read.
+      Capped at the provider's log limit (100 by default), so the worst case is
+      bounded by that rather than by the collection size. An item count of 0
+      means the backend returned no lines -- the endpoint did its work, but the
+      timing is then the cost of reaching an orchestration backend that had
+      nothing to give, not of rendering a full log.
 
   # -- artwork ------------------------------------------------------------
   # Read a `0 rows` measurement here as the cost of the read, not as evidence the
@@ -551,3 +610,418 @@ probes:
 
   - name: ping
     path: /api/ping
+
+# ===========================================================================
+# PHASE 6 -- WRITE PROBES
+# ===========================================================================
+#
+# These are NOT part of the Phase 4 suite above and are not reached through
+# `allowlist`. `probes.load_config` never reads this key.
+#
+# That separation is deliberate. `allowlist` being empty is what makes Phase 4
+# structurally incapable of mutating the production-backed instance it runs
+# against; adding write probes to it would trade that guarantee for the
+# convenience of one loader. Phase 6 has its own loader, its own environment
+# variables, and its own `--allow-writes` flag, and it refuses to run until it
+# has positively proven that its instance and its database are one disposable
+# system.
+#
+# SCENARIO KINDS
+#   repeat     Send the identical request twice. Classifies the route
+#              `idempotent`, `guarded` or `duplicating` from what actually
+#              happened -- never from the verb. This is 6b.
+#   violation  Provoke a named constraint and record verbatim what the API
+#              returns. A 5xx here is the finding, and so is a 4xx whose body
+#              says nothing a user could act on. This is 6c and 6d.
+#   omission   Create a row, re-send it without one field and then with that
+#              field explicitly null, re-reading after each. Confirms by
+#              experiment what the static `exclude_none` trace derived. 6a.
+#
+# CLEANUP -- AND WHY IT NEEDS THE DATABASE
+#   The API is not a complete inverse of itself. There is no DELETE for
+#   titles, assets, tags or id_schemes: the library's primary objects cannot
+#   be removed over HTTP at all. A probe that creates a Title therefore cannot
+#   undo itself through the interface it is probing, which is why a scenario
+#   declares `sql_cleanup` and why Phase 6 requires CAPINV_WRITE_DATABASE_URL
+#   rather than only a base URL. Table and column names are checked against a
+#   closed list in the runner, because they reach an identifier position where
+#   no parameter binding is possible.
+#
+#   `cleanup` (HTTP) is preferred wherever a route exists, so teardown
+#   exercises the same cascades a real client would. `sql_cleanup` is the
+#   fallback for what has no route.
+#
+# FILESYSTEM
+#   `needs_media_root: true` marks a scenario that writes bytes. It is skipped
+#   and recorded UNKNOWN unless CAPINV_WRITE_MEDIA_ROOT names a scratch root.
+#   It is never run against a real one.
+#
+# BRACES
+#   Paths carry `{placeholder}` substitutions, which YAML reads as a flow
+#   mapping inside `{...}`. Every such value is written in block style or
+#   quoted; an unquoted one is a parse error, not a silent misread.
+write_probes:
+  scenarios:
+
+    # -- 6b: repetition, on the routes a UI will actually retry --------------
+
+    - name: contents-attach-asset-twice
+      endpoint: POST /api/titles/{parent_title_id}/contents
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe parent A
+            title_type: collection
+          capture:
+            parent: id
+          sql_cleanup:
+            table: titles
+            id_var: parent
+        - method: POST
+          path: /api/assets/
+          body:
+            filename: capinv-probe-a.mkv
+            path: /capinv-probe/a.mkv
+            size: 1024
+            duration: 1.0
+            bitrate: 1000
+          capture:
+            asset: id
+          sql_cleanup:
+            table: assets
+            id_var: asset
+      act:
+        method: POST
+        path: /api/titles/{parent}/contents
+        body:
+          kind: asset
+          asset_id: "{asset}"
+      act_sql_table: title_contents
+      note: >-
+        the attach a browse UI retries after a dropped connection. Guarded by
+        `uq_parent_asset_once`, a partial unique index rather than a table
+        constraint -- so whether it surfaces as a conflict or a 500 is exactly
+        what this measures.
+
+    - name: contents-attach-title-twice
+      endpoint: POST /api/titles/{parent_title_id}/contents
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe parent B
+            title_type: collection
+          capture:
+            parent: id
+          sql_cleanup:
+            table: titles
+            id_var: parent
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe child B
+            title_type: movie
+          capture:
+            child: id
+          sql_cleanup:
+            table: titles
+            id_var: child
+      act:
+        method: POST
+        path: /api/titles/{parent}/contents
+        body:
+          kind: title
+          child_title_id: "{child}"
+      act_sql_table: title_contents
+      note: >-
+        the title-to-title edge. `uq_parent_asset_once` covers the asset edge
+        only, so this pair asks whether the title edge is guarded at all -- and
+        a curated collection is built entirely out of these.
+
+    - name: title-tags-attach-twice
+      endpoint: POST /api/titles/{title_id}/tags
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe tagged title
+            title_type: movie
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+      act:
+        method: POST
+        path: /api/titles/{title}/tags
+        body:
+          tag_names:
+            - capinv-probe-tag
+      sql_cleanup:
+        - table: tags
+          column: name
+          value: capinv-probe-tag
+      note: >-
+        tagging by free-text name, which creates the tag if it does not exist.
+        Sending it twice asks both whether the edge duplicates and whether a
+        second tag row appears. The tag it creates has no captured id, so it is
+        cleaned up by name.
+
+    - name: title-external-id-attach-twice
+      endpoint: POST /api/titles/{title_id}/ids
+      kind: repeat
+      constraint: uq_external_identifier_scheme_id
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe identified title
+            title_type: movie
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+        - method: POST
+          path: /api/id_schemes
+          body:
+            code: capinv-scheme
+            label: Capinv probe scheme
+          capture:
+            scheme: id
+          sql_cleanup:
+            table: id_schemes
+            id_var: scheme
+      act:
+        method: POST
+        path: /api/titles/{title}/ids
+        body:
+          scheme_id: "{scheme}"
+          external_id: capinv-probe-ext-1
+      note: >-
+        the identifier attach. `uq_external_identifier_scheme_id` makes
+        (scheme, external_id) unique across titles, so the repeat is also the
+        constraint probe. Note the scheme code is 13 characters: `id_schemes.code`
+        is varchar(16) and a longer one fails in a way worth reading below.
+
+    # -- 6c / 6d: constraint violations, and what the API makes of them ------
+
+    - name: title-contains-itself
+      endpoint: POST /api/titles/{parent_title_id}/contents
+      kind: violation
+      constraint: no_self_containment_chk
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe self-contain
+            title_type: collection
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+      act:
+        method: POST
+        path: /api/titles/{title}/contents
+        body:
+          kind: title
+          child_title_id: "{title}"
+      note: >-
+        the shortest containment cycle, and the only one the database rules out
+        declaratively. 263 of these existed in production, so a UI that builds
+        collections will reach it.
+
+    - name: contents-two-targets
+      endpoint: POST /api/titles/{parent_title_id}/contents
+      kind: violation
+      constraint: one_target_chk
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe two-target
+            title_type: collection
+          capture:
+            parent: id
+          sql_cleanup:
+            table: titles
+            id_var: parent
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe two-target child
+            title_type: movie
+          capture:
+            child: id
+          sql_cleanup:
+            table: titles
+            id_var: child
+        - method: POST
+          path: /api/assets/
+          body:
+            filename: capinv-probe-b.mkv
+            path: /capinv-probe/b.mkv
+            size: 1024
+            duration: 1.0
+            bitrate: 1000
+          capture:
+            asset: id
+          sql_cleanup:
+            table: assets
+            id_var: asset
+      act:
+        method: POST
+        path: /api/titles/{parent}/contents
+        body:
+          kind: asset
+          asset_id: "{asset}"
+          child_title_id: "{child}"
+      note: >-
+        discriminator and payload disagree. Whether this is caught by the schema
+        or reaches the check constraint decides whether a form can explain
+        itself -- watch the `loc` in the response body, not just the status.
+
+    - name: tag-duplicate-name
+      endpoint: POST /api/tags
+      kind: repeat
+      constraint: ix_tags_name
+      act:
+        method: POST
+        path: /api/tags
+        body:
+          name: capinv-probe-dupe-tag
+      act_sql_table: tags
+      note: >-
+        tag names are globally unique, and a management UI creates tags from
+        free text, so this is the most reachable unique violation on the whole
+        surface.
+
+    - name: id-scheme-duplicate-code
+      endpoint: POST /api/id_schemes
+      kind: repeat
+      constraint: ix_id_schemes_code
+      act:
+        method: POST
+        path: /api/id_schemes
+        body:
+          code: capinv-dupe
+          label: Capinv probe duplicate
+      act_sql_table: id_schemes
+      note: >-
+        scheme codes are the vocabulary the identifier UI is built on, created
+        rarely and by hand -- exactly the conditions under which a double submit
+        happens.
+
+    - name: id-scheme-code-too-long
+      endpoint: POST /api/id_schemes
+      kind: violation
+      constraint: id_schemes.code varchar(16)
+      act:
+        method: POST
+        path: /api/id_schemes
+        body:
+          code: capinv-probe-scheme
+          label: Capinv probe overlong code
+      act_sql_table: id_schemes
+      note: >-
+        a nineteen-character code against a varchar(16) column. The schema
+        declares no maxLength, so nothing rejects it before the database does.
+        This probe exists for what the API makes of that, which is not what a
+        reader would predict -- see the Error taxonomy.
+
+    # -- 6a: confirming the exclude_none trace by experiment -----------------
+
+    - name: title-patch-omission
+      endpoint: PATCH /api/titles/{title_id}
+      kind: omission
+      field: synopsis
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe patch semantics
+            title_type: movie
+            synopsis: capinv probe original synopsis
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+      read:
+        method: GET
+        path: /api/titles/{title}
+      act:
+        method: PATCH
+        path: /api/titles/{title}
+      note: >-
+        the derivation says omitted-means-unchanged, and that an explicit null is
+        discarded by the same rule so the field cannot be cleared. This checks
+        that against the running system rather than trusting the call-site trace.
+
+    - name: title-put-omission
+      endpoint: PUT /api/titles/{title_id}
+      kind: omission
+      field: synopsis
+      base_body:
+        name: capinv probe put semantics
+        title_type: movie
+        library_root: true
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe put semantics
+            title_type: movie
+            synopsis: capinv probe original synopsis
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+      read:
+        method: GET
+        path: /api/titles/{title}
+      act:
+        method: PUT
+        path: /api/titles/{title}
+      note: >-
+        the same body model as the PATCH above with the opposite null semantics.
+        `base_body` carries every field backed by a NOT NULL column -- `name`,
+        `title_type` and `library_root` -- because PUT writes every field of the
+        model whether the caller sent it or not, so omitting any of them is a 422
+        from the database before the probe can demonstrate anything. That refusal
+        is itself worth knowing and was the first thing this scenario found; with
+        the non-nullable fields supplied it goes on to ask the real question,
+        which is whether omitting a *nullable* field erases it.
+
+    # -- filesystem: declared, and deliberately not run ----------------------
+
+    - name: title-artwork-upload-twice
+      endpoint: POST /api/titles/{title_id}/artwork
+      kind: repeat
+      needs_media_root: true
+      constraint: uq_artwork_entity_storage_path
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe artwork title
+            title_type: movie
+          capture:
+            title: id
+          sql_cleanup:
+            table: titles
+            id_var: title
+      act:
+        method: POST
+        path: /api/titles/{title}/artwork
+      note: >-
+        writes bytes into the artwork root and is content-addressed, so the
+        repeat is also the `uq_artwork_entity_storage_path` probe. Skipped and
+        reported UNKNOWN unless CAPINV_WRITE_MEDIA_ROOT names a scratch root --
+        never run against a real one.

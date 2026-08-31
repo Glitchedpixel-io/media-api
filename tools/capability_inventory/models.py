@@ -285,6 +285,37 @@ class CollectionStats:
 
 
 @dataclass(frozen=True)
+class CoverageMetric:
+    """What proportion of a designed-for population actually carries something.
+
+    A fill rate over a whole table answers a different question from the one a
+    surface asks. The browse grid renders ``library_root=true`` Titles and
+    nothing else, so what decides its design is the proportion of *those* that
+    resolve a display image -- not the proportion of all Titles, and not a
+    figure a reader has to derive by dividing two numbers out of the Tables
+    appendix and hoping the denominators match.
+
+    Attributes:
+        population: The rows the metric is measured over, in words.
+        attribute: What is being counted.
+        covered: How many rows have it.
+        total: How many rows are in the population.
+        note: What the figure means for the design.
+    """
+
+    population: str
+    attribute: str
+    covered: int
+    total: int
+    note: str = ""
+
+    @property
+    def fraction(self) -> float:
+        """Covered as a proportion of the population, or 0.0 when empty."""
+        return (self.covered / self.total) if self.total else 0.0
+
+
+@dataclass(frozen=True)
 class DataShape:
     """Phase 3 results for the whole database."""
 
@@ -294,6 +325,7 @@ class DataShape:
     server_version: str
     captured_from: str
     unknowns: tuple[Unknown, ...] = ()
+    coverage: tuple[CoverageMetric, ...] = ()
     baseline_rtt_ms: float | None = None
     """Median round-trip time for a trivial ``SELECT 1``.
 
@@ -398,6 +430,153 @@ class UsageEvidence:
 
 
 # --------------------------------------------------------------------------
+# Phase 6 -- write semantics
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FieldContract:
+    """One field of a write endpoint's request body.
+
+    Attributes:
+        name: Field name as the client sends it.
+        type_: Rendered type.
+        required: Whether the body is rejected without it.
+        nullable: Whether the schema permits an explicit null.
+        default: Declared default, or None when there isn't one.
+        omitted_means: What the handler does when the field is absent --
+            ``unchanged``, ``set to null``, or ``n/a`` on a create.
+        null_means: What an explicit ``null`` does, which is not always the
+            same thing. Under ``exclude_none=True`` a null is discarded
+            alongside an omission, so a nullable field cannot be cleared
+            through that route at all. None on a create.
+        constraints: Declared validation bounds (``maxLength``, ``ge``,
+            ``pattern``, enum membership...).
+        server_controlled: Set when the value is assigned by the server and a
+            submitted one is ignored.
+    """
+
+    name: str
+    type_: str
+    required: bool
+    nullable: bool
+    default: Any = None
+    omitted_means: str = "n/a"
+    null_means: str | None = None
+    constraints: dict[str, Any] = field(default_factory=dict)
+    server_controlled: bool = False
+
+
+@dataclass(frozen=True)
+class ErrorCase:
+    """One non-2xx response a route can actually produce.
+
+    Attributes:
+        status: HTTP status, as a string to match :class:`ResponseInfo`.
+        condition: What triggers it, in the terms a caller can act on.
+        body: Shape of the response body.
+        usable_message: Whether the body carries something a UI could show a
+            user. None when it was not established.
+        source: ``probed`` when a request produced it in this run, ``declared``
+            when it is read from the route's own ``responses``, ``implicit``
+            when FastAPI raises it before the handler is entered.
+        note: Anything a front end needs beyond the condition.
+    """
+
+    status: str
+    condition: str
+    body: str
+    usable_message: bool | None = None
+    source: str = "declared"
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class SideEffect:
+    """Something a write changes besides its target row.
+
+    ``kind`` is one of ``filesystem``, ``enqueue``, ``cascade`` or ``counter``.
+    """
+
+    kind: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class DeleteSemantics:
+    """What a DELETE destroys, and what it merely detaches.
+
+    Stated in the vocabulary the interface will use, because "remove from this
+    collection" and "delete permanently" must never be the same button --
+    principle 4 of the design brief, and the reason this record is separate
+    from the generic side-effect list.
+
+    Attributes:
+        destroys: The object that ceases to exist, or "nothing".
+        detaches: The edge that is broken, or "nothing".
+        children: ``orphaned``, ``cascaded``, ``blocked`` or ``none``.
+        reachable_with_references: Whether the delete succeeds while other rows
+            still reference the target. None when not established.
+        ui_vocabulary: The label this affordance must carry.
+    """
+
+    destroys: str
+    detaches: str
+    children: str
+    reachable_with_references: bool | None = None
+    ui_vocabulary: str = ""
+
+
+@dataclass(frozen=True)
+class WriteContract:
+    """Everything Phase 6 establishes about one mutating endpoint.
+
+    ``probed`` distinguishes a contract that was exercised against a disposable
+    instance from one derived from the code alone. Both are reported; only the
+    first can say what a constraint violation actually returns, which is the
+    question the error taxonomy exists to answer.
+    """
+
+    fields: tuple[FieldContract, ...] = ()
+    unknown_fields: str = "UNKNOWN"
+    omission_semantics: str = "UNKNOWN"
+    idempotency: str = "UNKNOWN"
+    idempotency_evidence: str = ""
+    atomic: bool | None = None
+    atomicity_note: str = ""
+    concurrency: str = "UNKNOWN"
+    side_effects: tuple[SideEffect, ...] = ()
+    delete: DeleteSemantics | None = None
+    auth: str = "UNKNOWN"
+    audience: str = "UNKNOWN"
+    errors: tuple[ErrorCase, ...] = ()
+    probed: bool = False
+    unknowns: tuple[Unknown, ...] = ()
+
+
+@dataclass(frozen=True)
+class ConstraintMapping:
+    """A database constraint a user could violate through the interface.
+
+    The column that matters is ``distinguishable``: a violation that surfaces as
+    a generic 500 gives a front end nothing to say to the user and nothing to
+    branch on, and no amount of client work recovers it. That is a back-end
+    defect, and this record is where it is named.
+    """
+
+    name: str
+    table: str
+    kind: str
+    definition: str
+    endpoints: tuple[str, ...] = ()
+    status: int | None = None
+    body: str = ""
+    distinguishable: bool | None = None
+    ui_message: str = ""
+    note: str = ""
+
+
+# --------------------------------------------------------------------------
 # Assembled record
 # --------------------------------------------------------------------------
 
@@ -410,6 +589,7 @@ class EndpointRecord:
     annotation: RouteAnnotation | None = None
     probes: tuple[ProbeResult, ...] = ()
     usage: UsageEvidence | None = None
+    write_contract: WriteContract | None = None
     risks: tuple[str, ...] = ()
     verdict: str = "UNKNOWN"
     verdict_class: str = "unknown"
@@ -431,4 +611,5 @@ class Inventory:
     indexes: tuple[IndexInfo, ...]
     data_shape: DataShape | None
     unknowns: tuple[Unknown, ...]
+    constraint_map: tuple[ConstraintMapping, ...] = ()
     notes: tuple[str, ...] = ()

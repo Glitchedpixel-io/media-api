@@ -13,13 +13,16 @@ report rather than a visible failure:
 from __future__ import annotations
 
 import ast
+import json
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from tools.capability_inventory import (
+    annotate,
     cli,
     data_shape,
     dead_surface,
@@ -30,6 +33,10 @@ from tools.capability_inventory import (
     indexes,
     static_surface,
     verdict,
+    write_assemble,
+    write_contracts,
+    write_probes,
+    write_semantics,
 )
 from tools.capability_inventory.annotate import (
     _describe_expression_predicate,
@@ -40,8 +47,13 @@ from tools.capability_inventory.indexes import IndexLookup
 from tools.capability_inventory.models import (
     CollectionStats,
     ColumnStats,
+    ConstraintMapping,
+    CoverageMetric,
     DataShape,
+    DeleteSemantics,
     EndpointRecord,
+    ErrorCase,
+    FieldContract,
     FieldInfo,
     FilterCoverage,
     IndexInfo,
@@ -55,6 +67,7 @@ from tools.capability_inventory.models import (
     RouteSurface,
     Timing,
     UsageEvidence,
+    WriteContract,
 )
 
 pytestmark = pytest.mark.unit
@@ -672,8 +685,39 @@ def _sample_inventory() -> Inventory:
         surface=_surface("POST", "/api/tags", body="TagCreatePublic", model="TagRead"),
         annotation=_annotation(queries=(_query(),)),
         usage=_usage("POST /api/tags"),
-        verdict="single-row write with no loops.",
-        verdict_class="write",
+        write_contract=WriteContract(
+            fields=(
+                FieldContract(
+                    name="name",
+                    type_="string",
+                    required=True,
+                    nullable=False,
+                    omitted_means="rejected",
+                    constraints={"maxLength": 50},
+                ),
+            ),
+            unknown_fields='rejected with 422 naming the field (`extra="forbid"`)',
+            omission_semantics="Create: an omitted optional field takes its declared default.",
+            idempotency="guarded",
+            idempotency_evidence="probed -- the second identical request is refused with 409",
+            atomic=True,
+            atomicity_note="Single transaction.",
+            concurrency="last-write-wins",
+            auth="bearer",
+            audience="front end",
+            errors=(
+                ErrorCase(
+                    status="409",
+                    condition="the same request is sent a second time",
+                    body='`{"detail": "Unique constraint violated."}`',
+                    usable_message=False,
+                    source="probed",
+                ),
+            ),
+            probed=True,
+        ),
+        verdict="Usable, with handling — a repeat is refused with a conflict.",
+        verdict_class="caution",
     )
     looping_write = EndpointRecord(
         surface=_surface(
@@ -682,8 +726,58 @@ def _sample_inventory() -> Inventory:
         annotation=_annotation(queries=(_query(in_loop=True),), loops=(_query(in_loop=True),)),
         usage=_usage("PUT /api/assets/{asset_id}/tags"),
         risks=("queries issued inside a loop",),
+        write_contract=WriteContract(
+            fields=(
+                FieldContract(
+                    name="tag_ids",
+                    type_="array[integer]",
+                    required=True,
+                    nullable=False,
+                    omitted_means="rejected -- the field is required",
+                ),
+            ),
+            unknown_fields='rejected with 422 naming the field (`extra="forbid"`)',
+            omission_semantics=(
+                "Whole-collection replacement: `tag_ids` replaces the existing set."
+            ),
+            idempotency="idempotent",
+            idempotency_evidence="probed",
+            atomic=True,
+            atomicity_note="Single transaction.",
+            concurrency="last-write-wins",
+            auth="bearer",
+            audience="front end",
+            delete=None,
+            probed=True,
+        ),
         verdict="work is proportional to the size of the payload.",
         verdict_class="caution",
+    )
+    deleting_write = EndpointRecord(
+        surface=_surface("DELETE", "/api/titles/{title_id}/tags/{tag_id}", model=None),
+        annotation=_annotation(queries=(_query(),)),
+        usage=_usage("DELETE /api/titles/{title_id}/tags/{tag_id}"),
+        write_contract=WriteContract(
+            unknown_fields="n/a -- no request body",
+            omission_semantics="No request body.",
+            idempotency="idempotent",
+            idempotency_evidence="probed",
+            atomic=True,
+            atomicity_note="Single transaction.",
+            concurrency="last-write-wins",
+            auth="bearer",
+            audience="front end",
+            delete=DeleteSemantics(
+                destroys="nothing -- the Tag itself is untouched",
+                detaches="the edge between this Title and the Tag",
+                children="none",
+                reachable_with_references=True,
+                ui_vocabulary="Remove tag from this Title (never 'Delete tag')",
+            ),
+            probed=True,
+        ),
+        verdict="Safe to build on — it detaches an edge and destroys nothing.",
+        verdict_class="safe",
     )
     unreferenced = EndpointRecord(
         surface=_surface("GET", "/api/health", model=None),
@@ -717,16 +811,38 @@ def _sample_inventory() -> Inventory:
         server_version="PostgreSQL 17.9",
         captured_from="read-only Postgres, connection fingerprint abc123",
         baseline_rtt_ms=28.0,
+        coverage=(
+            CoverageMetric(
+                population="Titles with library_root=true",
+                attribute="resolve a display image",
+                covered=955,
+                total=1136,
+                note="the browse grid's central design constraint",
+            ),
+        ),
     )
     return Inventory(
         generated_from="media-api @ app.openapi()",
         app_version="1.5.4",
-        phases_run=("1", "2", "3", "4", "5"),
+        phases_run=("1", "2", "3", "4", "5", "6"),
         phases_skipped=(),
-        endpoints=(listing, uniform_write, looping_write, unreferenced),
+        endpoints=(listing, uniform_write, looping_write, deleting_write, unreferenced),
         indexes=(IndexInfo("assets_pkey", "assets", ("id",), True, source="primary key"),),
         data_shape=shape,
         unknowns=(),
+        constraint_map=(
+            ConstraintMapping(
+                name="ix_tags_name",
+                table="tags",
+                kind="unique (index)",
+                definition="UNIQUE (name)",
+                endpoints=("POST /api/tags",),
+                status=409,
+                body='{"detail": "Unique constraint violated."}',
+                distinguishable=False,
+                ui_message="nothing usable -- the body names neither the field nor the cause",
+            ),
+        ),
         notes=("a note",),
     )
 
@@ -834,17 +950,25 @@ def _write_table(rendered: str) -> str:
     return body
 
 
-def test_uniform_writes_are_collapsed_not_sectioned(rendered: str) -> None:
-    """A single-row write gets a table row, not a section of its own."""
-    assert "## Write endpoints" in rendered
-    assert "### POST /api/tags" not in rendered, "a uniform write should not get a section"
-    assert "| `POST /api/tags` |" in _write_table(rendered)
+def test_writes_are_sectioned_rather_than_collapsed(rendered: str) -> None:
+    """Every write gets a section, and the collapsed table is gone.
+
+    This reverses the rule that held before Phase 6. Writes used to be collapsed
+    on the grounds that a single-row write with no loops has nothing
+    endpoint-specific to get wrong -- true of its *query shape*, and false of its
+    contract. What a form gets wrong is whether a partial submit erases fields,
+    whether a retry duplicates, and whether a failure is legible, and those
+    differ per route. The collapsed table said one sentence about fifty-eight
+    endpoints and so said nothing about any of them.
+    """
+    assert "## Write endpoints" not in rendered
+    assert "### POST /api/tags" in rendered
+    assert "### PUT /api/assets/{asset_id}/tags" in rendered
 
 
 def test_a_looping_write_keeps_its_own_section(rendered: str) -> None:
     """A write that issues per-item queries has a failure mode worth a section."""
     assert "### PUT /api/assets/{asset_id}/tags" in rendered
-    assert "| `PUT /api/assets/{asset_id}/tags` |" not in _write_table(rendered)
 
 
 def test_table_facts_are_written_once(rendered: str) -> None:
@@ -1684,3 +1808,329 @@ def test_operator_classes_survive_a_json_round_trip() -> None:
         "ops": ["gin_trgm_ops"],
     }
     assert load._index(payload).ops == ("gin_trgm_ops",)
+
+
+# --------------------------------------------------------------------------
+# Phase 6 -- write semantics
+# --------------------------------------------------------------------------
+#
+# The safety design is the part of this phase worth testing hardest. Everything
+# else produces a wrong report when it breaks; this produces a wrong database.
+
+
+def test_writes_are_refused_without_the_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Configuration alone never authorises a write."""
+    monkeypatch.setenv(write_semantics.BASE_URL_ENV, "http://127.0.0.1:9")
+    monkeypatch.setenv(write_semantics.DATABASE_URL_ENV, "postgresql://u@h:5432/scratch")
+    with pytest.raises(write_semantics.WriteTargetError, match="--allow-writes"):
+        write_semantics.resolve_target(allow_writes=False)
+
+
+def test_writes_are_refused_without_the_variables(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(write_semantics.BASE_URL_ENV, raising=False)
+    monkeypatch.delenv(write_semantics.DATABASE_URL_ENV, raising=False)
+    with pytest.raises(write_semantics.WriteTargetError, match=write_semantics.BASE_URL_ENV):
+        write_semantics.resolve_target(allow_writes=True)
+
+
+@pytest.mark.parametrize(
+    "write_dsn, read_dsn",
+    [
+        # The same database, spelled differently every way that matters. A string
+        # comparison passes all of these and then writes to the read-side database.
+        (
+            "postgresql+psycopg://u:p@localhost:5432/media",
+            "postgresql://other:q@127.0.0.1:5432/media",
+        ),
+        ("postgresql://u@localhost/media", "postgresql://u@localhost:5432/media"),
+        (
+            "postgresql://u@host:5432/media?sslmode=require",
+            "postgresql://u@host:5432/media",
+        ),
+    ],
+)
+def test_a_respelled_read_dsn_is_still_the_read_database(write_dsn: str, read_dsn: str) -> None:
+    """Identity is host, port and database -- not the characters of the URL."""
+    assert write_semantics.normalise_dsn(write_dsn) == write_semantics.normalise_dsn(read_dsn)
+
+
+def test_distinct_databases_are_distinguished() -> None:
+    assert write_semantics.normalise_dsn(
+        "postgresql://u@host:5432/scratch"
+    ) != write_semantics.normalise_dsn("postgresql://u@host:5432/media")
+
+
+def test_the_forbidden_digest_matches_the_published_fingerprint() -> None:
+    """The refusal list must hold the same kind of value the report publishes.
+
+    ``data_shape.fingerprint`` publishes ``sha256(dsn)[:12]``. If the constant
+    guarding against a known production DSN held a Postgres system identifier
+    instead it could never match anything -- a gate that reads as protection and
+    provides none, which is worse than no gate at all.
+    """
+    dsn = "postgresql://someone@example:5432/db"
+    assert write_semantics.dsn_digest(dsn) in data_shape.fingerprint(dsn)
+
+
+def test_write_probes_are_not_reachable_through_the_phase_4_allowlist() -> None:
+    """``allowlist`` stays empty, and the write scenarios live outside it.
+
+    That empty list is what makes Phase 4 structurally unable to mutate the
+    production-backed instance it runs against. Routing write probes through it
+    would trade the guarantee for a code path.
+    """
+    path = Path(probes.__file__).with_name("probes.yaml")
+    config = probes.load_config(path)
+    assert config.allowlist == frozenset()
+    assert probes.load_write_scenarios(path), "the write scenarios must still be declared"
+
+
+def test_every_shipped_write_scenario_is_valid() -> None:
+    scenarios = probes.load_write_scenarios(Path(probes.__file__).with_name("probes.yaml"))
+    kinds = {s["kind"] for s in scenarios}
+    assert kinds <= {"repeat", "violation", "omission"}
+    for scenario in scenarios:
+        assert scenario["endpoint"].split(" ", 1)[0] in {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def test_a_write_scenario_may_only_clean_up_listed_tables() -> None:
+    """Table and column names reach an identifier position, where no binding is
+    possible, so they are checked against a closed list rather than escaped."""
+    for scenario in probes.load_write_scenarios(Path(probes.__file__).with_name("probes.yaml")):
+        for step in scenario.get("setup") or ():
+            cleanup = step.get("sql_cleanup")
+            if cleanup:
+                assert cleanup["table"] in write_probes._CLEANABLE_TABLES
+        for entry in scenario.get("sql_cleanup") or ():
+            assert entry["table"] in write_probes._CLEANABLE_TABLES
+            assert entry.get("column", "id") in write_probes._CLEANABLE_COLUMNS
+        if scenario.get("act_sql_table"):
+            assert scenario["act_sql_table"] in write_probes._CLEANABLE_TABLES
+
+
+# -- the contract derivation ------------------------------------------------
+
+
+def test_patch_and_put_sharing_one_body_model_have_opposite_null_semantics() -> None:
+    """The finding the whole phase exists to surface.
+
+    ``PATCH`` and ``PUT /api/titles/{title_id}`` both take ``TitlePatchPublic``.
+    The PATCH leaves an omitted field alone; the PUT writes it as null. Nothing
+    in the OpenAPI document distinguishes them -- only the positional argument
+    the router hands the service does, which is why the tracer has to read
+    positional arguments and not only keywords.
+    """
+    api = static_surface.load_app()
+    routes, spec = static_surface.collect(api)
+    root = Path.cwd()
+    graph = annotate.CodeGraph(root / "app", root)
+
+    by_key = {r.key: r for r in routes}
+    patch = write_contracts.derive(by_key["PATCH /api/titles/{title_id}"], None, spec, graph)
+    put = write_contracts.derive(by_key["PUT /api/titles/{title_id}"], None, spec, graph)
+
+    assert by_key["PATCH /api/titles/{title_id}"].request_body == "TitlePatchPublic"
+    assert by_key["PUT /api/titles/{title_id}"].request_body == "TitlePatchPublic"
+
+    synopsis_patch = next(f for f in patch.fields if f.name == "synopsis")
+    synopsis_put = next(f for f in put.fields if f.name == "synopsis")
+    assert synopsis_patch.omitted_means == "unchanged"
+    assert synopsis_put.omitted_means == "set to null"
+    assert "cannot be cleared" in (synopsis_patch.null_means or "")
+
+
+def test_every_write_route_resolves_its_omission_semantics() -> None:
+    """No write endpoint may report UNKNOWN for what omitting a field does.
+
+    This is the single most destructive thing a management UI can get wrong, and
+    the repository answers it for every route -- via a keyword, a positional
+    argument, a callee default, a hard-coded ``model_dump`` inside the service,
+    or the absence of a body. An UNKNOWN here means the tracer stopped working,
+    not that the answer is unknowable.
+    """
+    api = static_surface.load_app()
+    routes, spec = static_surface.collect(api)
+    root = Path.cwd()
+    graph = annotate.CodeGraph(root / "app", root)
+
+    unresolved = [
+        route.key
+        for route in routes
+        if route.method not in ("GET", "HEAD")
+        and write_contracts.derive(route, None, spec, graph).omission_semantics == "UNKNOWN"
+    ]
+    assert not unresolved, f"omission semantics unresolved for: {unresolved}"
+
+
+def test_the_constraint_inventory_finds_the_partial_unique_indexes() -> None:
+    """A partial unique index guards a duplicate exactly as a constraint does.
+
+    ``uq_parent_asset_once`` is spelled as an ``Index`` because Postgres has no
+    partial unique constraint. Omitting it because of how it is spelled would
+    drop one of the constraints a UI is most likely to hit.
+    """
+    static_surface.load_app()
+    names = {c.name for c in write_contracts.constraints_from_metadata()}
+    assert {"uq_parent_asset_once", "uq_artwork_entity_storage_path"} <= names
+
+
+def test_an_unusable_error_body_is_recognised() -> None:
+    """A status a client can branch on is not the same as a message it can show."""
+    assert not write_assemble._message_is_usable(
+        '{"detail": [{"loc": [], "msg": "CHECK constraint violated.", "type": "domain_error"}]}'
+    )
+    assert write_assemble._message_is_usable('{"detail": "A title cannot contain itself."}')
+
+
+# -- rendering --------------------------------------------------------------
+
+
+def test_every_write_endpoint_renders_a_write_contract(rendered: str) -> None:
+    """The block replaces the collapsed table, so no write may be without one."""
+    inventory = _sample_inventory()
+    writes = sum(1 for e in inventory.endpoints if e.write_contract is not None)
+    assert rendered.count("#### Write contract") == writes
+
+
+def test_writes_are_no_longer_collapsed(rendered: str) -> None:
+    """The uniform-write table is retired; each write has its own section."""
+    assert "## Write endpoints" not in rendered
+    assert "### POST /api/tags" in rendered
+
+
+def test_both_new_appendices_render(rendered: str) -> None:
+    assert "## Error taxonomy" in rendered
+    assert "## Constraint map" in rendered
+    assert "## Coverage" in rendered
+
+
+def test_an_unusable_error_body_is_flagged_in_the_taxonomy(rendered: str) -> None:
+    """The column the taxonomy exists for must survive rendering."""
+    taxonomy = rendered.split("## Error taxonomy", 1)[1].split("## Constraint map", 1)[0]
+    assert "**no**" in taxonomy, "an error a UI cannot show must be flagged, not softened"
+
+
+def test_delete_semantics_state_what_the_button_says(rendered: str) -> None:
+    """`Remove from collection` and `Delete permanently` are different buttons."""
+    assert "The button must say" in rendered
+    assert "never 'Delete tag'" in rendered
+
+
+def test_a_skipped_write_phase_renders_correctly_without_it() -> None:
+    """The document must render without Phase 6, marking contracts absent."""
+    inventory = _sample_inventory()
+    stripped = replace(
+        inventory,
+        endpoints=tuple(replace(e, write_contract=None) for e in inventory.endpoints),
+        constraint_map=(),
+        phases_run=("1", "2", "3", "4", "5"),
+        phases_skipped=("6 (write semantics)",),
+    )
+    out = render.to_markdown(stripped)
+    assert "#### Write contract" not in out
+    assert "## Constraint map" not in out
+    assert "### POST /api/tags" in out, "sections must still render without the phase"
+
+
+def test_a_write_contract_survives_a_json_round_trip() -> None:
+    """``--from-json`` must not silently drop Phase 6.
+
+    The loader reads field by field, so a record it does not know about vanishes
+    on the next presentation-only re-render of the committed document.
+    """
+    inventory = _sample_inventory()
+    payload = json.loads(render.to_json(inventory))
+    endpoint = next(e for e in payload["endpoints"] if e["surface"]["path"] == "/api/tags")
+    restored = load._endpoint(endpoint)
+
+    assert restored.write_contract is not None
+    assert restored.write_contract.idempotency == "guarded"
+    assert restored.write_contract.errors[0].usable_message is False
+    assert restored.write_contract.fields[0].constraints == {"maxLength": 50}
+
+    constraints = tuple(load._constraint_mapping(c) for c in payload["constraint_map"])
+    assert constraints[0].distinguishable is False
+
+
+def test_a_scaling_probe_downgrades_a_static_n_plus_one_flag() -> None:
+    """C1: measurement beats comprehension detection where the two disagree.
+
+    A query issued per row costs about one round trip per row. When two probes
+    of one endpoint differ only in page size and the cost is flat, the queries
+    are not per-row, whatever the comprehension around them looks like.
+    """
+    fast = ProbeResult(
+        name="titles-page-1",
+        endpoint_key="GET /api/titles/",
+        method="GET",
+        url="/api/titles/?limit=50",
+        status="ok",
+        http_status=200,
+        timing=Timing(runs=7, p50_ms=110.0, p95_ms=120.0, min_ms=100.0, max_ms=130.0),
+        item_count=50,
+    )
+    big = replace(
+        fast,
+        name="titles-scaling-200-rows",
+        timing=Timing(runs=7, p50_ms=127.0, p95_ms=140.0, min_ms=120.0, max_ms=150.0),
+        item_count=200,
+    )
+    assert verdict._scaling_contradiction((fast, big), 25.0) is not None
+
+    # A genuine per-row cost is not downgraded.
+    slow = replace(
+        big,
+        timing=Timing(runs=7, p50_ms=3900.0, p95_ms=4200.0, min_ms=3800.0, max_ms=4300.0),
+    )
+    assert verdict._scaling_contradiction((fast, slow), 25.0) is None
+
+
+def test_a_contradiction_needs_a_measured_round_trip() -> None:
+    """Without Phase 3 there is no baseline, so nothing is downgraded."""
+    probe = ProbeResult(
+        name="p",
+        endpoint_key="GET /api/titles/",
+        method="GET",
+        url="/",
+        status="ok",
+        http_status=200,
+        timing=Timing(runs=7, p50_ms=110.0, p95_ms=1.0, min_ms=1.0, max_ms=1.0),
+        item_count=50,
+    )
+    assert verdict._scaling_contradiction((probe,), None) is None
+
+
+def test_every_worker_fleet_declaration_names_a_live_route() -> None:
+    """A declaration nothing else can check must at least be checked for existence.
+
+    ``_WORKER_FLEET`` is hand-written: nothing in the code says a route is for the
+    runner fleet rather than for the front end. That is the same situation
+    ``filters.yaml`` is in, and the rule there is that a declaration naming an
+    endpoint which no longer exists fails the run. A renamed worker route would
+    otherwise silently report ``audience: front end``, which is precisely what 6h
+    exists to prevent.
+    """
+    api = static_surface.load_app()
+    routes, _spec = static_surface.collect(api)
+    live = {route.key for route in routes}
+    missing = sorted(write_contracts._WORKER_FLEET - live)
+    assert not missing, f"_WORKER_FLEET names routes that no longer exist: {missing}"
+
+
+def test_a_probed_body_excerpt_is_stable_across_runs() -> None:
+    """Row ids must not reach the committed artefact.
+
+    The better error messages on this API quote the id they are about --
+    "Title 3 already has an intrinsic parent, recorded by containment row 3" --
+    and those ids come from a scratch database whose sequences are not reset
+    between runs. Committed verbatim, each Phase 6 run would produce a diff that
+    says nothing about the API.
+    """
+    first = write_probes._excerpt(
+        {"detail": "Title 3 already has an intrinsic parent, recorded by containment row 3."}
+    )
+    second = write_probes._excerpt(
+        {"detail": "Title 41 already has an intrinsic parent, recorded by containment row 41."}
+    )
+    assert first == second
+    assert "intrinsic parent" in first, "the message shape must survive the scrub"

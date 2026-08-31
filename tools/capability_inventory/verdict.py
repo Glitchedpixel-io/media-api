@@ -46,6 +46,64 @@ def _bytes(value: int) -> str:
     return f"{value / (1024 * 1024):.1f}MB"
 
 
+# How much of the per-row cost of a genuine N+1 must be absent before a static
+# flag is treated as contradicted. A real query-per-row at the measured round
+# trip adds `rtt` milliseconds for every extra row; observing less than this
+# fraction of that means the queries are not being issued per row, whatever the
+# comprehension around them looks like.
+_SCALING_TOLERANCE = 0.10
+
+
+def _scaling_contradiction(probes: tuple[ProbeResult, ...], rtt: float | None) -> str | None:
+    """Whether timings across two page sizes rule out a per-row query.
+
+    A comprehension containing a query is what the static pass can see, and it
+    cannot see whether the comprehension runs once or once per row. When two
+    probes of the same endpoint differ only in row count, the answer is
+    arithmetic: a query issued per row costs about one round trip per row, so
+    150 extra rows against a 25ms round trip would add nearly four seconds. If
+    the measured difference is a small fraction of that, the queries are being
+    batched and the flag is wrong.
+
+    Reporting it anyway is not harmlessly conservative. A report that cries wolf
+    gets skimmed, and the findings that matter get skimmed with it.
+
+    Args:
+        probes: Every probe attached to the endpoint.
+        rtt: Median round-trip time to the database, from Phase 3.
+
+    Returns:
+        A sentence naming the probe pair and the arithmetic, or None when the
+        measurements do not settle it.
+    """
+    if not rtt:
+        return None
+    sized = [
+        (p.item_count, p.timing.p50_ms, p.name)
+        for p in probes
+        if p.measured and p.timing is not None and p.item_count
+    ]
+    if len(sized) < 2:
+        return None
+    low = min(sized, key=lambda s: s[0])
+    high = max(sized, key=lambda s: s[0])
+    extra_rows = high[0] - low[0]
+    if extra_rows <= 0:
+        return None
+    predicted = extra_rows * rtt
+    observed = high[1] - low[1]
+    if observed >= predicted * _SCALING_TOLERANCE:
+        return None
+    return (
+        f"`{low[2]}` returns {low[0]} rows at p50 {low[1]:.0f}ms and `{high[2]}` "
+        f"returns {high[0]} at p50 {high[1]:.0f}ms — {observed:.0f}ms for "
+        f"{extra_rows} extra rows, against the ~{predicted / 1000:.1f}s a genuine "
+        f"query-per-row would cost at the measured {rtt:.0f}ms round trip. The "
+        "queries inside these comprehensions are issued once for the page, not "
+        "once per row."
+    )
+
+
 def _worst_probe(probes: tuple[ProbeResult, ...]) -> ProbeResult | None:
     """The slowest successful probe for an endpoint."""
     timed = [p for p in probes if p.measured and p.timing is not None]
@@ -186,10 +244,17 @@ def assess(
         )
     if explicit_loops:
         loops = sorted({f"{q.owner} ({q.loop_note})" for q in explicit_loops})
-        risks.append(
-            "queries issued inside a loop, so cost grows with the size of the "
-            "request: " + "; ".join(loops)
-        )
+        contradiction = _scaling_contradiction(probes, rtt)
+        if contradiction is not None:
+            risks.append(
+                "static analysis flags queries inside a loop — **contradicted by "
+                "measurement** and downgraded: " + "; ".join(loops) + ". " + contradiction
+            )
+        else:
+            risks.append(
+                "queries issued inside a loop, so cost grows with the size of the "
+                "request: " + "; ".join(loops)
+            )
 
     uncovered_filters = [
         c for c in annotation.coverage if c.role == "filter" and c.covered is False

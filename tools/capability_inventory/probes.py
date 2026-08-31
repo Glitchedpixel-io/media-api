@@ -97,6 +97,58 @@ def _normalise_allowlist(entry: object) -> str:
     return f"{method.upper()} {path.strip()}".strip()
 
 
+def load_write_scenarios(path: Path) -> list[dict[str, Any]]:
+    """Read the Phase 6 ``write_probes`` section, which Phase 4 never touches.
+
+    Kept out of :func:`load_config` on purpose. That function refuses any non-GET
+    probe absent from ``allowlist``, and the emptiness of that list is what makes
+    Phase 4 structurally unable to mutate the production-backed instance it runs
+    against. Write probes reaching Phase 4's loader would trade that guarantee
+    for the convenience of one code path.
+
+    Args:
+        path: The probe definitions file.
+
+    Returns:
+        The declared scenarios, or an empty list when the file declares none.
+
+    Raises:
+        ProbeConfigError: If the section is present but malformed.
+    """
+    import yaml  # noqa: PLC0415 -- deferred so --skip-writes needs no parser.
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    section = raw.get("write_probes")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        raise ProbeConfigError(f"{path}: `write_probes` must be a mapping")
+    scenarios = section.get("scenarios") or []
+    if not isinstance(scenarios, list):
+        raise ProbeConfigError(f"{path}: `write_probes.scenarios` must be a list")
+    seen: set[str] = set()
+    for entry in scenarios:
+        if not isinstance(entry, dict):
+            raise ProbeConfigError(f"{path}: every write scenario must be a mapping")
+        for required in ("name", "endpoint", "kind"):
+            if not entry.get(required):
+                raise ProbeConfigError(
+                    f"{path}: write scenario {entry.get('name', '<unnamed>')!r} is "
+                    f"missing `{required}`"
+                )
+        name = str(entry["name"])
+        if name in seen:
+            raise ProbeConfigError(f"{path}: duplicate write scenario name {name!r}")
+        seen.add(name)
+        if "?" in str(entry.get("act", {}).get("path", "")):
+            raise ProbeConfigError(
+                f"{path}: write scenario {name!r} puts a query string in `act.path`; "
+                "a path carrying '?' matches no route and the result could not be "
+                "attached to an endpoint"
+            )
+    return scenarios
+
+
 def load_config(path: Path) -> ProbeConfig:
     """Parse and validate the probe definitions.
 
