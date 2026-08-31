@@ -106,38 +106,25 @@ variables:
   external_id:
     literal: "capinv-probe-no-such-external-id"
 
-  # The newest asset, as the one likeliest to carry artwork.
+  # Resolved from the artwork collection route (#121), which is one hop and does
+  # not depend on any particular entity carrying artwork.
   #
-  # This is the only heuristic available: the API exposes no way to ask for an
-  # entity that *has* artwork. There is no collection route over `artwork`, and
-  # neither listing takes a "has artwork" filter, so artwork is reachable only
-  # through an id a caller already holds. Picking the newest asset is not
-  # arbitrary -- covers are fetched when an asset is acquired, so registrations
-  # cluster at the top of the id range rather than spreading evenly.
+  # This too was previously reachable only through an id a caller already held:
+  # there was no collection route over `artwork`, so the variable was resolved
+  # from one asset's own artwork list and went unresolvable whenever that asset
+  # had none. Reading the collection directly removes that coupling.
   #
-  # If that asset has no artwork the probes below measure the empty case and the
-  # report records `0 items`, which is a true statement about that asset and not
-  # a bound on the collection. `asset_id` deliberately stays on the *oldest*
-  # asset, so the pair spans both cases.
-  covered_asset_id:
-    from_endpoint: /api/assets/
-    query: {limit: 1, sort: "id:desc"}
-    pick: items.0.id
-
-  # Resolved from that asset's own artwork list, which is a direct read rather
-  # than the recursive poster resolution -- one hop, and it does not depend on
-  # the asset belonging to any title.
-  #
-  # It resolves nothing while the artwork table is empty, and every probe that
-  # needs it is then reported `unavailable` with that reason rather than silently
-  # skipped. An instance that has not had `tools/artwork_backfill` run against it
-  # is in exactly that state: the schema and the seeded kinds are deployed, but
-  # nothing has registered any artwork yet. Nothing in this file can fix that,
-  # and it should not try -- no `fallback`, for the same reason the `runner_key`
-  # note below gives.
+  # It still resolves nothing while the artwork table is empty, and every probe
+  # that needs it is then reported `unavailable` with that reason rather than
+  # silently skipped. An instance that has not had `tools/artwork_backfill` run
+  # against it is in exactly that state: the schema and the seeded kinds are
+  # deployed, but nothing has registered any artwork yet. Nothing in this file can
+  # fix that, and it should not try -- no `fallback`, for the same reason the
+  # `runner_key` note below gives.
   artwork_id:
-    from_endpoint: /api/assets/{covered_asset_id}/artwork
-    pick: 0.id
+    from_endpoint: /api/artwork
+    query: {limit: 1, sort: "id:asc"}
+    pick: items.0.id
 
   # There is deliberately no `runner_key` variable, so
   # GET /api/runner_state/{runner_key} stays unprobed.
@@ -275,6 +262,21 @@ probes:
     query: {limit: 50}
     paginate: {style: keyset, pages: 40}
 
+  # Twenty pages rather than the forty the two listings above walk. `artwork` is
+  # an order of magnitude smaller than `assets`, and a walk that outruns the
+  # collection measures nothing: it reports `unavailable` for want of a page 41,
+  # which is what `titles-deep-page` already does here. Twenty is chosen to sit
+  # inside the collection at its present size while still being deep enough for
+  # a cursor to have drifted if it were going to.
+  - name: artwork-deep-page
+    path: /api/artwork
+    query: {limit: 50}
+    paginate: {style: keyset, pages: 20}
+    note: >-
+      page 21 by cursor; compare against artwork-page-1. Kept beside the other
+      deep walks rather than in the artwork section, because what it measures is
+      cursor stability at depth rather than anything about artwork
+
   - name: search-transcripts-page-1
     path: /api/search/transcripts
     query: {q: "the", size: 25, offset: 0}
@@ -324,6 +326,13 @@ probes:
 
   - name: id-schemes-all
     path: /api/id_schemes
+
+  - name: title-parents
+    path: /api/titles/{title_id}/parents
+    note: >-
+      uncapped, and the upward counterpart of title-contents. Immediate parents
+      only, so its cost is bounded by how many titles contain this one rather
+      than by the size of any listing
 
   - name: title-contents
     path: /api/titles/{parent_title_id}/contents
@@ -465,6 +474,14 @@ probes:
     path: /api/artwork_kinds
     note: bounded by the seeded kinds, which is small and fixed at six
 
+  - name: artwork-page-1
+    path: /api/artwork
+    query: {limit: 50}
+    note: >-
+      default first page of the collection route. Unlike the nested per-entity
+      artwork reads above this one is capped by `KeysetPagination`, so it is the
+      only artwork listing whose cost does not grow with the entity behind it
+
   - name: title-artwork
     path: /api/titles/{title_id}/artwork
     note: uncapped, and returns a bare array rather than a page
@@ -477,14 +494,15 @@ probes:
       an `if params.kind` branch and the repository names the parameter
       `kind_id`. It is applied; this times it
 
-  # There is deliberately no second probe here on `{covered_asset_id}`, tempting
-  # as the empty/populated pair is. A probe attaches to an endpoint by its path
-  # *template*, so the placeholder has to be spelled exactly as the route
-  # declares it -- `/api/assets/{covered_asset_id}/artwork` matches no route and
-  # its timing is reported as unattached rather than against this endpoint, the
-  # same trap the `parent_title_id` note above describes. One id per route
-  # parameter is the limit, and `asset_id` is the oldest asset, so this measures
-  # the ordinary case: most assets carry no artwork at all.
+  # There is deliberately only one probe on this route, tempting as an
+  # empty/populated pair is. A probe attaches to an endpoint by its path
+  # *template*, so a second variable would have to be spelled exactly as the route
+  # declares its parameter -- `/api/assets/{covered_asset_id}/artwork` matches no
+  # route and its timing is reported as unattached rather than against this
+  # endpoint, the same trap the `parent_title_id` note above describes. One id per
+  # route parameter is the limit, and `asset_id` is the oldest asset, so this
+  # measures the ordinary case: most assets carry no artwork at all. The populated
+  # case is covered by `artwork-page-1` reading the collection directly.
   - name: asset-artwork
     path: /api/assets/{asset_id}/artwork
     note: uncapped, and returns a bare array rather than a page
