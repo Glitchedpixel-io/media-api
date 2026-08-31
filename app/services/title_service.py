@@ -11,7 +11,6 @@ from app.repositories import (
     TitleTypeRepository,
 )
 from app.schemas import (
-    ArtworkRead,
     PaginatedResponse,
     TitleCreateInternal,
     TitleCreatePublic,
@@ -125,43 +124,39 @@ class TitleService:
         by_code = {kind.code: kind.id for kind in self.artwork_kind_repo.list_all()}
         return [by_code[code] for code in DISPLAY_IMAGE_KINDS if code in by_code]
 
-    def _attach_display_images(self, titles: list[TitleReadExtended]) -> None:
-        """Resolve and attach a display image for each title, in a few queries.
+    def _attach_display_images(
+        self, titles: list[TitleReadExtended], kind_ids: list[int] | None = None
+    ) -> None:
+        """Resolve and attach a display image for each title, in two queries.
 
-        Walks ``DISPLAY_IMAGE_KINDS`` in order, resolving each kind for the titles that
-        have not resolved yet, so the id list narrows as it goes and the loop stops as
-        soon as every title has something.
+        **The query count is independent of both page size and chain length.** One
+        lookup for the kinds, then one resolution for the whole chain. It used to be
+        one resolution *per kind*, narrowing the id list as it went, which is fine
+        amortised over a 500-row page and is not fine for one row: a title with no
+        artwork never resolves, so it paid every kind. That is #168 -- nine queries to
+        read one title, six of them recursive walks.
 
-        **The query count stays independent of page size**, which is the property that
-        matters: one lookup for the kinds plus at most one resolution per kind, never
-        one per row. `GET /api/titles/` caps at 500 rows, and a resolution walk
-        evaluated per row is #49 again -- 14.6s at the cap against 263ms without it.
-        `TestTitleListQueryCount` holds that line and is why this narrows the id list
-        rather than resolving every kind for every title.
+        The page-size property is the older one and still the one that matters most:
+        a resolution walk evaluated per row is #49 again, 14.6s at the 500-row cap
+        against 263ms without it. `TestTitleListQueryCount` holds that line.
 
-        The kinds are read in one call rather than looked up per code, so adding a kind
-        to the chain costs a resolution rather than a resolution plus a lookup.
+        Precedence now lives in the query rather than in the order of calls, and the
+        repository documents why kind has to outrank depth. A kind in the chain that no
+        longer exists is skipped rather than raising -- kinds are a lookup table and a
+        row can be edited away, and a grid of placeholders beats a 500.
 
-        A kind in the chain that no longer exists is skipped, not an error: kinds are a
-        lookup table and a row can be edited away, and a grid rendering placeholders is
-        a better answer than a 500.
+        Args:
+            titles: The titles to attach to, mutated in place.
+            kind_ids: The resolved chain, if the caller already has it. Passed by
+                `get_titles`, which resolves it for the `resolves_display_image`
+                filter, so one request does not read the lookup table twice.
         """
         if not titles:
             return
 
-        by_code = {kind.code: kind.id for kind in self.artwork_kind_repo.list_all()}
-        remaining = [title.id for title in titles]
-        resolved: dict[int, ArtworkRead] = {}
-
-        for code in DISPLAY_IMAGE_KINDS:
-            if not remaining:
-                break
-            kind_id = by_code.get(code)
-            if kind_id is None:
-                continue
-            found = self.artwork_repo.resolve_for_titles(remaining, kind_id)
-            resolved.update(found)
-            remaining = [title_id for title_id in remaining if title_id not in found]
+        if kind_ids is None:
+            kind_ids = self._display_image_kind_ids()
+        resolved = self.artwork_repo.resolve_for_titles([title.id for title in titles], kind_ids)
 
         for title in titles:
             title.display_image = resolved.get(title.id)
@@ -184,7 +179,7 @@ class TitleService:
         )
         page = self.repository.list_paged(params, kind_ids)
         if self._wants_display_image(params.include):
-            self._attach_display_images(page.items)
+            self._attach_display_images(page.items, kind_ids)
         if self._includes(params.include, COUNTS_INCLUDE):
             self._attach_counts(page.items)
         if self._includes(params.include, TOTALS_INCLUDE):
@@ -192,13 +187,23 @@ class TitleService:
         return page
 
     def get_title(self, title_id: int) -> TitleReadExtended:
-        """One title, with its poster already resolved.
+        """One title, with its display image already resolved.
 
         Resolved unconditionally here, unlike the list endpoint where it is opt-in via
-        `include=poster`. The only reason `include` exists is the cost of doing work
-        per row across a 500-row page, and that reason does not apply to one row: this
-        is a single extra query whichever way the caller asks. `AssetORM.external_ids`
-        is eager for the same reason -- there is no request that wants it unloaded.
+        `include=`. The reason `include` exists is the cost of doing work per row across
+        a 500-row page, and that reason does not apply to one row.
+
+        That argument was originally written as "a single extra query whichever way the
+        caller asks", which was not true and is the substance of #168: the display chain
+        ran one recursive walk per kind, so a title resolving late or not at all cost
+        five of them, and this route measured nine queries for one title. The chain is
+        now resolved in one walk whatever it finds, and the count here is fixed at five:
+        the title, the kind lookup, one resolution walk, the counts, the totals.
+
+        Four of those five are still paid by a caller who wanted only the title's name,
+        so the premise is worth revisiting on its own merits rather than on the arithmetic
+        that used to support it. `AssetORM.external_ids` is eager for the same reason --
+        there is no request that wants it unloaded.
         """
         title = self.repository.get(title_id)
         if title is None:
