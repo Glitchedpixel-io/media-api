@@ -227,6 +227,10 @@ def from_migrations(alembic_dir: Path) -> tuple[IndexInfo, ...]:
                 if len(columns) != len(args[2].elts):
                     expression = ast.unparse(args[2])
             unique = any(kw.arg == "unique" and _literal(kw.value) is True for kw in node.keywords)
+            using = next(
+                (_literal(kw.value) for kw in node.keywords if kw.arg == "postgresql_using"),
+                None,
+            )
             out.append(
                 IndexInfo(
                     name=str(name or "<computed>"),
@@ -234,6 +238,9 @@ def from_migrations(alembic_dir: Path) -> tuple[IndexInfo, ...]:
                     columns=columns,
                     unique=unique,
                     expression=expression,
+                    # Read here too, so the historical cross-check does not report a
+                    # GIN index as a btree and disagree with the models table beside it.
+                    method=str(using).lower() if using else "btree",
                     source=f"migration {path.stem.split('_', 1)[0]}",
                 )
             )

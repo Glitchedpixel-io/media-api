@@ -1572,3 +1572,27 @@ def test_two_indexes_on_one_column_survive_when_their_methods_differ() -> None:
         i.name for i in indexes.from_metadata() if i.table == "titles" and i.columns == ("name",)
     }
     assert names == {"ix_titles_name", "ix_titles_name_trgm"}
+
+
+def test_an_index_method_survives_a_json_round_trip() -> None:
+    """``--from-json`` promises presentation-only changes, so it must lose nothing.
+
+    Dropping the method here would be invisible rather than loud: every GIN index
+    would reload as a btree, and ``covering()`` would start offering one for an
+    ordering it cannot serve -- reintroducing the bug through the one path the
+    README says re-runs no phase.
+    """
+    payload = {
+        "name": "ix_titles_name_trgm",
+        "table": "titles",
+        "columns": ["name"],
+        "unique": False,
+        "method": "gin",
+        "source": "models",
+    }
+    assert load._index(payload).method == "gin"
+
+
+def test_a_json_written_before_the_method_existed_still_loads() -> None:
+    payload = {"name": "ix_titles_name", "table": "titles", "columns": ["name"], "unique": False}
+    assert load._index(payload).method == "btree"

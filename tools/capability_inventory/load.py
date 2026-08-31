@@ -238,6 +238,10 @@ def _index(payload: dict[str, Any]) -> IndexInfo:
         unique=payload["unique"],
         expression=payload.get("expression"),
         where=payload.get("where"),
+        # Defaulted, not required: a JSON written before the field existed still
+        # loads. Dropping it instead would silently turn every GIN index back into
+        # a btree, and `covering()` would offer one for an ordering it cannot serve.
+        method=payload.get("method", "btree"),
         source=payload.get("source", "models"),
     )
 
