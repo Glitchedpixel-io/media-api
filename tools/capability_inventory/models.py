@@ -118,6 +118,12 @@ class IndexInfo:
     the trigram one cannot serve ``ORDER BY name`` because GIN has no order. Without
     the method the two are indistinguishable here, and whichever happened to be seen
     first won.
+
+    ``ops`` carries the operator classes, because the method alone does not say what a
+    GIN index can do. A GIN index over ``jsonb`` serves containment and nothing like a
+    ``LIKE``; one declared ``gin_trgm_ops`` serves a leading wildcard. Deciding that
+    from the index's *name* would be guessing, which is the failure this whole area
+    keeps having.
     """
 
     name: str
@@ -127,6 +133,7 @@ class IndexInfo:
     expression: str | None = None
     where: str | None = None
     method: str = "btree"
+    ops: tuple[str, ...] = ()
     source: str = "models"
 
 
