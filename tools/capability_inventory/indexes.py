@@ -43,6 +43,22 @@ _UNINDEXABLE = frozenset(
 )
 
 
+def _index_method(index: object) -> str:
+    """The access method an index uses, defaulting to btree.
+
+    Only ``postgresql_using`` is consulted, which is how the models spell it. The
+    default matters: every operator this module judges -- equality, ranges, ordering,
+    prefix matching -- is a btree capability, so an index that does not say otherwise
+    is treated as one.
+    """
+    options = getattr(index, "dialect_options", {})
+    try:
+        using = options["postgresql"]["using"]
+    except (KeyError, TypeError):
+        return "btree"
+    return str(using).lower() if using else "btree"
+
+
 def _partial_where(index: object) -> str | None:
     """Render an index's partial-index predicate, if it has one.
 
@@ -89,6 +105,7 @@ def from_metadata() -> tuple[IndexInfo, ...]:
                     unique=bool(index.unique),
                     expression=expression,
                     where=_partial_where(index),
+                    method=_index_method(index),
                     source="models",
                 )
             )
@@ -155,9 +172,16 @@ def _deduplicate(entries: list[IndexInfo]) -> tuple[IndexInfo, ...]:
     Returns:
         One entry per distinct index, named as Postgres names it.
     """
-    best: dict[tuple[str, tuple[str, ...], str | None, str | None, bool], IndexInfo] = {}
+    best: dict[tuple[str, tuple[str, ...], str | None, str | None, bool, str], IndexInfo] = {}
     for entry in entries:
-        key = (entry.table, entry.columns, entry.expression, entry.where, entry.unique)
+        key = (
+            entry.table,
+            entry.columns,
+            entry.expression,
+            entry.where,
+            entry.unique,
+            entry.method,
+        )
         current = best.get(key)
         if current is None or _SOURCE_PRECEDENCE.index(entry.source) < _SOURCE_PRECEDENCE.index(
             current.source
@@ -291,6 +315,12 @@ class IndexLookup:
         ``scheme_id``. Judging the column on its own reports that as a sequential
         scan when the planner does an index scan.
 
+        Partial indexes are never offered. One serves only a query whose own
+        predicate implies its ``WHERE`` clause, which this oracle has no way to
+        establish, so claiming one would report a sequential scan as an index scan.
+        Non-btree indexes are not offered either, for the same reason in a different
+        shape: every operator judged here is something only a btree does.
+
         Args:
             table: Table being read.
             column: Column the predicate applies to.
@@ -300,10 +330,30 @@ class IndexLookup:
         Returns:
             The index the planner can use, or None if no index applies.
         """
-        candidates = list(self._by_leading.get((table, column), []))
+        candidates = [
+            i
+            for i in self._by_leading.get((table, column), [])
+            if not i.where and i.method == "btree"
+        ]
 
         for index in self._indexes:
             if index.table != table or column not in index.columns:
+                continue
+            if index.method != "btree":
+                # Every operator judged here -- equality, ranges, ordering, prefix --
+                # is a btree capability. `titles.name` carries a GIN trigram index
+                # alongside its btree, and the model records why they are not
+                # interchangeable: GIN has no order, so it cannot serve `ORDER BY
+                # name`. Offering it would name an index the planner cannot use.
+                continue
+            if index.where:
+                # A partial index serves only queries whose own predicate implies
+                # its WHERE clause, and nothing here establishes that. Naming one
+                # anyway reports a filter as served by an index the planner will not
+                # use: `uq_artwork_one_primary_per_kind` is partial on
+                # `is_primary IS true`, while `list_for_entity` does not constrain
+                # `is_primary` at all -- it orders by it. Skipping them can only
+                # understate coverage, which is the safe direction to be wrong in.
                 continue
             position = index.columns.index(column)
             if position == 0:
@@ -339,6 +389,7 @@ class IndexLookup:
         column: str | None,
         operator: str | None,
         constrained: frozenset[str] = frozenset(),
+        function: str | None = None,
     ) -> tuple[bool | None, str | None, str]:
         """Decide whether a filter can use an index.
 
@@ -349,6 +400,13 @@ class IndexLookup:
             constrained: Other columns of ``table`` pinned by the same query,
                 which decide whether a composite index applies -- see
                 :meth:`covering`.
+            function: SQL function applied to ``column`` by the predicate, if any.
+                When given, only an expression index over that function can serve
+                the filter, and an index on the bare column cannot -- so this is
+                answered from :meth:`expression_index` and never falls through to
+                :meth:`covering`. Letting it fall through would report an index the
+                planner cannot use for this query, which is worse than reporting
+                none.
 
         Returns:
             A tuple of (covered, index name, note). ``covered`` is None when the
@@ -361,6 +419,22 @@ class IndexLookup:
             return None, None, "comparison operator could not be resolved"
 
         index = self.covering(table, column, constrained)
+
+        if function is not None and operator not in _UNINDEXABLE:
+            expression = self.expression_index(table, function, column)
+            if expression is not None:
+                return (
+                    True,
+                    expression.name,
+                    f"{function}({table}.{column}) served by {expression.name}",
+                )
+            return (
+                False,
+                None,
+                f"no expression index on {function}({table}.{column}); an index on "
+                f"{table}.{column} alone cannot serve a predicate written against "
+                f"{function}() of it, so this is a sequential scan",
+            )
 
         if operator in _UNINDEXABLE:
             if operator in {"ilike_contains", "like_contains", "ilike_suffix", "like_suffix"}:

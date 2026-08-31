@@ -24,6 +24,7 @@ from . import (
     annotate,
     data_shape,
     dead_surface,
+    filter_map,
     indexes,
     load,
     probes,
@@ -104,6 +105,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(__file__).with_name("probes.yaml"),
         help="probe definitions (default: the probes.yaml beside this package).",
+    )
+    parser.add_argument(
+        "--filter-map",
+        metavar="FILE",
+        type=Path,
+        default=None,
+        help=(
+            "declared filter resolutions, for filters Phase 2 cannot trace "
+            "statically (default: the filters.yaml beside this package)."
+        ),
     )
     parser.add_argument(
         "--markdown-out",
@@ -342,7 +353,22 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
     index_inventory = model_indexes + migration_indexes
     lookup = indexes.IndexLookup(model_indexes)
     graph = annotate.CodeGraph(root / "app", root)
-    analyser = annotate.RouteAnalyser(graph, lookup)
+
+    # Declared filter resolutions are verified against this run's own surface and
+    # index inventory before they are used. A declaration that no longer matches the
+    # code is an error rather than a stale line in the report: the whole point of
+    # writing one down is that nothing else can check it, so the one thing that can
+    # be checked -- that its endpoint, parameter and index still exist -- is.
+    declarations = filter_map.load(Path(args.filter_map) if args.filter_map else None)
+    filter_map.verify(
+        declarations,
+        endpoint_params={
+            route.key: {p.name for p in route.params if p.location == "query"} for route in routes
+        },
+        index_names={index.name for index in index_inventory},
+    )
+
+    analyser = annotate.RouteAnalyser(graph, lookup, declarations)
     annotations = {route.key: analyser.analyse(route) for route in routes}
     phases_run.append("2 (code annotation)")
 

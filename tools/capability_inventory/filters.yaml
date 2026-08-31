@@ -1,0 +1,116 @@
+# Declared filter resolutions, for filters Phase 2's tracer cannot follow.
+#
+# The tracer derives a filter's column by finding `if params.<name>:` in a
+# repository's list method and reducing the `where()` under it. That is the
+# default and it should stay the default -- it reads the code rather than a note
+# about the code, so it cannot drift.
+#
+# A filter belongs here only when static analysis *structurally* cannot see it,
+# not when seeing it would merely be awkward. Two shapes qualify, and each entry
+# has to say which and why in `established_by`:
+#
+#   1. The repository never sees the parameter. A service translates it first --
+#      a public code becomes internal ids -- so `params.<name>` appears nowhere
+#      in the query layer. Following it needs cross-layer dataflow through a
+#      rename.
+#
+#   2. The predicate's expression cannot be matched textually to the index that
+#      serves it. `app/models/asset.py` documents at length why the model and
+#      PostgreSQL spell the same expression differently and never match as text.
+#
+# A declaration supplies only what the tracer could not: which column, and how it
+# is compared. Index coverage is still judged by the oracle from those two, so a
+# declaration cannot claim a filter is fast -- with one exception, `index:`, for
+# the single case where the expression cannot be matched by shape. That one
+# asserts coverage, so it names the test that actually holds it true.
+#
+# Every declaration is verified before the report is written. An endpoint that no
+# longer exists, a parameter it no longer accepts, or an index no longer in the
+# schema fails the run rather than printing a stale resolution.
+
+version: 1
+
+declarations:
+  # -- 1. translated before the repository sees them ----------------------
+
+  - endpoint: "GET /api/artwork"
+    param: kind
+    table: artwork
+    column: artwork_kind_id
+    operator: "=="
+    established_by: >-
+      The service resolves the public `kind` code to kind ids before building the
+      query, so the repository filters on `artwork_kind_id` and the name `kind`
+      never reaches it. Seeing this statically would need dataflow across the
+      service boundary through a rename. The filter is applied: `artwork-page-1`
+      and the nested artwork probes exercise the same repository. Nothing else is
+      pinned on this route -- `entity_type` and `entity_id` are optional here -- so
+      unlike the nested reads there is no leading column to make
+      `ix_artwork_entity_kind_primary` apply, and the filter is genuinely uncovered.
+
+  - endpoint: "GET /api/titles/{title_id}/artwork"
+    param: kind
+    table: artwork
+    column: artwork_kind_id
+    operator: "=="
+    constrained: [entity_type, entity_id]
+    established_by: >-
+      Same translation as the collection route: the code is resolved to an id in the
+      service. `title-artwork-by-kind` in probes.yaml exists precisely to time this
+      filter, and its note has recorded that it is applied since the probe was added.
+      `constrained` is not incidental here: `list_for_entity` always pins
+      `entity_type` and `entity_id` before narrowing by kind, which is what lets
+      `ix_artwork_entity_kind_primary` apply from its leading column. Judged without
+      them this reads as a sequential scan, which is the opposite of true.
+
+  - endpoint: "GET /api/assets/{asset_id}/artwork"
+    param: kind
+    table: artwork
+    column: artwork_kind_id
+    operator: "=="
+    constrained: [entity_type, entity_id]
+    established_by: >-
+      Same translation, and the same `list_for_entity` call as the title route, so
+      `entity_type` and `entity_id` are pinned here too. Declared per endpoint rather
+      than once for the parameter name, so that a future unrelated `kind` on some
+      other route is not silently answered by this entry.
+
+  - endpoint: "GET /api/titles/"
+    param: resolves_display_image
+    table: artwork
+    column: artwork_kind_id
+    operator: in_
+    established_by: >-
+      Not a column on `titles` at all. The service resolves the display chain to
+      kind ids and the repository semi-joins against `titles_resolving_artwork`,
+      whose seed is `artwork.artwork_kind_id IN (...)` -- so what the filter costs
+      is decided there. `params.resolves_display_image` only selects whether the
+      semi-join is built, which is why no `where()` is keyed on it.
+
+  # -- 2. expression the index is matched by, not the column --------------
+
+  - endpoint: "GET /api/assets/"
+    param: filename_ext
+    table: assets
+    column: filename
+    expression: lower(substring(filename, '\.([^.]+)$'))
+    operator: "=="
+    index: ix_assets_filename_ext
+    established_by: >-
+      The predicate is written against `filename_extension()` so that it matches
+      `ix_assets_filename_ext`, and `app/models/asset.py` documents why the model
+      and PostgreSQL spellings of that expression never match as text -- the same
+      reason the tracer cannot match them either. The pairing is held by
+      `test_filename_ext_filter_uses_the_index`, not by this file.
+
+  # -- 3. not a database filter -------------------------------------------
+
+  - endpoint: "GET /api/inbox"
+    param: depth
+    kind: not-a-database-filter
+    established_by: >-
+      The inbox walks the filesystem, not a table: `list_inbox(depth)` passes
+      straight to `list_all(depth)` and bounds how many directory levels are
+      descended. There is no column behind it, so "which column does it hit" is a
+      malformed question rather than an open one. What it costs is bounded by the
+      walk, which `inbox-full` and `inbox-top-level` measure.

@@ -43,6 +43,7 @@ uv run capability-inventory
 | `--frontend-path DIR` | Phase 5: grep a consumer checkout for call sites. Searches both URL literals and generated-client `operationId`s, and reports them separately. |
 | `--access-log FILE` | Phase 5: parse an access log. Request paths are normalised back to route templates, so `/api/assets/4213` counts against `/api/assets/{asset_id}`. |
 | `--probes-file FILE` | Alternative probe definitions (default: the `probes.yaml` beside the package). |
+| `--filter-map FILE` | Alternative filter declarations (default: the `filters.yaml` beside the package). |
 | `--markdown-out FILE` / `--json-out FILE` | Alternative output paths. |
 | `--cardinality-scan-limit N` | Distinct-value scan cap per column in Phase 3 (default 5000). Above the cap the count is reported as a floor and flagged. |
 | `--from-json FILE` | Re-render from a previous run's JSON. No phase runs, no database or instance is contacted. Risks and verdicts are re-derived from the stored measurements, so a changed threshold in `verdict.py` takes effect without re-probing. |
@@ -113,6 +114,46 @@ see below.
   instance, a malformed `probes.yaml` and a `--only` pattern that matches
   nothing are all errors. A phase you did not ask to skip never silently
   produces nothing.
+
+## Declared filters
+
+Phase 2 resolves a filter by finding an `if params.<name>` branch in a repository's
+list method and reducing the `where()` under it to a column. That derives the answer
+from the code rather than from a note about the code, so it cannot drift, and it is
+the default for every filter.
+
+Two shapes defeat it, and no amount of cleverness changes that:
+
+- **The repository never sees the parameter.** `kind` arrives as a public code and
+  the service resolves it to an id before the query is built, so `params.kind`
+  appears nowhere in the query layer. Following it needs dataflow across the service
+  boundary through a rename.
+- **The expression cannot be matched textually.** `filename_ext` is written against
+  `filename_extension()` so that it matches `ix_assets_filename_ext`;
+  `app/models/asset.py` documents at length why the model and PostgreSQL spellings of
+  that expression never match as text, which is the same reason the tracer cannot
+  match them either.
+
+Those are declared in `filters.yaml`, each with the reason it cannot be derived. A
+declaration supplies only what the tracer could not — the column and the operator —
+and coverage is still judged by the index oracle from them, so declaring a filter
+cannot assert that it is cheap. The single exception is `index:`, for the expression
+case, and it names the test that holds the pairing true.
+
+`constrained:` is part of that judgement rather than decoration. A composite index
+serves a column that is not its first only when every column before it is pinned too,
+so the nested artwork reads — which always pin `entity_type` and `entity_id` before
+narrowing by kind — are covered, while the collection route, where both are optional,
+is not. Omit it and the first pair reads as a sequential scan.
+
+A third case is not a resolution at all: `GET /api/inbox`'s `depth` walks the
+filesystem and has no column behind it, so it is marked `kind: not-a-database-filter`
+and reported as such rather than asked about.
+
+**Every declaration is verified before the report is written.** An endpoint that no
+longer exists, a parameter it no longer accepts, or an index no longer in the schema
+fails the run. That check is the only thing keeping a declaration honest as the code
+moves underneath it, so it is an error rather than a warning.
 
 ## Editing probes
 
@@ -209,6 +250,7 @@ changed about the API, not noise from the harness.
 | `static_surface.py` | 1 — OpenAPI document plus route-table and mapper introspection |
 | `annotate.py` | 2 — router → service → repository call-graph walk |
 | `indexes.py` | 2 — index inventory from the models and the migrations, and the coverage oracle |
+| `filter_map.py` | 2 — declared filter resolutions, and their verification |
 | `data_shape.py` | 3 — read-only SQL |
 | `probes.py` | 4 — the `probes.yaml` runner |
 | `dead_surface.py` | 5 — usage evidence |
