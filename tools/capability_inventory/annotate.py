@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .filter_map import FilterDeclaration
 from .indexes import IndexLookup
 from .models import (
     FilterCoverage,
@@ -387,15 +388,25 @@ def _orm_names_in(node: ast.AST) -> list[str]:
 class RouteAnalyser:
     """Produces a :class:`RouteAnnotation` for one route."""
 
-    def __init__(self, graph: CodeGraph, lookup: IndexLookup) -> None:
+    def __init__(
+        self,
+        graph: CodeGraph,
+        lookup: IndexLookup,
+        filter_map: dict[tuple[str, str], FilterDeclaration] | None = None,
+    ) -> None:
         """Build the analyser.
 
         Args:
             graph: The parsed call graph.
             lookup: Index coverage oracle.
+            filter_map: Declared resolutions for filters the tracer structurally
+                cannot follow, keyed by (endpoint, parameter). Defaults to none,
+                which is the right default for a caller that wants only what can
+                be derived from the code.
         """
         self.graph = graph
         self.lookup = lookup
+        self.filter_map = filter_map or {}
         self._sort_configs = _load_sort_configs()
 
     # -- public -----------------------------------------------------------
@@ -977,16 +988,24 @@ class RouteAnalyser:
                 continue
             resolved = filter_exprs.get(param)
             if resolved is None:
+                declared = self.filter_map.get((surface.key, param))
+                if declared is not None:
+                    out.append(self._declared_coverage(declared))
+                    continue
                 if any(p.name == param for p in surface.params) and list_methods:
                     unknowns.append(
                         Unknown(
                             scope=surface.key,
                             question=f"which column the `{param}` filter hits",
                             resolution=(
-                                "no `if params."
-                                f"{param}` branch was found in the repository's list "
-                                "method; read the handler to confirm the parameter is "
-                                "actually applied rather than accepted and ignored"
+                                f"no `if params.{param}` branch was found in the "
+                                "repository's list method, and the filter is not "
+                                "declared in filters.yaml. Either it is applied "
+                                "somewhere the tracer does not look -- a service that "
+                                "translates it before the query is built, or an "
+                                "expression it cannot match -- in which case declare it "
+                                "there with the reason; or it is accepted and ignored, "
+                                "which is a bug in the endpoint"
                             ),
                         )
                     )
@@ -1003,9 +1022,11 @@ class RouteAnalyser:
                         )
                     )
                 continue
-            orm, column, operator = resolved
+            orm, column, operator, function = resolved
             filter_table = self.graph.orm_tables.get(orm, orm)
-            covered, index, note = self.lookup.judge(filter_table, column, operator)
+            covered, index, note = self.lookup.judge(
+                filter_table, column, operator, function=function
+            )
             out.append(
                 FilterCoverage(
                     param=param,
@@ -1076,6 +1097,63 @@ class RouteAnalyser:
             column for orm, column in joined if self.graph.orm_tables.get(orm, orm) == table
         }
         return frozenset(columns)
+
+    def _declared_coverage(self, declared: FilterDeclaration) -> FilterCoverage:
+        """Build coverage for a filter whose resolution is declared, not derived.
+
+        A declaration supplies the column and operator the tracer could not reach;
+        the coverage judgement is still the oracle's, so declaring a filter cannot
+        assert that it is cheap. The one exception is ``index``, for a predicate
+        whose expression cannot be matched to the inventory by shape -- there the
+        declaration names the index and the note names what holds the pairing true,
+        because nothing here can check it.
+        """
+        if not declared.is_database_filter:
+            return FilterCoverage(
+                param=declared.param,
+                role="filter",
+                table=None,
+                column=None,
+                operator=None,
+                covered=None,
+                index=None,
+                note=f"not a database filter. {declared.established_by}",
+            )
+
+        assert declared.table is not None and declared.column is not None
+        target = declared.expression or f"{declared.table}.{declared.column}"
+
+        if declared.index is not None:
+            return FilterCoverage(
+                param=declared.param,
+                role="filter",
+                table=declared.table,
+                column=declared.column,
+                operator=declared.operator,
+                covered=True,
+                index=declared.index,
+                note=(
+                    f"`{target}` served by {declared.index}; declared rather than "
+                    f"derived. {declared.established_by}"
+                ),
+            )
+
+        covered, index, note = self.lookup.judge(
+            declared.table,
+            declared.column,
+            declared.operator,
+            constrained=frozenset(declared.constrained),
+        )
+        return FilterCoverage(
+            param=declared.param,
+            role="filter",
+            table=declared.table,
+            column=declared.column,
+            operator=declared.operator,
+            covered=covered,
+            index=index,
+            note=f"resolves to `{target}`, declared rather than derived. {declared.established_by} {note}",
+        )
 
     def _lookup_coverage(
         self,
@@ -1372,17 +1450,25 @@ def _load_sort_configs() -> dict[str, _SortConfig]:
 
 def _filter_expressions(
     list_methods: list[_MethodContext],
-) -> dict[str, tuple[str, str, str]]:
+) -> dict[str, tuple[str, str, str, str | None]]:
     """Map each ``params.<name>`` filter to the column and operator it uses.
 
     Only ``if params.<name>`` branches are considered, which is exactly how the
     repositories apply optional filters. A parameter with no such branch is
     reported as unresolved rather than assumed absent.
 
+    A predicate written against a SQL function of a column rather than the column
+    itself -- ``func.lower(AssetORM.path).like(...)`` -- resolves to that column
+    plus the function's name, because what serves it is an expression index and not
+    an index on the bare column. Judging it as though the column were bare gets the
+    answer wrong in both directions: it credits an index the planner cannot use, and
+    it misses the expression index that it can.
+
     Returns:
-        Parameter name -> (ORM class name, column, normalised operator).
+        Parameter name -> (ORM class name, column, normalised operator, SQL
+        function applied to the column, or None when the column is bare).
     """
-    out: dict[str, tuple[str, str, str]] = {}
+    out: dict[str, tuple[str, str, str, str | None]] = {}
     for ctx in list_methods:
         locals_ = _assignments(ctx.node)
         for node in ast.walk(ctx.node):
@@ -1400,10 +1486,68 @@ def _filter_expressions(
                     and call.args
                 ):
                     continue
+                expression = _describe_expression_predicate(call.args[0], locals_)
+                if expression:
+                    out.setdefault(param, expression)
+                    continue
                 resolved = _describe_predicate(call.args[0], locals_)
                 if resolved:
-                    out.setdefault(param, resolved)
+                    out.setdefault(param, (*resolved, None))
     return out
+
+
+def _describe_expression_predicate(
+    node: ast.expr, locals_: dict[str, list[ast.expr]] | None = None
+) -> tuple[str, str, str, str] | None:
+    """Reduce a predicate on ``func.<fn>(XORM.column)`` to its parts.
+
+    Deliberately narrow: only SQLAlchemy's ``func.<name>`` is recognised, never a
+    project helper. A helper would have to be resolved to the SQL it builds before
+    it could be matched against an index, and ``app/models/asset.py`` sets out at
+    length why that matching does not work textually even when both spellings are
+    correct. Where a helper is used, the filter is declared in ``filters.yaml``
+    instead of guessed at here.
+
+    Returns:
+        (ORM class name, column, normalised operator, function name), or None if
+        the predicate is not a comparison or method call on a function of a column.
+    """
+    if isinstance(node, ast.Compare) and node.ops:
+        target = _function_of_column(node.left)
+        if target is None:
+            return None
+        symbol = _COMPARISON_SYMBOLS.get(type(node.ops[0]))
+        if symbol is None:
+            return None
+        return target[0], target[1], symbol, target[2]
+
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        target = _function_of_column(node.func.value)
+        if target is None:
+            return None
+        method = node.func.attr
+        if method in {"ilike", "like"}:
+            pattern = _pattern_shape(node.args[0], locals_) if node.args else "unknown"
+            return target[0], target[1], f"{method}_{pattern}", target[2]
+        return target[0], target[1], method, target[2]
+
+    return None
+
+
+def _function_of_column(node: ast.expr) -> tuple[str, str, str] | None:
+    """Resolve ``func.<fn>(XORM.column)`` to (``XORM``, column, fn)."""
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "func"
+    ):
+        return None
+    for arg in node.args:
+        column = _column_ref(arg)
+        if column:
+            return column[0], column[1], node.func.attr
+    return None
 
 
 def _params_referenced(node: ast.AST) -> list[str]:
@@ -1426,15 +1570,7 @@ def _describe_predicate(
     if isinstance(node, ast.Compare) and node.ops:
         target = _column_ref(node.left)
         if target:
-            symbol = {
-                ast.Eq: "==",
-                ast.NotEq: "!=",
-                ast.Gt: ">",
-                ast.GtE: ">=",
-                ast.Lt: "<",
-                ast.LtE: "<=",
-                ast.In: "in_",
-            }.get(type(node.ops[0]))
+            symbol = _COMPARISON_SYMBOLS.get(type(node.ops[0]))
             if symbol:
                 return target[0], target[1], symbol
         return None
@@ -1451,6 +1587,18 @@ def _describe_predicate(
             return target[0], target[1], method
         return target[0], target[1], method
     return None
+
+
+#: Python comparison node -> the operator name :meth:`IndexLookup.judge` expects.
+_COMPARISON_SYMBOLS: dict[type[ast.cmpop], str] = {
+    ast.Eq: "==",
+    ast.NotEq: "!=",
+    ast.Gt: ">",
+    ast.GtE: ">=",
+    ast.Lt: "<",
+    ast.LtE: "<=",
+    ast.In: "in_",
+}
 
 
 def _column_ref(node: ast.expr) -> tuple[str, str] | None:

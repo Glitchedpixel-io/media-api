@@ -23,6 +23,7 @@ from tools.capability_inventory import (
     cli,
     data_shape,
     dead_surface,
+    filter_map,
     load,
     probes,
     render,
@@ -30,7 +31,11 @@ from tools.capability_inventory import (
     static_surface,
     verdict,
 )
-from tools.capability_inventory.annotate import _describe_predicate, _pattern_shape
+from tools.capability_inventory.annotate import (
+    _describe_expression_predicate,
+    _describe_predicate,
+    _pattern_shape,
+)
 from tools.capability_inventory.indexes import IndexLookup
 from tools.capability_inventory.models import (
     CollectionStats,
@@ -1410,3 +1415,184 @@ def test_the_models_report_one_index_per_constrained_column() -> None:
     ):
         matching = [e for e in entries if e.table == table and e.columns == (column,) and e.unique]
         assert len(matching) == 1, f"{table}.{column} reported {[e.name for e in matching]}"
+
+
+# --------------------------------------------------------------------------
+# Declared filter resolutions, and the index properties that decide coverage
+# --------------------------------------------------------------------------
+
+
+def test_shipped_filter_declarations_are_valid() -> None:
+    """The sibling of the probe check: every shipped declaration must parse."""
+    declarations = filter_map.load()
+    assert declarations, "filters.yaml ships declarations and must not be empty"
+    for (endpoint, param), declared in declarations.items():
+        assert declared.endpoint == endpoint
+        assert declared.param == param
+        assert declared.established_by, f"{endpoint} `{param}` declares no reason"
+        if declared.is_database_filter:
+            assert declared.table and declared.column
+
+
+def test_a_declaration_without_a_reason_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "filters.yaml"
+    path.write_text(
+        "declarations:\n"
+        "  - endpoint: 'GET /api/artwork'\n"
+        "    param: kind\n"
+        "    table: artwork\n"
+        "    column: artwork_kind_id\n"
+    )
+    with pytest.raises(filter_map.FilterMapError, match="established_by"):
+        filter_map.load(path)
+
+
+def test_a_declaration_for_an_endpoint_that_no_longer_exists_fails_the_run() -> None:
+    """A declaration is a standing claim; it must not outlive what it describes."""
+    declared = filter_map.FilterDeclaration(
+        endpoint="GET /api/gone",
+        param="kind",
+        established_by="why",
+        table="artwork",
+        column="artwork_kind_id",
+    )
+    with pytest.raises(filter_map.FilterMapError, match="no such endpoint"):
+        filter_map.verify(
+            {("GET /api/gone", "kind"): declared},
+            endpoint_params={"GET /api/artwork": {"kind"}},
+            index_names=set(),
+        )
+
+
+def test_a_declaration_naming_a_dropped_index_fails_the_run() -> None:
+    declared = filter_map.FilterDeclaration(
+        endpoint="GET /api/assets/",
+        param="filename_ext",
+        established_by="why",
+        table="assets",
+        column="filename",
+        index="ix_assets_filename_ext",
+    )
+    with pytest.raises(filter_map.FilterMapError, match="not in the live inventory"):
+        filter_map.verify(
+            {("GET /api/assets/", "filename_ext"): declared},
+            endpoint_params={"GET /api/assets/": {"filename_ext"}},
+            index_names={"some_other_index"},
+        )
+
+
+def test_the_shipped_declarations_match_the_live_surface() -> None:
+    """Runs the same verification the CLI does, against the real app and models."""
+    routes, _ = static_surface.collect(static_surface.load_app())
+    filter_map.verify(
+        filter_map.load(),
+        endpoint_params={
+            route.key: {p.name for p in route.params if p.location == "query"} for route in routes
+        },
+        index_names={i.name for i in indexes.from_metadata()},
+    )
+
+
+def test_a_predicate_on_a_function_of_a_column_resolves_to_that_function() -> None:
+    """``func.lower(X.col).like(...)`` is a filter on lower(col), not on col."""
+    node = ast.parse("func.lower(AssetORM.path).like(f'{prefix}%')").body[0].value
+    assert _describe_expression_predicate(node) == ("AssetORM", "path", "like_prefix", "lower")
+
+
+def test_a_bare_column_predicate_is_not_mistaken_for_an_expression() -> None:
+    node = ast.parse("AssetORM.path.ilike(pattern)").body[0].value
+    assert _describe_expression_predicate(node) is None
+
+
+def test_a_function_predicate_is_judged_against_an_expression_index() -> None:
+    lookup = IndexLookup(
+        (
+            IndexInfo(
+                name="ix_assets_path_lower",
+                table="assets",
+                columns=(),
+                unique=False,
+                expression="lower(assets.path)",
+            ),
+        )
+    )
+    covered, index, _ = lookup.judge("assets", "path", "like_prefix", function="lower")
+    assert covered is True
+    assert index == "ix_assets_path_lower"
+
+
+def test_a_function_predicate_never_falls_back_to_the_bare_column_index() -> None:
+    """The trap this exists to prevent: an index on `path` cannot serve lower(path)."""
+    lookup = IndexLookup(
+        (IndexInfo(name="ix_assets_path", table="assets", columns=("path",), unique=False),)
+    )
+    covered, index, note = lookup.judge("assets", "path", "==", function="lower")
+    assert covered is False
+    assert index is None
+    assert "lower(assets.path)" in note
+
+
+def test_a_partial_index_is_not_offered_for_an_unconstrained_query() -> None:
+    """A partial index serves only a query implying its WHERE, which is unknowable here."""
+    lookup = IndexLookup(
+        (
+            IndexInfo(
+                name="uniq_pending_per_asset",
+                table="media_transform_requests",
+                columns=("asset_id", "transform_type"),
+                unique=True,
+                where="actioned = false",
+            ),
+        )
+    )
+    assert lookup.covering("media_transform_requests", "asset_id") is None
+
+
+def test_a_gin_index_is_not_offered_for_an_ordering() -> None:
+    """GIN has no order, so it cannot back `sort=name` however it is spelled."""
+    lookup = IndexLookup(
+        (
+            IndexInfo(
+                name="ix_titles_name_trgm",
+                table="titles",
+                columns=("name",),
+                unique=False,
+                method="gin",
+            ),
+            IndexInfo(name="ix_titles_name", table="titles", columns=("name",), unique=False),
+        )
+    )
+    index = lookup.covering("titles", "name")
+    assert index is not None and index.name == "ix_titles_name"
+
+
+def test_two_indexes_on_one_column_survive_when_their_methods_differ() -> None:
+    """Deduping them by columns alone let allocation order decide which was reported."""
+    names = {
+        i.name for i in indexes.from_metadata() if i.table == "titles" and i.columns == ("name",)
+    }
+    assert names == {"ix_titles_name", "ix_titles_name_trgm"}
+
+
+def test_an_index_method_survives_a_json_round_trip() -> None:
+    """``--from-json`` promises presentation-only changes, so it must lose nothing.
+
+    Dropping the method here would be invisible rather than loud: every GIN index
+    would reload as a btree, and ``covering()`` would start offering one for an
+    ordering it cannot serve -- reintroducing the bug through the one path the
+    README says re-runs no phase.
+    """
+    payload = {
+        "name": "ix_titles_name_trgm",
+        "table": "titles",
+        "columns": ["name"],
+        "unique": False,
+        "method": "gin",
+        "source": "models",
+    }
+    assert load._index(payload).method == "gin"
+
+
+def test_a_json_written_before_the_method_existed_still_loads() -> None:
+    payload = {"name": "ix_titles_name", "table": "titles", "columns": ["name"], "unique": False}
+    assert load._index(payload).method == "btree"

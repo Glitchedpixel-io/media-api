@@ -111,7 +111,14 @@ class RouteSurface:
 
 @dataclass(frozen=True)
 class IndexInfo:
-    """An index as declared in the SQLAlchemy metadata or a migration."""
+    """An index as declared in the SQLAlchemy metadata or a migration.
+
+    ``method`` matters as much as the columns. ``titles.name`` carries both a btree
+    and a GIN trigram index; they are not interchangeable, and the model says so --
+    the trigram one cannot serve ``ORDER BY name`` because GIN has no order. Without
+    the method the two are indistinguishable here, and whichever happened to be seen
+    first won.
+    """
 
     name: str
     table: str
@@ -119,6 +126,7 @@ class IndexInfo:
     unique: bool
     expression: str | None = None
     where: str | None = None
+    method: str = "btree"
     source: str = "models"
 
 
