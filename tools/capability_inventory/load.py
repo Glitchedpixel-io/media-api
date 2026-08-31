@@ -242,6 +242,7 @@ def _index(payload: dict[str, Any]) -> IndexInfo:
         # loads. Dropping it instead would silently turn every GIN index back into
         # a btree, and `covering()` would offer one for an ordering it cannot serve.
         method=payload.get("method", "btree"),
+        ops=tuple(payload.get("ops") or ()),
         source=payload.get("source", "models"),
     )
 

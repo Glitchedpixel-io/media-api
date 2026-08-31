@@ -59,6 +59,23 @@ def _index_method(index: object) -> str:
     return str(using).lower() if using else "btree"
 
 
+def _index_ops(index: object) -> tuple[str, ...]:
+    """The operator classes an index declares, sorted for a stable identity.
+
+    ``postgresql_ops`` maps column name to opclass. Only the opclasses are kept: what
+    the caller needs to know is whether any of them is a trigram class, not which
+    column carries it, since these indexes are single-column in this schema.
+    """
+    options = getattr(index, "dialect_options", {})
+    try:
+        ops = options["postgresql"]["ops"]
+    except (KeyError, TypeError):
+        return ()
+    if not isinstance(ops, dict):
+        return ()
+    return tuple(sorted(str(v) for v in ops.values()))
+
+
 def _partial_where(index: object) -> str | None:
     """Render an index's partial-index predicate, if it has one.
 
@@ -71,6 +88,21 @@ def _partial_where(index: object) -> str | None:
     except (KeyError, TypeError):
         return None
     return None if predicate is None else str(predicate)
+
+
+def _migration_ops(node: ast.Call) -> tuple[str, ...]:
+    """Operator classes from a migration's ``postgresql_ops={...}`` keyword.
+
+    Read here as well as from the models so the historical cross-check does not
+    describe a trigram index as an ordinary GIN one and disagree with the models
+    table printed beside it.
+    """
+    for keyword in node.keywords:
+        if keyword.arg != "postgresql_ops" or not isinstance(keyword.value, ast.Dict):
+            continue
+        values = [_literal(v) for v in keyword.value.values]
+        return tuple(sorted(str(v) for v in values if v is not None))
+    return ()
 
 
 def from_metadata() -> tuple[IndexInfo, ...]:
@@ -106,6 +138,7 @@ def from_metadata() -> tuple[IndexInfo, ...]:
                     expression=expression,
                     where=_partial_where(index),
                     method=_index_method(index),
+                    ops=_index_ops(index),
                     source="models",
                 )
             )
@@ -172,7 +205,10 @@ def _deduplicate(entries: list[IndexInfo]) -> tuple[IndexInfo, ...]:
     Returns:
         One entry per distinct index, named as Postgres names it.
     """
-    best: dict[tuple[str, tuple[str, ...], str | None, str | None, bool, str], IndexInfo] = {}
+    best: dict[
+        tuple[str, tuple[str, ...], str | None, str | None, bool, str, tuple[str, ...]],
+        IndexInfo,
+    ] = {}
     for entry in entries:
         key = (
             entry.table,
@@ -181,6 +217,7 @@ def _deduplicate(entries: list[IndexInfo]) -> tuple[IndexInfo, ...]:
             entry.where,
             entry.unique,
             entry.method,
+            entry.ops,
         )
         current = best.get(key)
         if current is None or _SOURCE_PRECEDENCE.index(entry.source) < _SOURCE_PRECEDENCE.index(
@@ -241,6 +278,7 @@ def from_migrations(alembic_dir: Path) -> tuple[IndexInfo, ...]:
                     # Read here too, so the historical cross-check does not report a
                     # GIN index as a btree and disagree with the models table beside it.
                     method=str(using).lower() if using else "btree",
+                    ops=_migration_ops(node),
                     source=f"migration {path.stem.split('_', 1)[0]}",
                 )
             )
@@ -296,6 +334,7 @@ class IndexLookup:
         self._indexes = indexes
         self._by_leading: dict[tuple[str, str], list[IndexInfo]] = {}
         self._expressions: dict[str, list[IndexInfo]] = {}
+        self._trigram: dict[tuple[str, str], IndexInfo] = {}
         for index in indexes:
             if index.columns:
                 # Only the leading column of a composite index is usable on its
@@ -303,6 +342,9 @@ class IndexLookup:
                 self._by_leading.setdefault((index.table, index.columns[0]), []).append(index)
             if index.expression:
                 self._expressions.setdefault(index.table, []).append(index)
+            if index.method == "gin" and any(o.endswith("trgm_ops") for o in index.ops):
+                for column in index.columns:
+                    self._trigram[(index.table, column)] = index
 
     def all(self) -> tuple[IndexInfo, ...]:
         """Every index in the inventory."""
@@ -372,6 +414,20 @@ class IndexLookup:
             return None
         # Prefer a single-column index; it is the one the planner will reach for.
         return min(candidates, key=lambda i: (len(i.columns), i.name))
+
+    def trigram_index(self, table: str, column: str) -> IndexInfo | None:
+        """Return a GIN trigram index over ``column``, if one exists.
+
+        Both conditions are required and neither is guessed from the index's name: the
+        access method has to be GIN, and an operator class has to be a trigram one. A
+        GIN index over ``jsonb`` serves containment and would do nothing for a ``LIKE``,
+        so treating every GIN index as trigram-capable would report an unrelated index
+        as serving a search box.
+
+        Returns:
+            The trigram index, or None if the column has none.
+        """
+        return self._trigram.get((table, column))
 
     def expression_index(self, table: str, function: str, column: str) -> IndexInfo | None:
         """Return an expression index applying ``function`` to ``column``.
@@ -446,6 +502,20 @@ class IndexLookup:
         if operator in _UNINDEXABLE:
             if operator in {"ilike_contains", "like_contains", "ilike_suffix", "like_suffix"}:
                 shape = "substring" if "contains" in operator else "suffix"
+                trigram = self.trigram_index(table, column)
+                if trigram is not None:
+                    return (
+                        True,
+                        trigram.name,
+                        f"{shape} match on {table}.{column}; a btree cannot use a "
+                        f"leading wildcard, but {trigram.name} is a GIN trigram index "
+                        "and serves this for patterns of **three characters or more**. "
+                        "A shorter pattern contains no whole trigram, so the planner "
+                        "falls back to a sequential scan -- verified by EXPLAIN against "
+                        "the deployed schema, where a two-character pattern seq-scans "
+                        "and a three-character one does not. A search box that waits "
+                        "for three characters is on the right side of that line",
+                    )
                 return (
                     False,
                     None,
@@ -464,6 +534,15 @@ class IndexLookup:
             expr = self.expression_index(table, "lower", column)
             if expr is not None:
                 return True, expr.name, f"case-insensitive prefix served by {expr.name}"
+            trigram = self.trigram_index(table, column)
+            if trigram is not None:
+                return (
+                    True,
+                    trigram.name,
+                    f"case-insensitive prefix served by {trigram.name}, a GIN trigram "
+                    "index, for patterns of three characters or more; a shorter one "
+                    "seq-scans",
+                )
             if index is not None:
                 return (
                     False,
