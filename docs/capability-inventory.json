@@ -1,7 +1,7 @@
 {
   "app_version": "5.0.1.dev0+g21cecdc6a.d20260831",
   "data_shape": {
-    "baseline_rtt_ms": 25.78,
+    "baseline_rtt_ms": 25.32,
     "captured_from": "read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)",
     "collections": [
       {
@@ -2047,10 +2047,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 103.3,
-            "min_ms": 85.7,
-            "p50_ms": 93.0,
-            "p95_ms": 103.3,
+            "max_ms": 113.6,
+            "min_ms": 97.7,
+            "p50_ms": 102.2,
+            "p95_ms": 113.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2071,10 +2071,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 110.7,
-            "min_ms": 94.5,
-            "p50_ms": 103.8,
-            "p95_ms": 110.7,
+            "max_ms": 108.1,
+            "min_ms": 85.5,
+            "p50_ms": 105.5,
+            "p95_ms": 108.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2505,10 +2505,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 102.7,
-            "min_ms": 88.9,
-            "p50_ms": 93.1,
-            "p95_ms": 102.7,
+            "max_ms": 102.1,
+            "min_ms": 87.9,
+            "p50_ms": 99.1,
+            "p95_ms": 102.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -2668,7 +2668,7 @@
           "tests/unit/services/test_artwork_service.py"
         ]
       },
-      "verdict": "p95 103ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 102ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -3082,10 +3082,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 113.9,
-            "min_ms": 88.7,
-            "p50_ms": 94.4,
-            "p95_ms": 113.9,
+            "max_ms": 104.7,
+            "min_ms": 79.7,
+            "p50_ms": 90.2,
+            "p95_ms": 104.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3190,7 +3190,7 @@
           "tests/integration/api/test_artwork_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 114ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -3249,9 +3249,9 @@
           },
           {
             "column": "path",
-            "covered": false,
-            "index": null,
-            "note": "substring match on assets.path; the pattern has a leading wildcard, which a btree cannot use at all, so this is a sequential scan regardless of indexing (a trigram index would be needed)",
+            "covered": true,
+            "index": "ix_assets_path_trgm",
+            "note": "substring match on assets.path; a btree cannot use a leading wildcard, but ix_assets_path_trgm is a GIN trigram index and serves this for patterns of **three characters or more**. A shorter pattern contains no whole trigram, so the planner falls back to a sequential scan -- verified by EXPLAIN against the deployed schema, where a two-character pattern seq-scans and a three-character one does not. A search box that waits for three characters is on the right side of that line",
             "operator": "ilike_contains",
             "param": "path_part",
             "role": "filter",
@@ -3418,10 +3418,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 148.7,
-            "min_ms": 139.8,
-            "p50_ms": 147.3,
-            "p95_ms": 148.7,
+            "max_ms": 154.1,
+            "min_ms": 128.0,
+            "p50_ms": 149.2,
+            "p95_ms": 154.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3442,10 +3442,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 213.3,
-            "min_ms": 172.7,
-            "p50_ms": 184.2,
-            "p95_ms": 213.3,
+            "max_ms": 190.0,
+            "min_ms": 172.6,
+            "p50_ms": 183.8,
+            "p95_ms": 190.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3466,10 +3466,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 145.4,
-            "min_ms": 121.1,
-            "p50_ms": 128.6,
-            "p95_ms": 145.4,
+            "max_ms": 135.7,
+            "min_ms": 120.0,
+            "p50_ms": 126.3,
+            "p95_ms": 135.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3490,10 +3490,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 176.4,
-            "min_ms": 137.1,
-            "p50_ms": 151.6,
-            "p95_ms": 176.4,
+            "max_ms": 189.1,
+            "min_ms": 154.4,
+            "p50_ms": 166.0,
+            "p95_ms": 189.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3514,10 +3514,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 313.0,
-            "min_ms": 236.4,
-            "p50_ms": 242.2,
-            "p95_ms": 313.0,
+            "max_ms": 312.1,
+            "min_ms": 228.5,
+            "p50_ms": 237.8,
+            "p95_ms": 312.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3538,10 +3538,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 242.9,
-            "min_ms": 228.1,
-            "p50_ms": 237.6,
-            "p95_ms": 242.9,
+            "max_ms": 257.2,
+            "min_ms": 229.8,
+            "p50_ms": 242.3,
+            "p95_ms": 257.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3562,10 +3562,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 230.4,
-            "min_ms": 190.3,
-            "p50_ms": 214.7,
-            "p95_ms": 230.4,
+            "max_ms": 252.6,
+            "min_ms": 229.1,
+            "p50_ms": 239.1,
+            "p95_ms": 252.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3580,16 +3580,16 @@
           "method": "GET",
           "name": "assets-broadest-filter",
           "notes": [
-            "substring filter matching almost everything; sequential scan by construction"
+            "substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case"
           ],
           "reason": null,
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 146.5,
-            "min_ms": 124.6,
-            "p50_ms": 133.9,
-            "p95_ms": 146.5,
+            "max_ms": 149.7,
+            "min_ms": 131.2,
+            "p50_ms": 147.5,
+            "p95_ms": 149.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3611,10 +3611,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 148.7,
-            "min_ms": 128.8,
-            "p50_ms": 139.4,
-            "p95_ms": 148.7,
+            "max_ms": 171.7,
+            "min_ms": 141.8,
+            "p50_ms": 150.0,
+            "p95_ms": 171.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -3624,8 +3624,8 @@
       ],
       "risks": [
         "unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,343 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
-        "filters that cannot use an index (`duration_max`, `duration_min`, `path_part`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,343 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
-        "measured p95 of 313ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke",
+        "filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,343 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "measured p95 of 312ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
       "surface": {
@@ -4247,10 +4247,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 109.5,
-            "min_ms": 86.7,
-            "p50_ms": 93.3,
-            "p95_ms": 109.5,
+            "max_ms": 103.6,
+            "min_ms": 86.3,
+            "p50_ms": 96.6,
+            "p95_ms": 103.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4416,7 +4416,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "the lookup is not index-covered and measures p95 110ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict": "the lookup is not index-covered and measures p95 104ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
       "verdict_class": "caution"
     },
     {
@@ -4624,10 +4624,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 140.3,
-            "min_ms": 113.8,
-            "p50_ms": 127.7,
-            "p95_ms": 140.3,
+            "max_ms": 138.9,
+            "min_ms": 112.2,
+            "p50_ms": 131.1,
+            "p95_ms": 138.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -4822,7 +4822,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 140ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 139ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -5210,10 +5210,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 125.7,
-            "min_ms": 118.0,
-            "p50_ms": 121.6,
-            "p95_ms": 125.7,
+            "max_ms": 129.8,
+            "min_ms": 114.9,
+            "p50_ms": 120.1,
+            "p95_ms": 129.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5321,7 +5321,7 @@
           "tests/unit/api/assets/test_files.py"
         ]
       },
-      "verdict": "p95 126ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 130ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -5429,10 +5429,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 162.6,
-            "min_ms": 143.2,
-            "p50_ms": 148.2,
-            "p95_ms": 162.6,
+            "max_ms": 164.4,
+            "min_ms": 137.4,
+            "p50_ms": 150.1,
+            "p95_ms": 164.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -5604,7 +5604,7 @@
           "tests/unit/api/test_openapi_binary_uploads.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6100,10 +6100,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 171.9,
-            "min_ms": 137.5,
-            "p50_ms": 143.9,
-            "p95_ms": 171.9,
+            "max_ms": 148.2,
+            "min_ms": 141.9,
+            "p50_ms": 146.4,
+            "p95_ms": 148.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6261,7 +6261,7 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 172ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 148ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -6584,10 +6584,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 101.4,
-            "min_ms": 87.3,
-            "p50_ms": 90.7,
-            "p95_ms": 101.4,
+            "max_ms": 102.2,
+            "min_ms": 83.4,
+            "p50_ms": 89.2,
+            "p95_ms": 102.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -6715,7 +6715,7 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 101ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7397,10 +7397,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 174.5,
-            "min_ms": 149.2,
-            "p50_ms": 156.0,
-            "p95_ms": 174.5,
+            "max_ms": 157.6,
+            "min_ms": 137.8,
+            "p50_ms": 151.4,
+            "p95_ms": 157.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -7520,7 +7520,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 174ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -7978,10 +7978,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 166.4,
+            "max_ms": 160.8,
             "min_ms": 145.5,
-            "p50_ms": 151.7,
-            "p95_ms": 166.4,
+            "p50_ms": 153.2,
+            "p95_ms": 160.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8108,7 +8108,7 @@
           "tests/unit/services/test_metadata_service.py"
         ]
       },
-      "verdict": "p95 166ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 161ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -8587,10 +8587,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 157.7,
-            "min_ms": 140.1,
-            "p50_ms": 148.2,
-            "p95_ms": 157.7,
+            "max_ms": 161.5,
+            "min_ms": 140.2,
+            "p50_ms": 150.4,
+            "p95_ms": 161.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -8758,7 +8758,7 @@
           "tests/unit/api/assets/test_streams.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -9095,10 +9095,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 163.0,
-            "min_ms": 140.8,
-            "p50_ms": 145.1,
-            "p95_ms": 163.0,
+            "max_ms": 150.1,
+            "min_ms": 141.2,
+            "p50_ms": 146.6,
+            "p95_ms": 150.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -9226,7 +9226,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 150ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -9973,10 +9973,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 167.5,
-            "min_ms": 137.0,
-            "p50_ms": 155.8,
-            "p95_ms": 167.5,
+            "max_ms": 153.1,
+            "min_ms": 134.3,
+            "p50_ms": 140.2,
+            "p95_ms": 153.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10117,7 +10117,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 153ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -10207,10 +10207,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 168.2,
-            "min_ms": 134.5,
-            "p50_ms": 145.4,
-            "p95_ms": 168.2,
+            "max_ms": 163.2,
+            "min_ms": 144.3,
+            "p50_ms": 150.9,
+            "p95_ms": 163.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10398,7 +10398,7 @@
           "tests/unit/api/assets/test_transform_requests.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -10740,10 +10740,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 94.8,
-            "min_ms": 85.5,
-            "p50_ms": 89.4,
-            "p95_ms": 94.8,
+            "max_ms": 88.2,
+            "min_ms": 81.9,
+            "p50_ms": 83.6,
+            "p95_ms": 88.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -10856,7 +10856,7 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "p95 95ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 88ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -11119,10 +11119,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 138.6,
-            "min_ms": 107.5,
-            "p50_ms": 118.5,
-            "p95_ms": 138.6,
+            "max_ms": 118.9,
+            "min_ms": 106.5,
+            "p50_ms": 112.3,
+            "p95_ms": 118.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11168,7 +11168,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 139ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 119ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -11224,10 +11224,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 98.3,
-            "min_ms": 89.5,
+            "max_ms": 102.7,
+            "min_ms": 89.9,
             "p50_ms": 92.8,
-            "p95_ms": 98.3,
+            "p95_ms": 102.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11304,7 +11304,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 103ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -11527,10 +11527,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 103.1,
-            "min_ms": 86.3,
-            "p50_ms": 89.9,
-            "p95_ms": 103.1,
+            "max_ms": 98.1,
+            "min_ms": 83.8,
+            "p50_ms": 88.5,
+            "p95_ms": 98.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -11636,7 +11636,7 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "p95 103ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 98ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -11987,10 +11987,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 8.7,
+            "max_ms": 8.4,
             "min_ms": 1.8,
-            "p50_ms": 2.0,
-            "p95_ms": 8.7,
+            "p50_ms": 2.1,
+            "p95_ms": 8.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -12128,7 +12128,7 @@
           "tests/unit/services/test_inbox_service.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 9ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 8ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -12975,10 +12975,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 1.5,
-            "min_ms": 1.4,
-            "p50_ms": 1.4,
-            "p95_ms": 1.5,
+            "max_ms": 7.1,
+            "min_ms": 1.8,
+            "p50_ms": 3.9,
+            "p95_ms": 7.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -13024,7 +13024,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 2ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 7ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -14110,10 +14110,10 @@
           "records_failure_mode": true,
           "status": "ok",
           "timing": {
-            "max_ms": 3.1,
+            "max_ms": 3.5,
             "min_ms": 2.5,
             "p50_ms": 2.5,
-            "p95_ms": 3.1,
+            "p95_ms": 3.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14452,10 +14452,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 97.0,
-            "min_ms": 74.7,
-            "p50_ms": 90.7,
-            "p95_ms": 97.0,
+            "max_ms": 102.7,
+            "min_ms": 91.8,
+            "p50_ms": 96.6,
+            "p95_ms": 102.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14476,10 +14476,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 196.0,
-            "min_ms": 113.1,
-            "p50_ms": 121.2,
-            "p95_ms": 196.0,
+            "max_ms": 191.0,
+            "min_ms": 105.0,
+            "p50_ms": 117.4,
+            "p95_ms": 191.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14500,10 +14500,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 98.1,
-            "min_ms": 89.1,
-            "p50_ms": 90.7,
-            "p95_ms": 98.1,
+            "max_ms": 117.7,
+            "min_ms": 83.9,
+            "p50_ms": 92.8,
+            "p95_ms": 117.7,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14760,10 +14760,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 104.6,
-            "min_ms": 87.8,
-            "p50_ms": 96.0,
-            "p95_ms": 104.6,
+            "max_ms": 95.8,
+            "min_ms": 84.0,
+            "p50_ms": 88.1,
+            "p95_ms": 95.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -14930,7 +14930,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 105ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 96ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -15287,10 +15287,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 109.4,
-            "min_ms": 94.1,
-            "p50_ms": 99.8,
-            "p95_ms": 109.4,
+            "max_ms": 103.9,
+            "min_ms": 95.6,
+            "p50_ms": 99.0,
+            "p95_ms": 103.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15714,10 +15714,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 105.7,
-            "min_ms": 83.6,
-            "p50_ms": 86.7,
-            "p95_ms": 105.7,
+            "max_ms": 99.1,
+            "min_ms": 87.5,
+            "p50_ms": 92.3,
+            "p95_ms": 99.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -15841,7 +15841,7 @@
           "tests/unit/services/test_tag_service.py"
         ]
       },
-      "verdict": "p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -16374,10 +16374,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 139.0,
-            "min_ms": 108.9,
-            "p50_ms": 115.7,
-            "p95_ms": 139.0,
+            "max_ms": 127.5,
+            "min_ms": 115.0,
+            "p50_ms": 120.2,
+            "p95_ms": 127.5,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -16829,10 +16829,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 93.6,
-            "min_ms": 86.2,
-            "p50_ms": 89.4,
-            "p95_ms": 93.6,
+            "max_ms": 95.9,
+            "min_ms": 85.9,
+            "p50_ms": 89.5,
+            "p95_ms": 95.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -16906,7 +16906,7 @@
           "tests/integration/api/test_title_types_api.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 94ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -17310,10 +17310,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 94.5,
-            "min_ms": 78.4,
-            "p50_ms": 89.2,
-            "p95_ms": 94.5,
+            "max_ms": 91.4,
+            "min_ms": 83.4,
+            "p50_ms": 89.1,
+            "p95_ms": 91.4,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17419,7 +17419,7 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "p95 94ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 91ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -17640,9 +17640,9 @@
           },
           {
             "column": "name",
-            "covered": false,
-            "index": null,
-            "note": "substring match on titles.name; the pattern has a leading wildcard, which a btree cannot use at all, so this is a sequential scan regardless of indexing (a trigram index would be needed)",
+            "covered": true,
+            "index": "ix_titles_name_trgm",
+            "note": "substring match on titles.name; a btree cannot use a leading wildcard, but ix_titles_name_trgm is a GIN trigram index and serves this for patterns of **three characters or more**. A shorter pattern contains no whole trigram, so the planner falls back to a sequential scan -- verified by EXPLAIN against the deployed schema, where a two-character pattern seq-scans and a three-character one does not. A search box that waits for three characters is on the right side of that line",
             "operator": "ilike_contains",
             "param": "name",
             "role": "filter",
@@ -17741,18 +17741,6 @@
           {
             "in_loop": true,
             "kind": "execute",
-            "line": 501,
-            "loop_note": "for code in DISPLAY_IMAGE_KINDS",
-            "owner": "SQLAlchemyArtworkRepository.resolve_for_titles",
-            "source_file": "app/repositories/artwork_repository.py",
-            "tables": [
-              "artwork"
-            ],
-            "writes": false
-          },
-          {
-            "in_loop": true,
-            "kind": "execute",
             "line": 489,
             "loop_note": "comprehension",
             "owner": "SQLAlchemyTitleContentRepository.counts_for_titles",
@@ -17815,10 +17803,10 @@
             "writes": false
           },
           {
-            "in_loop": true,
+            "in_loop": false,
             "kind": "execute",
-            "line": 501,
-            "loop_note": "for code in DISPLAY_IMAGE_KINDS",
+            "line": 542,
+            "loop_note": null,
             "owner": "SQLAlchemyArtworkRepository.resolve_for_titles",
             "source_file": "app/repositories/artwork_repository.py",
             "tables": [
@@ -17871,10 +17859,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 133.1,
-            "min_ms": 107.4,
-            "p50_ms": 116.9,
-            "p95_ms": 133.1,
+            "max_ms": 131.0,
+            "min_ms": 100.4,
+            "p50_ms": 109.8,
+            "p95_ms": 131.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17895,10 +17883,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 119.1,
-            "min_ms": 103.4,
-            "p50_ms": 112.4,
-            "p95_ms": 119.1,
+            "max_ms": 132.1,
+            "min_ms": 105.4,
+            "p50_ms": 109.5,
+            "p95_ms": 132.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17919,10 +17907,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 156.2,
-            "min_ms": 124.0,
-            "p50_ms": 136.4,
-            "p95_ms": 156.2,
+            "max_ms": 139.8,
+            "min_ms": 119.7,
+            "p50_ms": 126.7,
+            "p95_ms": 139.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17943,10 +17931,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 111.9,
-            "min_ms": 96.3,
-            "p50_ms": 103.4,
-            "p95_ms": 111.9,
+            "max_ms": 108.8,
+            "min_ms": 99.4,
+            "p50_ms": 105.4,
+            "p95_ms": 108.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17967,10 +17955,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 113.6,
-            "min_ms": 94.1,
-            "p50_ms": 102.8,
-            "p95_ms": 113.6,
+            "max_ms": 105.8,
+            "min_ms": 99.2,
+            "p50_ms": 102.3,
+            "p95_ms": 105.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -17991,10 +17979,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 109.2,
-            "min_ms": 92.7,
-            "p50_ms": 98.0,
-            "p95_ms": 109.2,
+            "max_ms": 127.8,
+            "min_ms": 101.7,
+            "p50_ms": 109.1,
+            "p95_ms": 127.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -18017,8 +18005,8 @@
         }
       ],
       "risks": [
-        "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyArtworkRepository.resolve_for_titles (for code in DISPLAY_IMAGE_KINDS); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
-        "filters that cannot use an index (`membership`, `name`, `resolves_display_image`); each forces a sequential scan, though `title_contents` holds only 1,907 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
+        "filters that cannot use an index (`membership`, `resolves_display_image`); each forces a sequential scan, though `title_contents` holds only 1,907 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`"
       ],
       "surface": {
@@ -18298,7 +18286,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 156ms. Suitable as the backing query for a virtualised full-library scroll.",
+      "verdict": "cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 140ms. Suitable as the backing query for a virtualised full-library scroll.",
       "verdict_class": "safe"
     },
     {
@@ -18593,10 +18581,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 99.6,
-            "min_ms": 81.1,
-            "p50_ms": 90.7,
-            "p95_ms": 99.6,
+            "max_ms": 106.0,
+            "min_ms": 86.4,
+            "p50_ms": 93.1,
+            "p95_ms": 106.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -18721,7 +18709,7 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the lookup is not index-covered and measures p95 100ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict": "the lookup is not index-covered and measures p95 106ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
       "verdict_class": "caution"
     },
     {
@@ -18841,10 +18829,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 189.7,
-            "min_ms": 165.3,
-            "p50_ms": 175.1,
-            "p95_ms": 189.7,
+            "max_ms": 204.1,
+            "min_ms": 163.4,
+            "p50_ms": 183.8,
+            "p95_ms": 204.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -18855,7 +18843,8 @@
       "risks": [
         "one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`",
         "one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`",
-        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent",
+        "measured p95 of 204ms on `title-contents` is too slow to drive from a keystroke"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -18992,7 +18981,7 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 190ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 204ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -20443,18 +20432,6 @@
           {
             "in_loop": true,
             "kind": "execute",
-            "line": 501,
-            "loop_note": "for code in DISPLAY_IMAGE_KINDS",
-            "owner": "SQLAlchemyArtworkRepository.resolve_for_titles",
-            "source_file": "app/repositories/artwork_repository.py",
-            "tables": [
-              "artwork"
-            ],
-            "writes": false
-          },
-          {
-            "in_loop": true,
-            "kind": "execute",
             "line": 170,
             "loop_note": "comprehension",
             "owner": "SQLAlchemyArtworkKindRepository.list_all",
@@ -20511,10 +20488,10 @@
             "writes": false
           },
           {
-            "in_loop": true,
+            "in_loop": false,
             "kind": "execute",
-            "line": 501,
-            "loop_note": "for code in DISPLAY_IMAGE_KINDS",
+            "line": 542,
+            "loop_note": null,
             "owner": "SQLAlchemyArtworkRepository.resolve_for_titles",
             "source_file": "app/repositories/artwork_repository.py",
             "tables": [
@@ -20579,10 +20556,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 409.6,
-            "min_ms": 366.3,
-            "p50_ms": 372.9,
-            "p95_ms": 409.6,
+            "max_ms": 238.9,
+            "min_ms": 206.9,
+            "p50_ms": 214.6,
+            "p95_ms": 238.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20603,10 +20580,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 392.7,
-            "min_ms": 358.6,
-            "p50_ms": 365.0,
-            "p95_ms": 392.7,
+            "max_ms": 228.6,
+            "min_ms": 211.2,
+            "p50_ms": 216.4,
+            "p95_ms": 228.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -20615,8 +20592,8 @@
         }
       ],
       "risks": [
-        "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyArtworkRepository.resolve_for_titles (for code in DISPLAY_IMAGE_KINDS); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
-        "measured p95 of 410ms on `title-detail` is too slow to drive from a keystroke",
+        "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
+        "measured p95 of 239ms on `title-detail` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`"
       ],
       "surface": {
@@ -20789,7 +20766,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 410ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.",
+      "verdict": "p95 239ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.",
       "verdict_class": "caution"
     },
     {
@@ -21387,10 +21364,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 128.1,
-            "min_ms": 110.1,
-            "p50_ms": 118.2,
-            "p95_ms": 128.1,
+            "max_ms": 128.6,
+            "min_ms": 112.6,
+            "p50_ms": 117.3,
+            "p95_ms": 128.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -21411,10 +21388,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 157.2,
-            "min_ms": 134.5,
-            "p50_ms": 148.0,
-            "p95_ms": 157.2,
+            "max_ms": 168.9,
+            "min_ms": 146.8,
+            "p50_ms": 150.3,
+            "p95_ms": 168.9,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -21584,7 +21561,7 @@
           "tests/unit/api/test_openapi_artwork_request_fields.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -22062,10 +22039,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 100.2,
-            "min_ms": 85.4,
-            "p50_ms": 90.9,
-            "p95_ms": 100.2,
+            "max_ms": 96.1,
+            "min_ms": 83.5,
+            "p50_ms": 89.4,
+            "p95_ms": 96.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -22191,7 +22168,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 100ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -22872,10 +22849,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 160.9,
-            "min_ms": 140.1,
-            "p50_ms": 144.4,
-            "p95_ms": 160.9,
+            "max_ms": 158.0,
+            "min_ms": 142.1,
+            "p50_ms": 149.4,
+            "p95_ms": 158.0,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -23012,7 +22989,7 @@
           "tests/integration/api/test_title_parents.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 161ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -23092,10 +23069,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 141.3,
-            "min_ms": 111.0,
+            "max_ms": 133.1,
+            "min_ms": 110.6,
             "p50_ms": 116.6,
-            "p95_ms": 141.3,
+            "p95_ms": 133.1,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -23210,7 +23187,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 141ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 133ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -23688,10 +23665,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 128.1,
-            "min_ms": 111.6,
-            "p50_ms": 123.7,
-            "p95_ms": 128.1,
+            "max_ms": 135.6,
+            "min_ms": 111.3,
+            "p50_ms": 117.0,
+            "p95_ms": 135.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -23817,7 +23794,7 @@
           "tests/unit/api/titles/test_tags.py"
         ]
       },
-      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 128ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 136ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
       "verdict_class": "safe"
     },
     {
@@ -24610,10 +24587,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 182.9,
-            "min_ms": 159.1,
-            "p50_ms": 163.3,
-            "p95_ms": 182.9,
+            "max_ms": 195.8,
+            "min_ms": 169.2,
+            "p50_ms": 178.4,
+            "p95_ms": 195.8,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -25212,10 +25189,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 110.1,
-            "min_ms": 89.5,
-            "p50_ms": 96.5,
-            "p95_ms": 110.1,
+            "max_ms": 103.6,
+            "min_ms": 85.3,
+            "p50_ms": 95.8,
+            "p95_ms": 103.6,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -25401,7 +25378,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 110ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 104ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     },
     {
@@ -26568,10 +26545,10 @@
           "records_failure_mode": false,
           "status": "ok",
           "timing": {
-            "max_ms": 8.7,
-            "min_ms": 1.9,
-            "p50_ms": 3.6,
-            "p95_ms": 8.7,
+            "max_ms": 10.2,
+            "min_ms": 3.7,
+            "p50_ms": 8.7,
+            "p95_ms": 10.2,
             "runs": 7,
             "ttfb_p50_ms": null,
             "ttfb_p95_ms": null
@@ -26617,7 +26594,7 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "p95 9ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict": "p95 10ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
       "verdict_class": "safe"
     }
   ],
@@ -26630,6 +26607,7 @@
       "expression": null,
       "method": "btree",
       "name": "artwork_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "artwork",
       "unique": true,
@@ -26645,6 +26623,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_artwork_entity_kind_primary",
+      "ops": [],
       "source": "models",
       "table": "artwork",
       "unique": false,
@@ -26659,6 +26638,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_artwork_entity_storage_path",
+      "ops": [],
       "source": "models",
       "table": "artwork",
       "unique": true,
@@ -26673,6 +26653,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_artwork_one_primary_per_kind",
+      "ops": [],
       "source": "models",
       "table": "artwork",
       "unique": true,
@@ -26685,6 +26666,7 @@
       "expression": null,
       "method": "btree",
       "name": "artwork_kinds_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "artwork_kinds",
       "unique": true,
@@ -26697,6 +26679,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_artwork_kinds_code",
+      "ops": [],
       "source": "models",
       "table": "artwork_kinds",
       "unique": true,
@@ -26710,6 +26693,7 @@
       "expression": null,
       "method": "btree",
       "name": "asset_tags_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "asset_tags",
       "unique": true,
@@ -26722,6 +26706,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_asset_tags_asset_id",
+      "ops": [],
       "source": "models",
       "table": "asset_tags",
       "unique": false,
@@ -26734,6 +26719,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_asset_tags_tag_id",
+      "ops": [],
       "source": "models",
       "table": "asset_tags",
       "unique": false,
@@ -26746,6 +26732,7 @@
       "expression": null,
       "method": "btree",
       "name": "assets_path_key",
+      "ops": [],
       "source": "column unique=True",
       "table": "assets",
       "unique": true,
@@ -26758,6 +26745,7 @@
       "expression": null,
       "method": "btree",
       "name": "assets_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "assets",
       "unique": true,
@@ -26770,6 +26758,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_assets_created_at",
+      "ops": [],
       "source": "models",
       "table": "assets",
       "unique": false,
@@ -26780,6 +26769,7 @@
       "expression": "lower(\"substring\"(filename, '\\.([^.]+)$'::text))",
       "method": "btree",
       "name": "ix_assets_filename_ext",
+      "ops": [],
       "source": "models",
       "table": "assets",
       "unique": false,
@@ -26792,6 +26782,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_assets_master_asset_id",
+      "ops": [],
       "source": "models",
       "table": "assets",
       "unique": false,
@@ -26802,6 +26793,9 @@
       "expression": "lower(assets.path)",
       "method": "btree",
       "name": "ix_assets_path_lower",
+      "ops": [
+        "text_pattern_ops"
+      ],
       "source": "models",
       "table": "assets",
       "unique": false,
@@ -26814,6 +26808,9 @@
       "expression": null,
       "method": "gin",
       "name": "ix_assets_path_trgm",
+      "ops": [
+        "gin_trgm_ops"
+      ],
       "source": "models",
       "table": "assets",
       "unique": false,
@@ -26826,6 +26823,7 @@
       "expression": null,
       "method": "btree",
       "name": "external_asset_ids_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "external_asset_ids",
       "unique": true,
@@ -26839,6 +26837,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_asset_scheme",
+      "ops": [],
       "source": "unique constraint",
       "table": "external_asset_ids",
       "unique": true,
@@ -26852,6 +26851,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_scheme_external_id",
+      "ops": [],
       "source": "unique constraint",
       "table": "external_asset_ids",
       "unique": true,
@@ -26864,6 +26864,7 @@
       "expression": null,
       "method": "btree",
       "name": "external_identifiers_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "external_identifiers",
       "unique": true,
@@ -26877,6 +26878,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_external_identifiers_entity",
+      "ops": [],
       "source": "models",
       "table": "external_identifiers",
       "unique": false,
@@ -26890,6 +26892,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_external_identifier_scheme_id",
+      "ops": [],
       "source": "unique constraint",
       "table": "external_identifiers",
       "unique": true,
@@ -26902,6 +26905,7 @@
       "expression": null,
       "method": "btree",
       "name": "id_schemes_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "id_schemes",
       "unique": true,
@@ -26914,6 +26918,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_id_schemes_code",
+      "ops": [],
       "source": "models",
       "table": "id_schemes",
       "unique": true,
@@ -26926,6 +26931,7 @@
       "expression": null,
       "method": "btree",
       "name": "jobs_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "jobs",
       "unique": true,
@@ -26938,6 +26944,7 @@
       "expression": null,
       "method": "btree",
       "name": "media_transform_requests_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "media_transform_requests",
       "unique": true,
@@ -26951,6 +26958,7 @@
       "expression": null,
       "method": "btree",
       "name": "uniq_pending_transform_per_asset_and_type",
+      "ops": [],
       "source": "models",
       "table": "media_transform_requests",
       "unique": true,
@@ -26963,6 +26971,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_metadata_asset_id",
+      "ops": [],
       "source": "models",
       "table": "metadata",
       "unique": false,
@@ -26975,6 +26984,7 @@
       "expression": null,
       "method": "btree",
       "name": "metadata_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "metadata",
       "unique": true,
@@ -26987,6 +26997,7 @@
       "expression": null,
       "method": "btree",
       "name": "run_summaries_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "run_summaries",
       "unique": true,
@@ -26999,6 +27010,7 @@
       "expression": null,
       "method": "btree",
       "name": "runner_state_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "runner_state",
       "unique": true,
@@ -27011,6 +27023,7 @@
       "expression": null,
       "method": "btree",
       "name": "scanner_run_summaries_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "scanner_run_summaries",
       "unique": true,
@@ -27023,6 +27036,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_streams_asset_id",
+      "ops": [],
       "source": "models",
       "table": "streams",
       "unique": false,
@@ -27035,6 +27049,7 @@
       "expression": null,
       "method": "btree",
       "name": "streams_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "streams",
       "unique": true,
@@ -27047,6 +27062,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_tags_name",
+      "ops": [],
       "source": "models",
       "table": "tags",
       "unique": true,
@@ -27057,6 +27073,7 @@
       "expression": "lower(tags.name)",
       "method": "btree",
       "name": "ix_tags_name_lower",
+      "ops": [],
       "source": "models",
       "table": "tags",
       "unique": false,
@@ -27069,6 +27086,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_tags_parent_id",
+      "ops": [],
       "source": "models",
       "table": "tags",
       "unique": false,
@@ -27081,6 +27099,7 @@
       "expression": null,
       "method": "btree",
       "name": "tags_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "tags",
       "unique": true,
@@ -27094,6 +27113,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_contents_child_membership",
+      "ops": [],
       "source": "models",
       "table": "title_contents",
       "unique": false,
@@ -27106,6 +27126,7 @@
       "expression": null,
       "method": "btree",
       "name": "title_contents_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "title_contents",
       "unique": true,
@@ -27118,6 +27139,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_one_intrinsic_parent",
+      "ops": [],
       "source": "models",
       "table": "title_contents",
       "unique": true,
@@ -27131,6 +27153,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_parent_asset_once",
+      "ops": [],
       "source": "models",
       "table": "title_contents",
       "unique": true,
@@ -27144,6 +27167,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_parent_child_title_once",
+      "ops": [],
       "source": "models",
       "table": "title_contents",
       "unique": true,
@@ -27157,6 +27181,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_parent_position",
+      "ops": [],
       "source": "unique constraint",
       "table": "title_contents",
       "unique": true,
@@ -27169,6 +27194,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_references_title_id",
+      "ops": [],
       "source": "models",
       "table": "title_references",
       "unique": false,
@@ -27181,6 +27207,7 @@
       "expression": null,
       "method": "btree",
       "name": "title_references_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "title_references",
       "unique": true,
@@ -27193,6 +27220,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_tags_tag_id",
+      "ops": [],
       "source": "models",
       "table": "title_tags",
       "unique": false,
@@ -27205,6 +27233,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_tags_title_id",
+      "ops": [],
       "source": "models",
       "table": "title_tags",
       "unique": false,
@@ -27218,6 +27247,7 @@
       "expression": null,
       "method": "btree",
       "name": "title_tags_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "title_tags",
       "unique": true,
@@ -27230,6 +27260,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_types_code",
+      "ops": [],
       "source": "models",
       "table": "title_types",
       "unique": true,
@@ -27242,6 +27273,7 @@
       "expression": null,
       "method": "btree",
       "name": "title_types_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "title_types",
       "unique": true,
@@ -27255,6 +27287,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_titles_library_root_id",
+      "ops": [],
       "source": "models",
       "table": "titles",
       "unique": false,
@@ -27267,6 +27300,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_titles_name",
+      "ops": [],
       "source": "models",
       "table": "titles",
       "unique": false,
@@ -27279,6 +27313,9 @@
       "expression": null,
       "method": "gin",
       "name": "ix_titles_name_trgm",
+      "ops": [
+        "gin_trgm_ops"
+      ],
       "source": "models",
       "table": "titles",
       "unique": false,
@@ -27291,6 +27328,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_titles_title_type_id",
+      "ops": [],
       "source": "models",
       "table": "titles",
       "unique": false,
@@ -27303,6 +27341,7 @@
       "expression": null,
       "method": "btree",
       "name": "titles_pkey",
+      "ops": [],
       "source": "primary key",
       "table": "titles",
       "unique": true,
@@ -27318,6 +27357,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_artwork_entity_kind_primary",
+      "ops": [],
       "source": "migration 5249e7cf3eff",
       "table": "artwork",
       "unique": false,
@@ -27332,6 +27372,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_artwork_entity_storage_path",
+      "ops": [],
       "source": "migration 5249e7cf3eff",
       "table": "artwork",
       "unique": true,
@@ -27346,6 +27387,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_artwork_one_primary_per_kind",
+      "ops": [],
       "source": "migration 5249e7cf3eff",
       "table": "artwork",
       "unique": true,
@@ -27358,6 +27400,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_artwork_kinds_code",
+      "ops": [],
       "source": "migration 5249e7cf3eff",
       "table": "artwork_kinds",
       "unique": true,
@@ -27370,6 +27413,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_asset_tags_asset_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "asset_tags",
       "unique": false,
@@ -27382,6 +27426,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_asset_tags_tag_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "asset_tags",
       "unique": false,
@@ -27394,6 +27439,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_assets_created_at",
+      "ops": [],
       "source": "migration 03fe7ef15b37",
       "table": "assets",
       "unique": false,
@@ -27404,6 +27450,7 @@
       "expression": "[sa.literal_column(_EXTENSION_EXPR).label('filename_ext')]",
       "method": "btree",
       "name": "ix_assets_filename_ext",
+      "ops": [],
       "source": "migration a1c7f4d2e9b3",
       "table": "assets",
       "unique": false,
@@ -27414,6 +27461,9 @@
       "expression": "[sa.literal_column('lower(path)').label('path_lower')]",
       "method": "btree",
       "name": "ix_assets_path_lower",
+      "ops": [
+        "text_pattern_ops"
+      ],
       "source": "migration 9680d1aecf1e",
       "table": "assets",
       "unique": false,
@@ -27426,6 +27476,9 @@
       "expression": null,
       "method": "gin",
       "name": "ix_assets_path_trgm",
+      "ops": [
+        "gin_trgm_ops"
+      ],
       "source": "migration a1c7f4d2e9b3",
       "table": "assets",
       "unique": false,
@@ -27439,6 +27492,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_external_identifiers_entity",
+      "ops": [],
       "source": "migration ee9eb74e4b4b",
       "table": "external_identifiers",
       "unique": false,
@@ -27451,6 +27505,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_id_schemes_code",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "id_schemes",
       "unique": true,
@@ -27464,6 +27519,7 @@
       "expression": null,
       "method": "btree",
       "name": "uniq_pending_transform_per_video_and_type",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "media_transform_requests",
       "unique": true,
@@ -27476,6 +27532,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_metadata_asset_id",
+      "ops": [],
       "source": "migration 598c6446db99",
       "table": "metadata",
       "unique": false,
@@ -27488,6 +27545,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_streams_asset_id",
+      "ops": [],
       "source": "migration 598c6446db99",
       "table": "streams",
       "unique": false,
@@ -27500,6 +27558,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_tags_name",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "tags",
       "unique": true,
@@ -27510,6 +27569,7 @@
       "expression": "[sa.literal_column('lower(name)')]",
       "method": "btree",
       "name": "ix_tags_name_lower",
+      "ops": [],
       "source": "migration ee9eb74e4b4b",
       "table": "tags",
       "unique": false,
@@ -27522,6 +27582,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_tags_parent_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "tags",
       "unique": false,
@@ -27534,6 +27595,7 @@
       "expression": null,
       "method": "btree",
       "name": "<computed>",
+      "ops": [],
       "source": "migration 7c4a1e9d2b83",
       "table": "title_contents",
       "unique": true,
@@ -27547,6 +27609,7 @@
       "expression": null,
       "method": "btree",
       "name": "<computed>",
+      "ops": [],
       "source": "migration 9a3c5d17be24",
       "table": "title_contents",
       "unique": false,
@@ -27560,6 +27623,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_parent_asset_once",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "title_contents",
       "unique": true,
@@ -27573,6 +27637,7 @@
       "expression": null,
       "method": "btree",
       "name": "uq_parent_child_title_once",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "title_contents",
       "unique": true,
@@ -27585,6 +27650,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_references_title_id",
+      "ops": [],
       "source": "migration 598c6446db99",
       "table": "title_references",
       "unique": false,
@@ -27597,6 +27663,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_tags_tag_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "title_tags",
       "unique": false,
@@ -27609,6 +27676,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_tags_title_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "title_tags",
       "unique": false,
@@ -27621,6 +27689,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_title_types_code",
+      "ops": [],
       "source": "migration 9bdf7126f299",
       "table": "title_types",
       "unique": true,
@@ -27634,6 +27703,7 @@
       "expression": null,
       "method": "btree",
       "name": "<computed>",
+      "ops": [],
       "source": "migration 4f8b21c7ae60",
       "table": "titles",
       "unique": false,
@@ -27646,6 +27716,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_titles_name",
+      "ops": [],
       "source": "migration a1c7f4d2e9b3",
       "table": "titles",
       "unique": false,
@@ -27658,6 +27729,9 @@
       "expression": null,
       "method": "gin",
       "name": "ix_titles_name_trgm",
+      "ops": [
+        "gin_trgm_ops"
+      ],
       "source": "migration a1c7f4d2e9b3",
       "table": "titles",
       "unique": false,
@@ -27670,6 +27744,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_titles_title_type_id",
+      "ops": [],
       "source": "migration 9bdf7126f299",
       "table": "titles",
       "unique": false,
@@ -27682,6 +27757,7 @@
       "expression": null,
       "method": "btree",
       "name": "ix_videos_master_asset_id",
+      "ops": [],
       "source": "migration 31d43b7e01c0",
       "table": "videos",
       "unique": false,
