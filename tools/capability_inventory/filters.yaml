@@ -46,7 +46,13 @@ declarations:
       and the nested artwork probes exercise the same repository. Nothing else is
       pinned on this route -- `entity_type` and `entity_id` are optional here -- so
       unlike the nested reads there is no leading column to make
-      `ix_artwork_entity_kind_primary` apply, and the filter is genuinely uncovered.
+      `ix_artwork_entity_kind_primary` apply. Covered since #182 by
+      `ix_artwork_kind_id`, which exists for this route specifically. Its second
+      column is `id` rather than nothing: the route is keyset-paginated, and against
+      a bare `(artwork_kind_id)` index the planner prefers walking `artwork_pkey` in
+      id order and filtering, at 1,214 rows, at 100,014 rows, and with
+      `enable_seqscan = off`. The pair matches the cursor tuple so the index supplies
+      the ordering too -- 6.947ms against 0.019ms on `?kind=poster` at 100k rows.
 
   - endpoint: "GET /api/titles/{title_id}/artwork"
     param: kind

@@ -215,6 +215,32 @@ class ArtworkORM(Base):
             "artwork_kind_id",
             "is_primary",
         ),
+        # `GET /api/artwork?kind=` with no entity pinned (#182). The composite above
+        # cannot serve it: it leads with `entity_type, entity_id`, which that route
+        # leaves optional, so there is nothing to enter the index by.
+        #
+        # **The second column is `id`, and it is what makes this index get used at
+        # all.** The route is keyset-paginated, so the query is always
+        # `WHERE artwork_kind_id = K [AND id > cursor] ORDER BY id LIMIT n`. Against a
+        # bare `(artwork_kind_id)` index the planner correctly prefers walking
+        # `artwork_pkey` in id order and filtering, because that avoids a sort -- it
+        # made that choice at 1,214 rows, at 100,014 rows, and even with
+        # `enable_seqscan = off`. A single-column index here would have been dead
+        # weight. `(artwork_kind_id, id)` matches the cursor tuple, so the index
+        # supplies the ordering too, which is the shape #62 identified for the asset
+        # sort keys and the same reasoning applies here.
+        #
+        # Measured at 100,014 artwork rows in the production distribution
+        # (thumbnail 99,875 / cover_art 133 / poster 5), on `?kind=poster`:
+        # **6.947ms walking the primary key, 0.019ms with this index.** The gain is
+        # concentrated on the rare kinds, which is exactly where it is wanted: a page
+        # of posters is a page the grid asks for and the pkey walk has to cross the
+        # whole table to assemble.
+        Index(
+            "ix_artwork_kind_id",
+            "artwork_kind_id",
+            "id",
+        ),
         # At most one primary per (entity, kind). A partial unique index rather than a
         # constraint because only the `true` rows are constrained -- an entity may
         # hold any number of non-primary posters. Enforced here rather than in the
