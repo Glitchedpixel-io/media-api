@@ -45,6 +45,36 @@ def domain_error_detail(
     return [{"loc": [], "msg": message, "type": error_type}]
 
 
+def conflict_detail(message: str, code: str) -> list[dict[str, list[str] | str]]:
+    """Build a 409 ``detail`` body that names *which* conflict occurred.
+
+    Most 409s in this codebase carry a bare human-readable string, which is
+    enough when a route has one way to conflict. A move has several -- the edge
+    would close a containment cycle, the child already has a home, the
+    destination position is taken -- and a drag-and-drop interface has to
+    respond differently to each: "you cannot drop a season into its own
+    episode" is a refusal to explain, while a taken position is something to
+    retry at the next slot. Matching on the prose is not an interface.
+
+    Deliberately the same shape as :func:`domain_error_detail` rather than a
+    second one. A client already has to read ``detail[0]["type"]`` for
+    domain-level 422s, so reusing it means one parse for both, and ``type``
+    stays the field that carries the machine-readable half.
+
+    The existing flat-string 409s are left alone: changing them is a breaking
+    change to every current caller, and this route is new so it costs nothing
+    to be right from the start.
+
+    Args:
+        message: Human-readable description of the conflict.
+        code: Short machine-readable discriminator, e.g. ``containment_cycle``.
+
+    Returns:
+        A single-item list matching the domain-error detail shape.
+    """
+    return domain_error_detail(message, code)
+
+
 @overload
 def translate_repository_errors(func: Callable[P, R]) -> Callable[P, R]: ...
 @overload

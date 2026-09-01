@@ -839,6 +839,97 @@ class TestGetTitlesWithAsset:
         c_repo.get_titles_with_asset.assert_not_called()
 
 
+class TestMoveContentConflictCodes:
+    """The discriminators #178 asked for, on the branches an integration test cannot
+    reach. A position collision needs a concurrent writer or rows that predate the
+    service -- the repository renumbers the whole list, so its own arithmetic cannot
+    produce one -- which leaves the mapping itself to be asserted here."""
+
+    @staticmethod
+    def _svc(edge_parent: int = 1, edge_id: int = 7):
+        t_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
+        c_repo = create_autospec(TitleContentRepository, instance=True, spec_set=True)
+        m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
+        t_repo.exists.return_value = True
+        c_repo.intrinsic_parent_edge_id.return_value = None
+        c_repo.can_reach.return_value = False
+        c_repo.get.return_value = TitleContentReadFactory(
+            id=edge_id, parent_title_id=edge_parent, child_title_id=None
+        )
+        return TitleContentService(t_repo, c_repo, m_repo), c_repo
+
+    @pytest.mark.unit
+    def test_a_position_collision_is_a_409_carrying_position_conflict(self) -> None:
+        svc, c_repo = self._svc()
+        c_repo.reorder.side_effect = UniqueViolation("uq_parent_position")
+
+        with pytest.raises(HTTPException) as exc_info:
+            svc.move_content(2, 7)
+
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.detail[0]["type"] == "position_conflict"
+
+    @pytest.mark.unit
+    def test_a_cycle_is_a_409_carrying_containment_cycle(self) -> None:
+        svc, c_repo = self._svc()
+        c_repo.get.return_value = TitleContentReadFactory(
+            id=7, parent_title_id=1, child_title_id=9, kind=ContentKind.title
+        )
+        c_repo.can_reach.return_value = True
+
+        with pytest.raises(HTTPException) as exc_info:
+            svc.move_content(2, 7)
+
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.detail[0]["type"] == "containment_cycle"
+        # The guard's own explanation is preserved, not replaced by the code.
+        assert "cycle" in exc_info.value.detail[0]["msg"]
+        c_repo.reorder.assert_not_called()
+
+    @pytest.mark.unit
+    def test_the_two_codes_differ(self) -> None:
+        """The whole point of the bullet: one 409 status, two responses a UI must
+        treat differently."""
+        cycle_svc, cycle_repo = self._svc()
+        cycle_repo.get.return_value = TitleContentReadFactory(
+            id=7, parent_title_id=1, child_title_id=9, kind=ContentKind.title
+        )
+        cycle_repo.can_reach.return_value = True
+        position_svc, position_repo = self._svc()
+        position_repo.reorder.side_effect = UniqueViolation("uq_parent_position")
+
+        with pytest.raises(HTTPException) as cycle:
+            cycle_svc.move_content(2, 7)
+        with pytest.raises(HTTPException) as position:
+            position_svc.move_content(2, 7)
+
+        assert cycle.value.status_code == position.value.status_code == 409
+        assert cycle.value.detail[0]["type"] != position.value.detail[0]["type"]
+
+    @pytest.mark.unit
+    def test_an_unknown_edge_is_404_before_any_write(self) -> None:
+        svc, c_repo = self._svc()
+        c_repo.get.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            svc.move_content(2, 7)
+
+        assert exc_info.value.status_code == 404
+        c_repo.reorder.assert_not_called()
+
+    @pytest.mark.unit
+    def test_an_unknown_destination_is_404_before_the_edge_is_read(self) -> None:
+        svc, c_repo = self._svc()
+        svc.title_repository.exists.return_value = False
+
+        with pytest.raises(HTTPException) as exc_info:
+            svc.move_content(999, 7)
+
+        assert exc_info.value.status_code == 404
+        assert "Title not found" in exc_info.value.detail
+        c_repo.reorder.assert_not_called()
+
+
 class TestUnlinkContent:
     """Tests for TitleContentService.unlink_content."""
 
