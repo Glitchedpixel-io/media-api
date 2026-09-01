@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .models import CollectionStats, ColumnStats, DataShape, Unknown
+from .models import CollectionStats, ColumnStats, CoverageMetric, DataShape, Unknown
 
 ENV_VAR = "CAPINV_DATABASE_URL"
 
@@ -420,6 +420,152 @@ def _model_relationships() -> list[tuple[str, str, str]]:
     return sorted(set(out))
 
 
+def _resolving_display_image(session: ReadOnlySession, present: set[str]) -> int | None:
+    """How many library roots the API would resolve a display image for.
+
+    Compiles ``titles_resolving_artwork`` -- the selectable the
+    ``resolves_display_image`` filter is built on -- and counts library roots
+    inside it. The kinds come from ``DISPLAY_IMAGE_KINDS``, the same constant the
+    service resolves them from, so the harness cannot disagree with the API about
+    what a display image is.
+
+    Returns:
+        The count, or None when the application's query layer cannot be imported
+        or the artwork tables are absent. None is reported as a gap; a guess
+        would be reported as a fact.
+    """
+    if not {"artwork", "title_contents", "artwork_kinds"} <= present:
+        return None
+    try:
+        # Deferred: importing the query layer pulls in the models, and Phase 3
+        # must be able to run against a database whose application it cannot
+        # import -- an older deployment, say. A failure here is a gap, not a crash.
+        from sqlalchemy.dialects import postgresql  # noqa: PLC0415
+
+        from app.repositories.artwork_repository import (  # noqa: PLC0415
+            titles_resolving_artwork,
+        )
+        from app.services.title_service import DISPLAY_IMAGE_KINDS  # noqa: PLC0415
+    except Exception:
+        return None
+
+    codes = ", ".join(f"'{code}'" for code in DISPLAY_IMAGE_KINDS)
+    kind_rows = session.fetch(f"SELECT id FROM artwork_kinds WHERE code IN ({codes})")
+    kind_ids = [int(row[0]) for row in kind_rows]
+    if not kind_ids:
+        return None
+
+    try:
+        compiled = titles_resolving_artwork(kind_ids).compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    except Exception:
+        return None
+
+    value = session.scalar(
+        "SELECT count(*) FROM titles t WHERE t.library_root IS TRUE " f"AND t.id IN ({compiled})"
+    )
+    return int(value or 0)
+
+
+def _library_root_coverage(
+    session: ReadOnlySession, present: set[str]
+) -> tuple[CoverageMetric, ...]:
+    """The three figures the browse grid's design actually turns on.
+
+    ``library_root=true`` Titles are the whole population of the library
+    surface, and the design brief makes three of its views out of what they are
+    missing: roots with no artwork, roots with no year, roots with no tags.
+    Those are first-class views rather than advanced filters, so the figures
+    belong in the report as measurements rather than as arithmetic a reader
+    performs over the Tables appendix.
+
+    The artwork figure is the decisive one and is not a fill rate on any column.
+    A Title resolves a display image from its own artwork or, failing that, by a
+    bounded walk through containment -- and only for the kinds the service counts
+    as a display image.
+
+    It is measured by compiling the application's *own* selectable,
+    ``titles_resolving_artwork``, rather than by writing SQL that means roughly
+    the same thing. An approximation here would be worse than no number: counting
+    any artwork kind at one hop returns a materially higher figure than the grid
+    actually renders, and the whole point of the metric is to say how much of the
+    grid is not a poster wall. Reusing the query the filter itself uses means the
+    two agree by construction and cannot drift apart.
+
+    Args:
+        session: The read-only session.
+        present: Tables that exist in the probed database.
+
+    Returns:
+        One metric per figure, or an empty tuple when the tables are absent.
+    """
+    if "titles" not in present:
+        return ()
+
+    total_row = session.scalar("SELECT count(*) FROM titles WHERE library_root IS TRUE")
+    total = int(total_row or 0)
+    if not total:
+        return ()
+
+    metrics: list[CoverageMetric] = []
+
+    resolves = _resolving_display_image(session, present)
+    if resolves is not None:
+        metrics.append(
+            CoverageMetric(
+                population="Titles with library_root=true",
+                attribute="resolve a display image (the API's own resolution)",
+                covered=resolves,
+                total=total,
+                note=(
+                    "the browse grid's central design constraint: every root that does "
+                    "not resolve one needs the typographic treatment, so this is the "
+                    "proportion of the grid that is *not* a poster wall. Measured with "
+                    "the API's own resolution query, so it matches what "
+                    "`resolves_display_image=true` returns rather than approximating it"
+                ),
+            )
+        )
+
+    metrics.append(
+        CoverageMetric(
+            population="Titles with library_root=true",
+            attribute="have a release_year",
+            covered=int(
+                session.scalar(
+                    "SELECT count(*) FROM titles "
+                    "WHERE library_root IS TRUE AND release_year IS NOT NULL"
+                )
+                or 0
+            ),
+            total=total,
+            note="drives the 'titles with no year' view, and any sort or facet by year",
+        )
+    )
+
+    if "title_tags" in present:
+        metrics.append(
+            CoverageMetric(
+                population="Titles with library_root=true",
+                attribute="have at least one tag",
+                covered=int(
+                    session.scalar(
+                        "SELECT count(*) FROM titles t WHERE t.library_root IS TRUE "
+                        "AND EXISTS (SELECT 1 FROM title_tags tt WHERE tt.title_id = t.id)"
+                    )
+                    or 0
+                ),
+                total=total,
+                note=(
+                    "decides whether tag filter chips are a primary navigation device or "
+                    "a sparse one"
+                ),
+            )
+        )
+    return tuple(metrics)
+
+
 def collect(
     tables: set[str],
     noload_columns: set[tuple[str, str]],
@@ -487,6 +633,8 @@ def collect(
                     )
                 columns.append(stat)
 
+        coverage = _library_root_coverage(session, present)
+
         relationships = [
             (parent, child, fk)
             for parent, child, fk in _model_relationships()
@@ -504,6 +652,7 @@ def collect(
             captured_from=fingerprint(dsn),
             unknowns=tuple(unknowns),
             baseline_rtt_ms=rtt,
+            coverage=coverage,
         )
     finally:
         session.close()

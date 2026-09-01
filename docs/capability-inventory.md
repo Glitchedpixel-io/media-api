@@ -9,130 +9,146 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 ## Run
 
 - **Source:** media-api @ app.openapi()
-- **App version:** 5.0.1.dev0+g21cecdc6a.d20260831
-- **Phases run:** 1 (static surface), 2 (code annotation), 3 (data shape), 4 (timed probes), 5 (dead surface)
+- **App version:** 5.0.4.dev1+g4a7ea39e6
+- **Phases run:** 1 (static surface), 2 (code annotation), 3 (data shape), 4 (timed probes), 5 (dead surface), 6 (write semantics)
 - **Phases skipped:** none
 - **Endpoints:** 106
 - **Database:** read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)
 - **Server:** PostgreSQL 17.9 (Debian 17.9-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
 - **Baseline database round trip:** 25ms median for `SELECT 1`. This is the unit cost of a query issued once per row, and it is a property of where the harness ran relative to the database rather than of the API. An API co-located with its database would see a far smaller number for the same defect — so read a per-row cost below as evidence of *how many* queries an endpoint issues, and treat the absolute milliseconds as specific to this measurement setup.
 - Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.
-- Probed `http://127.0.0.1:8137` with 69 probe(s).
+- Probed `http://127.0.0.1:8137` with 70 probe(s).
+- Phase 6 probed `http://127.0.0.1:8077` against a disposable database (fingerprint `644092952611`), verified bound to it by sentinel before any write. 11 of 12 write scenarios executed; 1 idempotent, 5 guarded, 0 duplicating.
+- No scratch media root was configured, so filesystem-touching write probes were skipped rather than run against a real one.
 
 ## Summary
 
 | Endpoint | Auth | Paging | Measured p95 | Verdict | One-line judgement |
 |---|---|---|---|---|---|
-| `GET /api/artwork` | bearer | keyset | 114ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
-| `DELETE /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/artwork/{artwork_id}` | bearer | **none** | 102ms | safe | p95 102ms, index-covered |
-| `PATCH /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/artwork_kinds` | bearer | **none** | 105ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly |
-| `GET /api/assets/` | bearer | keyset | 312ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
-| `POST /api/assets/` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 104ms | caution | the lookup is not index-covered and measures p95 104ms, which will grow with the table |
-| `PATCH /api/assets/seen` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}` | bearer | **none** | 139ms | safe | p95 139ms, index-covered |
-| `PATCH /api/assets/{asset_id}` | bearer | — | UNKNOWN | caution | Touches the filesystem as well as the database, so it can fail after the database row already exists |
-| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | 130ms | safe | p95 130ms, index-covered |
-| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | 164ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/artwork` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | 148ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 148ms, so it is fine to render directly |
-| `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 102ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/ids` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 158ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/metadata` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | 161ms | safe | p95 161ms, index-covered |
-| `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | write | Single-row write with no loops |
+| `GET /api/artwork` | bearer | keyset | 110ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `DELETE /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/artwork/{artwork_id}` | bearer | **none** | 100ms | safe | p95 100ms, index-covered |
+| `PATCH /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/artwork_kinds` | bearer | **none** | 99ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 99ms, so it is fine to render directly |
+| `GET /api/assets/` | bearer | keyset | 314ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `POST /api/assets/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 105ms | caution | the lookup is not index-covered and measures p95 105ms, which will grow with the table |
+| `PATCH /api/assets/seen` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}` | bearer | **none** | 134ms | safe | p95 134ms, index-covered |
+| `PATCH /api/assets/{asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | 127ms | safe | p95 127ms, index-covered |
+| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
+| `POST /api/assets/{asset_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | 165ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 165ms, so it is fine to render directly |
+| `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 106ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly |
+| `POST /api/assets/{asset_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `PATCH /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 169ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly |
+| `POST /api/assets/{asset_id}/metadata` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | 173ms | safe | p95 173ms, index-covered |
+| `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `DELETE /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `GET /api/assets/{asset_id}/streams` | bearer | **none** | 162ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 150ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 150ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PUT /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/assets/{asset_id}/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 153ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 153ms, so it is fine to render directly |
-| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | 163ms | safe | the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly |
-| `POST /api/assets/{asset_id}/transform_requests` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/external-ids/resolve` | bearer | **none** | 88ms | safe | p95 88ms, index-covered |
+| `POST /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 154ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 154ms, so it is fine to render directly |
+| `POST /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `PUT /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/assets/{asset_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 175ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 175ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | 168ms | safe | the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly |
+| `POST /api/assets/{asset_id}/transform_requests` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/external-ids/resolve` | bearer | **none** | 104ms | safe | p95 104ms, index-covered |
 | `GET /api/fetch/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404) |
-| `GET /api/health` | **none** | **none** | 119ms | safe | p95 119ms, index-covered |
-| `GET /api/id_schemes` | bearer | **none** | 103ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 103ms, so it is fine to render directly |
-| `POST /api/id_schemes` | bearer | — | UNKNOWN | write | Single-row write with no loops |
+| `GET /api/health` | **none** | **none** | 126ms | safe | p95 126ms, index-covered |
+| `GET /api/id_schemes` | bearer | **none** | 97ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly |
+| `POST /api/id_schemes` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `GET /api/id_schemes/{scheme_id}` | bearer | **none** | 98ms | safe | p95 98ms, index-covered |
-| `PATCH /api/id_schemes/{scheme_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/inbox` | bearer | — | UNKNOWN | caution | Touches the filesystem as well as the database, so it can fail after the database row already exists |
-| `GET /api/inbox` | bearer | **none** | 8ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 8ms, so it is fine to render directly |
-| `POST /api/inbox` | bearer | — | UNKNOWN | caution | Touches the filesystem as well as the database, so it can fail after the database row already exists |
-| `POST /api/jobs` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/jobs/{job_key}/completed` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PUT /api/jobs/{job_key}/heartbeat` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `POST /api/log` | **none** | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/ping` | **none** | **none** | 7ms | safe | p95 7ms, index-covered |
-| `POST /api/run_summaries` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `POST /api/runner_state` | bearer | — | UNKNOWN | write | Single-row write with no loops |
+| `PATCH /api/id_schemes/{scheme_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `DELETE /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
+| `GET /api/inbox` | bearer | **none** | 9ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 9ms, so it is fine to render directly |
+| `POST /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
+| `POST /api/jobs` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `PATCH /api/jobs/{job_key}/completed` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `PUT /api/jobs/{job_key}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `POST /api/log` | **none** | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
+| `GET /api/ping` | **none** | **none** | 2ms | safe | p95 2ms, index-covered |
+| `POST /api/run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `POST /api/runner_state` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/runner_state/{runner_key}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
-| `PATCH /api/runner_state/{runner_key}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `POST /api/scanner_run_summaries` | bearer | — | UNKNOWN | write | Single-row write with no loops |
+| `PATCH /api/runner_state/{runner_key}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `POST /api/scanner_run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/search/transcripts` | bearer | offset | UNKNOWN | UNKNOWN | offset paging over Elasticsearch has a hard result-window ceiling, but where it falls on this index was not measured; see Gaps |
-| `GET /api/streams` | bearer | keyset | 191ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/streams` | bearer | keyset | 123ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `GET /api/streams/{stream_id}` | bearer | **none** | 96ms | safe | p95 96ms, index-covered |
-| `PATCH /api/streams/{stream_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/tags` | bearer | keyset | 104ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
-| `POST /api/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
+| `PATCH /api/streams/{stream_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/tags` | bearer | keyset | 106ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `POST /api/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `GET /api/tags/{tag_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
-| `PATCH /api/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PUT /api/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/tags/{tag_id}/tags` | bearer | keyset | 128ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
-| `POST /api/tags/{tag_id}/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/title_types` | bearer | **none** | 96ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly |
-| `POST /api/title_types` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/title_types/{title_type_id}` | bearer | **none** | 91ms | safe | p95 91ms, index-covered |
-| `PATCH /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/` | bearer | keyset | 140ms | safe | cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 140ms |
-| `POST /api/titles/` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 106ms | caution | the lookup is not index-covered and measures p95 106ms, which will grow with the table |
-| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 204ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 204ms, so it is fine to render directly |
-| `POST /api/titles/{parent_title_id}/contents` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `POST /api/titles/{parent_title_id}/contents/positioned` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}` | bearer | **none** | 239ms | caution | p95 239ms — fine for a detail view, too slow to fire on every keystroke |
-| `PATCH /api/titles/{title_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PUT /api/titles/{title_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}/artwork` | bearer | **none** | 169ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly |
-| `POST /api/titles/{title_id}/artwork` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}/ids` | bearer | **none** | 96ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly |
-| `POST /api/titles/{title_id}/ids` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}/parents` | bearer | **none** | 158ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly |
+| `PATCH /api/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `PUT /api/tags/{tag_id}` | bearer | — | UNKNOWN | not safe | Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest;… |
+| `GET /api/tags/{tag_id}/tags` | bearer | keyset | 144ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `POST /api/tags/{tag_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/title_types` | bearer | **none** | 97ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly |
+| `POST /api/title_types` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/title_types/{title_type_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
+| `PATCH /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/titles/` | bearer | keyset | 151ms | safe | cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 151ms |
+| `POST /api/titles/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 104ms | caution | the lookup is not index-covered and measures p95 104ms, which will grow with the table |
+| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 201ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly |
+| `POST /api/titles/{parent_title_id}/contents` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
+| `POST /api/titles/{parent_title_id}/contents/positioned` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/titles/{title_id}` | bearer | **none** | 236ms | caution | p95 236ms — fine for a detail view, too slow to fire on every keystroke |
+| `PATCH /api/titles/{title_id}` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
+| `PUT /api/titles/{title_id}` | bearer | — | UNKNOWN | not safe | Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest |
+| `GET /api/titles/{title_id}/artwork` | bearer | **none** | 151ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 151ms, so it is fine to render directly |
+| `POST /api/titles/{title_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/titles/{title_id}/ids` | bearer | **none** | 102ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly |
+| `POST /api/titles/{title_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
+| `DELETE /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `PATCH /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/titles/{title_id}/parents` | bearer | **none** | 164ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly |
 | `GET /api/titles/{title_id}/references` | bearer | **none** | 133ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 133ms, so it is fine to render directly |
-| `POST /api/titles/{title_id}/references` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/titles/{title_id}/references/{reference_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/titles/{title_id}/tags` | bearer | **none** | 136ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 136ms, so it is fine to render directly |
-| `POST /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PUT /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `DELETE /api/titles/{title_id}/tags/{tag_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/transform_requests` | bearer | keyset | 196ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
-| `POST /api/transform_requests/claim` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/transform_requests/{request_id}` | bearer | **none** | 104ms | safe | p95 104ms, index-covered |
-| `PATCH /api/transform_requests/{request_id}` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `PATCH /api/transform_requests/{request_id}/heartbeat` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `POST /api/transform_requests/{request_id}/link` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
-| `PATCH /api/transform_requests/{request_id}/retry` | bearer | — | UNKNOWN | write | Single-row write with no loops |
-| `GET /api/version` | **none** | **none** | 10ms | safe | p95 10ms, index-covered |
+| `POST /api/titles/{title_id}/references` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `PATCH /api/titles/{title_id}/references/{reference_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `GET /api/titles/{title_id}/tags` | bearer | **none** | 125ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 125ms, so it is fine to render directly |
+| `POST /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
+| `PUT /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `DELETE /api/titles/{title_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/transform_requests` | bearer | keyset | 198ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `POST /api/transform_requests/claim` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `GET /api/transform_requests/{request_id}` | bearer | **none** | 106ms | safe | p95 106ms, index-covered |
+| `PATCH /api/transform_requests/{request_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
+| `PATCH /api/transform_requests/{request_id}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
+| `POST /api/transform_requests/{request_id}/link` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | 107ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 107ms, so it is fine to render directly |
+| `PATCH /api/transform_requests/{request_id}/retry` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `GET /api/version` | **none** | **none** | 9ms | safe | p95 9ms, index-covered |
+
+## Coverage
+
+Measured over the rows a surface actually renders, not over whole tables. The library grid shows `library_root=true` Titles and makes first-class views out of what they are missing, so these are the figures its design depends on.
+
+| Population | Attribute | Covered | Of | Share |
+|---|---|---|---|---|
+| Titles with library_root=true | resolve a display image (the API's own resolution) | 955 | 1,136 | **84%** |
+| Titles with library_root=true | have a release_year | 878 | 1,136 | **77%** |
+| Titles with library_root=true | have at least one tag | 850 | 1,136 | **75%** |
+
+- **resolve a display image (the API's own resolution)** — the browse grid's central design constraint: every root that does not resolve one needs the typographic treatment, so this is the proportion of the grid that is *not* a poster wall. Measured with the API's own resolution query, so it matches what `resolves_display_image=true` returns rather than approximating it.
+- **have a release_year** — drives the 'titles with no year' view, and any sort or facet by year.
+- **have at least one tag** — decides whether tag filter chips are a primary navigation device or a sparse one.
 
 ## Endpoints
 
-48 endpoints have a section below. The remaining 58 are uniform single-row writes, collapsed into [Write endpoints](#write-endpoints).
+All 106 endpoints have a section below, including each of the 61 that write. Writes used to be collapsed into one table on the grounds that a single-row write has nothing endpoint-specific to get wrong. That was true of their query shape and false of their contract: what a form gets wrong is whether a partial submit erases fields, whether a retry duplicates, and whether a failure is legible — and those differ per route. Each now carries a [Write contract](#post-apititles) block saying so.
 
 ### GET /api/artwork
 
@@ -182,20 +198,97 @@ Own probe responses carried 50 item(s); the largest was 17.0KB (`artwork-deep-pa
 
 #### Measured
 
-- `artwork-deep-page` (`/api/artwork?after=>i:1000&limit=50`): p50 102ms · p95 114ms · 17.0KB · 50 items · n=7 — page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork
+- `artwork-deep-page` (`/api/artwork?after=>i:1000&limit=50`): p50 102ms · p95 110ms · 17.0KB · 50 items · n=7 — page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork
   - deep page reached by following 20 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
-- `artwork-page-1` (`/api/artwork?limit=50`): p50 106ms · p95 108ms · 16.8KB · 50 items · n=7 — default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it
+- `artwork-page-1` (`/api/artwork?limit=50`): p50 100ms · p95 105ms · 16.8KB · 50 items · n=7 — default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,205 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`entity_id`, `is_primary`, `kind`); each forces a sequential scan, though `artwork` holds only 1,205 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,206 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`entity_id`, `is_primary`, `kind`); each forces a sequential scan, though `artwork` holds only 1,206 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+
+---
+
+### DELETE /api/artwork/{artwork_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Artwork |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.artwork.delete_artwork` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `artwork_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `artwork` in `SQLAlchemyArtworkRepository.delete` (app/repositories/artwork_repository.py:358)
+- `execute` on `artwork` in `SQLAlchemyArtworkRepository.delete` (app/repositories/artwork_repository.py:361)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+
+#### Data shape
+
+Reads [`artwork`](#table-artwork) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | the artwork row |
+| **Detaches** | nothing else |
+| **Children** | none |
+| **Reachable with references** | UNKNOWN |
+| **The button must say** | Delete artwork |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/artwork/{artwork_id}
 
-> **SAFE** — p95 102ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 100ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -227,7 +320,96 @@ Reads [`artwork`](#table-artwork) — see the [Tables](#tables) appendix for eac
 
 #### Measured
 
-- `artwork-one` (`/api/artwork/1`): p50 99ms · p95 102ms · 343B · n=7 — index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable
+- `artwork-one` (`/api/artwork/1`): p50 96ms · p95 100ms · 343B · n=7 — index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/artwork/{artwork_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Artwork |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.artwork.update_artwork` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `ArtworkRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `artwork_kind: str`, `storage_path: str`, `mime: str`, `width: int`, `height: int`, `is_primary?: bool`, `source_scheme_id?: int | None`, `source_external_id?: str | None`, `source_url?: str | None`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ArtworkPatchPublic | n/a | — |
+| `artwork_id` | path | int | n/a | — |
+| `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
+| `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
+| `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
+| `artwork.is_primary` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, artwork_kind_id, so the composite index applies from its leading column |
+
+#### Queries
+
+- `get` on `artwork` in `SQLAlchemyArtworkRepository.update` (app/repositories/artwork_repository.py:303)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.update` (app/repositories/artwork_repository.py:312)
+- `execute` on `artwork_kinds` in `SQLAlchemyArtworkKindRepository.get_by_code` (app/repositories/artwork_repository.py:166)
+- `get` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:333)
+- `flush` on unresolved table in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:350)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:354)
+- `execute` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:337)
+
+#### Data shape
+
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `artwork_kind` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=32` |
+| `is_primary` | `boolean` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `source_external_id` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `source_scheme_id` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `source_url` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -237,7 +419,7 @@ None identified by this run.
 
 ### GET /api/artwork_kinds
 
-> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 99ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -265,7 +447,7 @@ Own probe responses carried 8 item(s); the largest was 1.1KB (`artwork-kinds`).
 
 #### Measured
 
-- `artwork-kinds` (`/api/artwork_kinds`): p50 90ms · p95 105ms · 1.1KB · 8 items · n=7 — bounded by the seeded kinds, which is small and fixed at six
+- `artwork-kinds` (`/api/artwork_kinds`): p50 90ms · p95 99ms · 1.1KB · 8 items · n=7 — bounded by the seeded kinds, which is small and fixed at six
 
 #### Risk
 
@@ -334,29 +516,109 @@ Own probe responses carried 10 to 500 items; the largest was 206.4KB (`assets-ma
 
 #### Measured
 
-- `assets-page-1` (`/api/assets/?limit=50`): p50 149ms · p95 154ms · 19.7KB · 50 items · n=7 — default first page a browse screen would issue
-- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 184ms · p95 190ms · 19.7KB · 50 items · n=7 — same page with every optional relation eager-loaded
-- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 126ms · p95 136ms · 4.0KB · 10 items · n=7 — N+1 scaling, 10 rows
-- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 166ms · p95 189ms · 81.7KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
-- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 238ms · p95 312ms · 206.4KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
-- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 242ms · p95 257ms · 206.4KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
-- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 239ms · p95 253ms · 205.0KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
-- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 148ms · p95 150ms · 19.7KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case
-- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 150ms · p95 172ms · 18.6KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
+- `assets-page-1` (`/api/assets/?limit=50`): p50 141ms · p95 160ms · 19.7KB · 50 items · n=7 — default first page a browse screen would issue
+- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 175ms · p95 188ms · 19.7KB · 50 items · n=7 — same page with every optional relation eager-loaded
+- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 128ms · p95 141ms · 4.0KB · 10 items · n=7 — N+1 scaling, 10 rows
+- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 165ms · p95 178ms · 81.7KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
+- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 250ms · p95 260ms · 206.4KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
+- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 221ms · p95 228ms · 206.4KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
+- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 223ms · p95 314ms · 205.0KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
+- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 139ms · p95 163ms · 19.7KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case
+- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 139ms · p95 172ms · 18.6KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
   - deep page reached by following 40 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
 
 #### Risk
 
-- unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,343 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,343 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
-- measured p95 of 312ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke
+- unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,344 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,344 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- measured p95 of 314ms on `assets-indexed-sort-no-n1` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`
+
+---
+
+### POST /api/assets/
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Asset |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.core.create_asset` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `AssetRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `path: str`, `filename: str`, `duration: float`, `bitrate: int`, `container_format?: str | None`, `edition?: str | None`, `size: int`, `mtime?: str(date-time) | None`, `last_seen?: str(date-time) | None`, `master_asset_id?: int | None`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | AssetCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `assets` in `SQLAlchemyMediaRepository.create` (app/repositories/media_repository.py:33)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `assets` in `SQLAlchemyMediaRepository.create` (app/repositories/media_repository.py:35)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `bitrate` | `integer` | yes | rejected | — | — |
+| `container_format` | `string` | no | the declared default | — | — |
+| `duration` | `number` | yes | rejected | — | — |
+| `edition` | `string` | no | the declared default | — | — |
+| `filename` | `string` | yes | rejected | — | — |
+| `last_seen` | `string` | no | the declared default | — | `format=date-time` |
+| `mtime` | `string` | no | the declared default | — | `format=date-time` |
+| `path` | `string` | yes | rejected | — | — |
+| `size` | `integer` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/assets/by-scheme/{scheme_id}/{external_id}
 
-> **CAUTION** — the lookup is not index-covered and measures p95 104ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
+> **CAUTION** — the lookup is not index-covered and measures p95 105ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -390,7 +652,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `asset-by-scheme` (`/api/assets/by-scheme/2/capinv-probe-no-such-external-id`): p50 97ms · p95 104ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
+- `asset-by-scheme` (`/api/assets/by-scheme/2/capinv-probe-no-such-external-id`): p50 93ms · p95 105ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -398,9 +660,77 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 ---
 
+### PATCH /api/assets/seen
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Mark Assets Seen |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.core.mark_assets_seen` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | AssetSeenBatch | n/a | — |
+| `assets.id` | lookup | — | yes (`assets_pkey`) | served by assets_pkey |
+
+#### Queries
+
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `assets` in `SQLAlchemyMediaRepository.mark_assets_seen` (app/repositories/media_repository.py:189)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `ids` | `array[integer]` | yes | rejected | — | — |
+
+Every field of the body is required, so there is no partial-update hazard: a request either carries the whole object or is rejected with 422.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}
 
-> **SAFE** — p95 139ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 134ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -438,7 +768,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `asset-detail` (`/api/assets/1065`): p50 131ms · p95 139ms · 373B · n=7
+- `asset-detail` (`/api/assets/1065`): p50 126ms · p95 134ms · 373B · n=7
 
 #### Risk
 
@@ -448,7 +778,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 ### PATCH /api/assets/{asset_id}
 
-> **CAUTION** — Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust the response; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
 
 | | |
 |---|---|
@@ -488,6 +818,49 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `bitrate` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `container_format` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `duration` | `number` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `edition` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `filename` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `last_seen` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `format=date-time` |
+| `mtime` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `format=date-time` |
+| `path` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `size` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | no — Touches the database and the filesystem. The two are not in one transaction, so a failure in the second half leaves the row committed and the file untouched, and the response does not distinguish that from success. A UI must re-read after the write rather than trust the response. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Side effects**
+
+- *filesystem* — Path(media_root_str).resolve()
+- *filesystem* — os.path.exists()
+- *filesystem* — os.rename()
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
 #### Measured
 
 UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
@@ -500,7 +873,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/accessories
 
-> **SAFE** — p95 130ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 127ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -536,7 +909,7 @@ Own probe responses carried 0 item(s); the largest was 28B (`asset-accessories`)
 
 #### Measured
 
-- `asset-accessories` (`/api/assets/1065/accessories`): p50 120ms · p95 130ms · 28B · 0 items · n=7
+- `asset-accessories` (`/api/assets/1065/accessories`): p50 123ms · p95 127ms · 28B · 0 items · n=7
 
 #### Risk
 
@@ -546,7 +919,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/artwork
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -584,7 +957,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-artwork`).
 
 #### Measured
 
-- `asset-artwork` (`/api/assets/1065/artwork`): p50 150ms · p95 164ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
+- `asset-artwork` (`/api/assets/1065/artwork`): p50 154ms · p95 171ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
 
 #### Risk
 
@@ -592,9 +965,104 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-artwork`).
 
 ---
 
+### POST /api/assets/{asset_id}/artwork
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Upload Asset Artwork |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.artwork.upload_asset_artwork` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `ArtworkRead` |
+| **Declares** | `400` Bad Request - the file is empty, or is not a readable image, `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `413` Payload Too Large - the file exceeds the size or pixel cap, `415` Unsupported Media Type - the file is not a supported image, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `artwork_kind: str`, `storage_path: str`, `mime: str`, `width: int`, `height: int`, `is_primary?: bool`, `source_scheme_id?: int | None`, `source_external_id?: str | None`, `source_url?: str | None`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | Body_upload_asset_artwork | n/a | — |
+| `asset_id` | path | int | n/a | — |
+| `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
+| `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
+| `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
+| `artwork.is_primary` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, artwork_kind_id, so the composite index applies from its leading column |
+
+#### Queries
+
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+- `execute` on `artwork_kinds` in `SQLAlchemyArtworkKindRepository.get_by_code` (app/repositories/artwork_repository.py:166)
+- `add` on `artwork` in `SQLAlchemyArtworkRepository.create` (app/repositories/artwork_repository.py:218)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.create` (app/repositories/artwork_repository.py:220)
+- `get` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:333)
+- `flush` on unresolved table in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:350)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:354)
+- `execute` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:337)
+
+#### Data shape
+
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `artwork_kind` | `string` | yes | rejected | — | — |
+| `file` | `string` | yes | rejected | — | `format=binary` |
+| `is_primary` | `boolean` | no | the declared default | — | — |
+| `source_external_id` | `string` | no | the declared default | — | — |
+| `source_scheme_id` | `integer` | no | the declared default | — | — |
+| `source_url` | `string` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | silently ignored -- a misspelled field name is accepted and does nothing |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `400` | Bad Request - the file is empty, or is not a readable image | `{"detail": ...}` | yes |
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `413` | Payload Too Large - the file exceeds the size or pixel cap | `{"detail": ...}` | yes |
+| `415` | Unsupported Media Type - the file is not a supported image | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/derived_assets
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 148ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 165ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -631,7 +1099,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-derived-assets
 
 #### Measured
 
-- `asset-derived-assets` (`/api/assets/1065/derived_assets`): p50 146ms · p95 148ms · 2B · 0 items · n=7
+- `asset-derived-assets` (`/api/assets/1065/derived_assets`): p50 152ms · p95 165ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -639,9 +1107,83 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-derived-assets
 
 ---
 
+### PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Declare Derived Asset |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.relationships.declare_derived_asset` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `AssetRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `path: str`, `filename: str`, `duration: float`, `bitrate: int`, `container_format?: str | None`, `edition?: str | None`, `size: int`, `mtime?: str(date-time) | None`, `last_seen?: str(date-time) | None`, `master_asset_id?: int | None`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `asset_id` | path | int | n/a | — |
+| `child_asset_id` | path | int | n/a | — |
+| `assets.id` | lookup | — | yes (`assets_pkey`) | served by assets_pkey |
+
+#### Queries
+
+- `execute` on `assets` in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:169)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:180)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/ids
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -675,7 +1217,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`)
 
 #### Measured
 
-- `asset-external-ids` (`/api/assets/1065/ids`): p50 89ms · p95 102ms · 2B · 0 items · n=7
+- `asset-external-ids` (`/api/assets/1065/ids`): p50 90ms · p95 106ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -684,9 +1226,241 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`)
 
 ---
 
+### POST /api/assets/{asset_id}/ids
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Asset Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.external_ids.create_asset_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `ExternalIdentifierRead` |
+| **Declares** | `404` Asset not found, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `external_id: str`, `scheme_id: int`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ExternalIdentifierCreatePublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `add` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.create` (app/repositories/external_identifier_repository.py:119)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.create` (app/repositories/external_identifier_repository.py:121)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`external_identifiers`](#table-external_identifiers) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `external_id` | `string` | yes | rejected | — | — |
+| `scheme_id` | `integer` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Asset not found | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/assets/{asset_id}/ids/{record_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Asset Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.external_ids.delete_asset_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` External ID not found or doesn't belong to this asset, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `asset_id` | path | int | n/a | — |
+| `record_id` | path | int | n/a | — |
+| `external_identifiers.id` | lookup | — | yes (`external_identifiers_pkey`) | served by external_identifiers_pkey |
+
+#### Queries
+
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.get` (app/repositories/external_identifier_repository.py:74)
+- `execute` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.delete` (app/repositories/external_identifier_repository.py:143)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+
+#### Data shape
+
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | the external identifier record |
+| **Detaches** | nothing else |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Delete identifier |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | External ID not found or doesn't belong to this asset | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/assets/{asset_id}/ids/{record_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Asset Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.external_ids.update_asset_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `ExternalIdentifierRead` |
+| **Declares** | `404` External ID not found or doesn't belong to this asset, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `external_id: str`, `scheme_id: int`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ExternalIdentifierPatchPublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+| `record_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.get` (app/repositories/external_identifier_repository.py:74)
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.update` (app/repositories/external_identifier_repository.py:128)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.update` (app/repositories/external_identifier_repository.py:137)
+
+#### Data shape
+
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `external_id` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | External ID not found or doesn't belong to this asset | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/metadata
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -722,7 +1496,7 @@ Own probe responses carried 1 item(s); the largest was 2.9KB (`asset-metadata`).
 
 #### Measured
 
-- `asset-metadata` (`/api/assets/1065/metadata`): p50 151ms · p95 158ms · 2.9KB · 1 items · n=7
+- `asset-metadata` (`/api/assets/1065/metadata`): p50 156ms · p95 169ms · 2.9KB · 1 items · n=7
 
 #### Risk
 
@@ -730,9 +1504,165 @@ Own probe responses carried 1 item(s); the largest was 2.9KB (`asset-metadata`).
 
 ---
 
+### POST /api/assets/{asset_id}/metadata
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Asset Metadata |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.metadata.create_asset_metadata` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `MetadataRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `metadata_type: str`, `data: object`, `asset_id: int`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | MetadataCreatePublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+
+#### Queries
+
+- `add` on `metadata` in `SQLAlchemyMetadataRepository.create` (app/repositories/metadata_repository.py:31)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `metadata` in `SQLAlchemyMetadataRepository.create` (app/repositories/metadata_repository.py:33)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `data` | `object` | yes | rejected | — | — |
+| `metadata_type` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/assets/{asset_id}/metadata/{metadata_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Asset Metadata |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.metadata.delete_asset_metadata` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `asset_id` | path | int | n/a | — |
+| `metadata_id` | path | int | n/a | — |
+| `metadata.id` | lookup | — | yes (`metadata_pkey`) | served by metadata_pkey |
+
+#### Queries
+
+- `get` on `metadata` in `SQLAlchemyMetadataRepository.get` (app/repositories/metadata_repository.py:37)
+- `execute` on `metadata` in `SQLAlchemyMetadataRepository.delete` (app/repositories/metadata_repository.py:57)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | the metadata record |
+| **Detaches** | nothing else |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Delete metadata entry |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/metadata/{metadata_id}
 
-> **SAFE** — p95 161ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 173ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -766,7 +1696,163 @@ Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Ta
 
 #### Measured
 
-- `asset-metadata-one` (`/api/assets/1065/metadata/5617`): p50 153ms · p95 161ms · 2.9KB · n=7 — metadata_id is read from this asset's own metadata list
+- `asset-metadata-one` (`/api/assets/1065/metadata/5617`): p50 153ms · p95 173ms · 2.9KB · n=7 — metadata_id is read from this asset's own metadata list
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/assets/{asset_id}/metadata/{metadata_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Asset Metadata |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.metadata.update_asset_metadata` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `MetadataRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `metadata_type: str`, `data: object`, `asset_id: int`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | MetadataPatchPublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+| `metadata_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `metadata` in `SQLAlchemyMetadataRepository.get` (app/repositories/metadata_repository.py:37)
+- `get` on `metadata` in `SQLAlchemyMetadataRepository.update` (app/repositories/metadata_repository.py:41)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `metadata` in `SQLAlchemyMetadataRepository.update` (app/repositories/metadata_repository.py:52)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `data` | `object` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `metadata_type` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/assets/{asset_id}/streams
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Asset Streams |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.streams.delete_asset_streams` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `asset_id` | path | int | n/a | — |
+| `streams.asset_id` | lookup | — | yes (`ix_streams_asset_id`) | served by ix_streams_asset_id |
+
+#### Queries
+
+- `execute` on `streams` in `SQLAlchemyStreamRepository.delete_asset_streams` (app/repositories/stream_repository.py:78)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | every Stream of this Asset |
+| **Detaches** | nothing else |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Delete all streams (plural, and destructive) |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -813,7 +1899,7 @@ Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 #### Measured
 
-- `asset-streams` (`/api/assets/1065/streams`): p50 150ms · p95 162ms · 699B · 3 items · n=7
+- `asset-streams` (`/api/assets/1065/streams`): p50 144ms · p95 162ms · 699B · 3 items · n=7
 
 #### Risk
 
@@ -821,9 +1907,94 @@ Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 ---
 
+### POST /api/assets/{asset_id}/streams
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Asset Stream |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.streams.create_asset_stream` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `StreamRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `stream_index?: int | None`, `codec_type: str`, `codec_name?: str | None`, `language?: str | None`, `width?: int | None`, `height?: int | None`, `frame_rate?: float | None`, `channels?: int | None`, `sample_rate?: int | None`, `is_default?: bool | None`, `is_forced?: bool | None`, `title?: str | None`, `asset_id: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | StreamCreatePublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+
+#### Queries
+
+- `add` on `streams` in `SQLAlchemyStreamRepository.create` (app/repositories/stream_repository.py:24)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `streams` in `SQLAlchemyStreamRepository.create` (app/repositories/stream_repository.py:26)
+
+#### Data shape
+
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `channels` | `integer` | no | the declared default | — | — |
+| `codec_name` | `string` | no | the declared default | — | — |
+| `codec_type` | `string` | yes | rejected | — | — |
+| `frame_rate` | `number` | no | the declared default | — | — |
+| `height` | `integer` | no | the declared default | — | — |
+| `is_default` | `boolean` | no | the declared default | — | — |
+| `is_forced` | `boolean` | no | the declared default | — | — |
+| `language` | `string` | no | the declared default | — | — |
+| `sample_rate` | `integer` | no | the declared default | — | — |
+| `stream_index` | `integer` | no | the declared default | — | — |
+| `title` | `string` | no | the declared default | — | — |
+| `width` | `integer` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 150ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 154ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -859,7 +2030,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-tags`).
 
 #### Measured
 
-- `asset-tags` (`/api/assets/1065/tags`): p50 147ms · p95 150ms · 2B · 0 items · n=7
+- `asset-tags` (`/api/assets/1065/tags`): p50 148ms · p95 154ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -868,9 +2039,246 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-tags`).
 
 ---
 
+### POST /api/assets/{asset_id}/tags
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Tag Asset By Name |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.tags.tag_asset_by_name` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TaggingReport` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`added_tags: list[TagRead]`, `tagging_errors: list[str]`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagNameSet | n/a | — |
+| `asset_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+| `tags.name` | lookup | — | yes (`ix_tags_name`) | served by ix_tags_name |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository.get_or_create_by_names` (app/repositories/tag_repository.py:136)
+- `flush` on unresolved table in `SQLAlchemyTagRepository.get_or_create_by_names` (app/repositories/tag_repository.py:137)
+- `execute` on `tags` in `SQLAlchemyTagRepository.get_by_names` (app/repositories/tag_repository.py:92)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:249)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:234)
+- `execute` on unresolved table in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:245)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `auto_tag_create` | `boolean` | no | the declared default | — | — |
+| `tag_names` | `array[string]` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PUT /api/assets/{asset_id}/tags
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Tag Asset |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.tags.tag_asset` |
+| **Pagination** | none — returns the entire collection in one response; there is no page size to be stable across |
+| **Response 200** | `list[TagRead]`, rows are `TagRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | returns an unbounded list; the response grows with the number of related rows |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagSet | n/a | — |
+| `asset_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:249)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:234)
+- `execute` on unresolved table in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:245)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `tag_ids` | `array[integer]` | yes | rejected | — | — |
+
+Whole-collection replacement: `tag_ids` is required and replaces the existing set outright. Omission does not arise -- but sending an empty list is a well-formed request that removes everything, so a form must never submit `tag_ids` it did not populate from a prior read.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- no pagination, but the largest collection measured is only 46 rows (at most all 46 rows of `tags`), so the absent cap is currently latent
+
+---
+
+### DELETE /api/assets/{asset_id}/tags/{tag_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Untag Asset By Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.tags.untag_asset_by_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `no model declared` |
+| **Declares** | `404` Asset does not exist, `422` Validation Error |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `asset_id` | path | int | n/a | — |
+| `tag_id` | path | int | n/a | — |
+| `asset_tags.asset_id` | lookup | — | yes (`ix_asset_tags_asset_id`) | served by ix_asset_tags_asset_id |
+| `asset_tags.tag_id` | lookup | — | yes (`ix_asset_tags_tag_id`) | served by ix_asset_tags_tag_id |
+
+#### Queries
+
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `asset_tags` in `SQLAlchemyTagRepository.remove_asset_tag` (app/repositories/tag_repository.py:286)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+
+#### Data shape
+
+Reads [`asset_tags`](#table-asset_tags) · [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | nothing -- the Tag itself is untouched |
+| **Detaches** | the edge between this Asset and the Tag |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Remove tag from this Asset (never 'Delete tag') |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Asset does not exist | `{"detail": ...}` | yes |
+| `422` | Validation Error | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/assets/{asset_id}/titles
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 153ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 175ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -906,7 +2314,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-titles`).
 
 #### Measured
 
-- `asset-titles` (`/api/assets/1065/titles`): p50 140ms · p95 153ms · 2B · 0 items · n=7
+- `asset-titles` (`/api/assets/1065/titles`): p50 157ms · p95 175ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -917,7 +2325,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-titles`).
 
 ### GET /api/assets/{asset_id}/transform_requests
 
-> **SAFE** — the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 163ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -954,7 +2362,7 @@ Own probe responses carried 4 item(s); the largest was 1.7KB (`asset-transform-r
 
 #### Measured
 
-- `asset-transform-requests` (`/api/assets/1065/transform_requests`): p50 151ms · p95 163ms · 1.7KB · 4 items · n=7
+- `asset-transform-requests` (`/api/assets/1065/transform_requests`): p50 147ms · p95 168ms · 1.7KB · 4 items · n=7
 
 #### Risk
 
@@ -963,9 +2371,93 @@ Own probe responses carried 4 item(s); the largest was 1.7KB (`asset-transform-r
 
 ---
 
+### POST /api/assets/{asset_id}/transform_requests
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Asset Transform Request |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.assets.transform_requests.create_asset_transform_request` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TransformRequestRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `transform_type: str`, `parameters?: object | None`, `actioned?: bool`, `processed_at?: str(date-time) | None`, `worker_notes?: str | None`, `external_job_id?: str | None`, `duration?: float | None`, `outcome?: OutcomeEnum | None`, `worker?: str | None`, `on_success?: object | None`, `on_failure?: object | None`, `asset_id: int`, `parent_transform_request_id?: int | None`, `created_at: str(date-time)`, `first_heartbeat?: str(date-time) | None`, `last_heartbeat?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TransformRequestCreatePublic | n/a | — |
+| `asset_id` | path | int | n/a | — |
+
+#### Queries
+
+- `add` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:26)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:28)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `actioned` | `boolean` | no | the declared default | — | — |
+| `duration` | `number` | no | the declared default | — | — |
+| `external_job_id` | `string` | no | the declared default | — | — |
+| `on_failure` | `object` | no | the declared default | — | — |
+| `on_success` | `object` | no | the declared default | — | — |
+| `outcome` | `OutcomeEnum` | no | the declared default | — | — |
+| `parameters` | `object` | no | the declared default | — | — |
+| `processed_at` | `string` | no | the declared default | — | `format=date-time` |
+| `transform_type` | `string` | yes | rejected | — | `pattern=^[^\s.]+\.[^\s]+$` |
+| `worker` | `string` | no | the declared default | — | — |
+| `worker_notes` | `string` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/external-ids/resolve
 
-> **SAFE** — p95 88ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 104ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1000,7 +2492,7 @@ Reads [`external_identifiers`](#table-external_identifiers) · [`id_schemes`](#t
 
 #### Measured
 
-- `external-id-resolve` (`/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin`): p50 84ms · p95 88ms · 81B · n=7 — the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id
+- `external-id-resolve` (`/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin`): p50 91ms · p95 104ms · 81B · n=7 — the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id
 
 #### Risk
 
@@ -1063,7 +2555,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 ### GET /api/health
 
-> **SAFE** — p95 119ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 126ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1084,7 +2576,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `health` (`/api/health`): p50 112ms · p95 119ms · 236B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
+- `health` (`/api/health`): p50 113ms · p95 126ms · 226B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
 
 #### Risk
 
@@ -1094,7 +2586,7 @@ This endpoint reads no database tables.
 
 ### GET /api/id_schemes
 
-> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 103ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1121,11 +2613,85 @@ Own probe responses carried 3 item(s); the largest was 182B (`id-schemes-all`).
 
 #### Measured
 
-- `id-schemes-all` (`/api/id_schemes`): p50 93ms · p95 103ms · 182B · 3 items · n=7
+- `id-schemes-all` (`/api/id_schemes`): p50 85ms · p95 97ms · 182B · 3 items · n=7
 
 #### Risk
 
 - no pagination, but the largest collection measured is only 3 rows (measured directly from a probe response), so the absent cap is currently latent
+
+---
+
+### POST /api/id_schemes
+
+> **CAUTION** — Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures (409, 422) come back with nothing a user could be shown, so the form needs its own message for them.
+
+| | |
+|---|---|
+| **Purpose** | Create Id Scheme |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.id_schemes.create_id_scheme` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `IdSchemeRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `code: str`, `label: str`, `validator?: str | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | IdSchemeCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `id_schemes` in `SQLAlchemyIdSchemeRepository.create` (app/repositories/id_scheme_repository.py:19)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `id_schemes` in `SQLAlchemyIdSchemeRepository.create` (app/repositories/id_scheme_repository.py:21)
+
+#### Data shape
+
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `code` | `string` | yes | rejected | — | — |
+| `label` | `string` | yes | rejected | — | — |
+| `validator` | `string` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | guarded — probed -- the second identical request is refused with 409; a retry after a dropped connection must treat that conflict as success, not as a new error to show the user |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated."}` | **no** |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `422` | violates `id_schemes.code varchar(16)` | `{"detail": [{"loc": [], "msg": "Invalid enum value.", "type": "domain_error"}]}` | **no** |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
@@ -1163,7 +2729,83 @@ Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix f
 
 #### Measured
 
-- `id-scheme-one` (`/api/id_schemes/2`): p50 88ms · p95 98ms · 62B · n=7
+- `id-scheme-one` (`/api/id_schemes/2`): p50 93ms · p95 98ms · 62B · n=7
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/id_schemes/{scheme_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Scheme |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.id_schemes.update_scheme` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `IdSchemeRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `code: str`, `label: str`, `validator?: str | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | IdSchemePatchPublic | n/a | — |
+| `scheme_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `id_schemes` in `SQLAlchemyIdSchemeRepository.update` (app/repositories/id_scheme_repository.py:41)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `id_schemes` in `SQLAlchemyIdSchemeRepository.update` (app/repositories/id_scheme_repository.py:50)
+
+#### Data shape
+
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `code` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `label` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `validator` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -1173,7 +2815,7 @@ None identified by this run.
 
 ### DELETE /api/inbox
 
-> **CAUTION** — Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.
+> **CAUTION** — Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust the response; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
 
 | | |
 |---|---|
@@ -1196,6 +2838,48 @@ None identified by this run.
 
 This endpoint reads no database tables.
 
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | no — Touches the database and the filesystem. The two are not in one transaction, so a failure in the second half leaves the row committed and the file untouched, and the response does not distinguish that from success. A UI must re-read after the write rather than trust the response. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Side effects**
+
+- *filesystem* — (base / rel_norm).resolve()
+- *filesystem* — (self.trash_root / rel).resolve()
+- *filesystem* — src.exists()
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | a file on disk |
+| **Detaches** | nothing |
+| **Children** | none |
+| **Reachable with references** | UNKNOWN |
+| **The button must say** | Delete file from inbox (destroys bytes, not a row) |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
 #### Measured
 
 UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
@@ -1208,7 +2892,7 @@ None identified by this run.
 
 ### GET /api/inbox
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 8ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 9ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1239,7 +2923,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`inbox-full`).
 
 #### Measured
 
-- `inbox-full` (`/api/inbox`): p50 2ms · p95 8ms · 2B · 0 items · n=7 — the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling
+- `inbox-full` (`/api/inbox`): p50 2ms · p95 9ms · 2B · 0 items · n=7 — the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling
 - `inbox-top-level` (`/api/inbox?depth=1`): p50 2ms · p95 2ms · 2B · 0 items · n=7 — one level only, the cheapest useful request a client can make
 
 #### Risk
@@ -1250,7 +2934,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`inbox-full`).
 
 ### POST /api/inbox
 
-> **CAUTION** — Touches the filesystem as well as the database, so it can fail after the database row already exists. Not safe for optimistic UI — the interface must wait for the response before showing success, and must be able to represent a partially-applied result.
+> **CAUTION** — Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust the response; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
 
 | | |
 |---|---|
@@ -1286,6 +2970,43 @@ Own probe responses carried 0 item(s); the largest was 2B (`inbox-full`).
 
 Reads [`assets`](#table-assets) · [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `source` | `string` | yes | rejected | — | — |
+| `target` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | no — Touches the database and the filesystem. The two are not in one transaction, so a failure in the second half leaves the row committed and the file untouched, and the response does not distinguish that from success. A UI must re-read after the write rather than trust the response. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Side effects**
+
+- *filesystem* — (base / rel_norm).resolve()
+- *filesystem* — abs_asset_path.stat()
+- *filesystem* — dst.exists()
+- *filesystem* — src.exists()
+- *filesystem* — src.is_file()
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
 #### Measured
 
 UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
@@ -1296,9 +3017,268 @@ None identified by this run.
 
 ---
 
+### POST /api/jobs
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Job |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.jobs.create_job` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `JobRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`job_key: str`, `created_at: str(date-time)`, `heartbeat_at?: str(date-time) | None`, `completed_at?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `job_key` | query | str | n/a | — |
+
+#### Queries
+
+- `add` on `jobs` in `SQLAlchemyJobRepository.create` (app/repositories/job_repository.py:28)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `jobs` in `SQLAlchemyJobRepository.create` (app/repositories/job_repository.py:30)
+
+#### Data shape
+
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/jobs/{job_key}/completed
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Mark Completed |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.jobs.mark_completed` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `JobRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`job_key: str`, `created_at: str(date-time)`, `heartbeat_at?: str(date-time) | None`, `completed_at?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `job_key` | path | str | n/a | — |
+
+#### Queries
+
+- `get` on `jobs` in `SQLAlchemyJobRepository.mark_complete` (app/repositories/job_repository.py:97)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `jobs` in `SQLAlchemyJobRepository.mark_complete` (app/repositories/job_repository.py:104)
+
+#### Data shape
+
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PUT /api/jobs/{job_key}/heartbeat
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Mark Heartbeat |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.jobs.mark_heartbeat` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `JobRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`job_key: str`, `created_at: str(date-time)`, `heartbeat_at?: str(date-time) | None`, `completed_at?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `job_key` | path | str | n/a | — |
+
+#### Queries
+
+- `get` on `jobs` in `SQLAlchemyJobRepository.heartbeat` (app/repositories/job_repository.py:74)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `jobs` in `SQLAlchemyJobRepository.heartbeat` (app/repositories/job_repository.py:81)
+
+#### Data shape
+
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### POST /api/log
+
+> **CAUTION** — Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust the response; this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Client Traces |
+| **Auth** | none (unauthenticated) |
+| **Handler** | `app.routers.logs.client_traces` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `no model declared` |
+| **External calls** | `httpx.AsyncClient()` |
+| **Limits** | none declared |
+
+#### Data shape
+
+This endpoint reads no database tables.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | no — Commits a row and then calls an external system. A failure after the commit leaves the row referring to work that was never started. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | none (unauthenticated) |
+| **Audience** | worker fleet |
+
+**Side effects**
+
+- *enqueue* — external call: httpx.AsyncClient()
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- no authentication is required on this route
+
+---
+
 ### GET /api/ping
 
-> **SAFE** — p95 7ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 2ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1315,11 +3295,163 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `ping` (`/api/ping`): p50 4ms · p95 7ms · 15B · n=7
+- `ping` (`/api/ping`): p50 2ms · p95 2ms · 15B · n=7
 
 #### Risk
 
 - no authentication is required on this route
+
+---
+
+### POST /api/run_summaries
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Run Summary |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.run_summaries.create_run_summary` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `RunSummaryRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `worker_name: str`, `worker_type: str`, `transform_type: str`, `started_at: str(date-time)`, `processed_count: int`, `success_count: int`, `failed_count: int`, `running_time: int`, `extras?: object | None`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | RunSummaryCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `run_summaries` in `SQLAlchemyRunSummaryRepository.create` (app/repositories/run_summary_repository.py:19)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `run_summaries` in `SQLAlchemyRunSummaryRepository.create` (app/repositories/run_summary_repository.py:21)
+
+#### Data shape
+
+Reads [`run_summaries`](#table-run_summaries) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `extras` | `object` | no | the declared default | — | — |
+| `failed_count` | `integer` | yes | rejected | — | — |
+| `processed_count` | `integer` | yes | rejected | — | — |
+| `running_time` | `integer` | yes | rejected | — | — |
+| `started_at` | `string` | yes | rejected | — | `format=date-time` |
+| `success_count` | `integer` | yes | rejected | — | — |
+| `transform_type` | `string` | yes | rejected | — | `pattern=^[^\s.]+\.[^\s]+$` |
+| `worker_name` | `string` | yes | rejected | — | — |
+| `worker_type` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### POST /api/runner_state
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Runner State |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.runner_state.create_runner_state` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `RunnerStateRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`state?: object | None`, `runner_key: str`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | RunnerStateCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `runner_state` in `SQLAlchemyRunnerStateRepository.create` (app/repositories/runner_state_repository.py:23)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `runner_state` in `SQLAlchemyRunnerStateRepository.create` (app/repositories/runner_state_repository.py:25)
+
+#### Data shape
+
+Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `state` | `object` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
@@ -1358,6 +3490,169 @@ Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) append
 #### Measured
 
 UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/runner_state/{runner_key}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Partial Runner Update |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.runner_state.partial_runner_update` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `RunnerStateRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`state?: object | None`, `runner_key: str`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | RunnerStatePatchPublic | n/a | — |
+| `runner_key` | path | str | n/a | — |
+| `runner_state.runner_key` | lookup | — | yes (`runner_state_pkey`) | served by runner_state_pkey |
+
+#### Queries
+
+- `execute` on `runner_state` in `SQLAlchemyRunnerStateRepository.set_runner_state` (app/repositories/runner_state_repository.py:32)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyRunnerStateRepository.set_runner_state` (app/repositories/runner_state_repository.py:43)
+
+#### Data shape
+
+Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `state` | `object` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### POST /api/scanner_run_summaries
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Scanner Run Summary |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.scanner_run_summaries.create_scanner_run_summary` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `ScannerRunSummaryRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `worker_name: str`, `worker_type: str`, `scan_path?: str | None`, `relative_to_path?: str | None`, `started_at: str(date-time)`, `running_time: int`, `dry_run: bool`, `total_count?: int | None`, `processed_count: int`, `folder_count?: int | None`, `excluded_count?: int | None`, `previously_seen_count: int`, `error_count?: int | None`, `api_error_count?: int | None`, `no_metadata_count?: int | None`, `unsupported_file_count?: int | None`, `extras?: object | None`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ScannerRunSummaryCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `scanner_run_summaries` in `SQLAlchemyScannerRunSummaryRepository.create` (app/repositories/run_summary_repository.py:37)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `scanner_run_summaries` in `SQLAlchemyScannerRunSummaryRepository.create` (app/repositories/run_summary_repository.py:39)
+
+#### Data shape
+
+Reads [`scanner_run_summaries`](#table-scanner_run_summaries) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `api_error_count` | `integer` | no | the declared default | — | — |
+| `dry_run` | `boolean` | yes | rejected | — | — |
+| `error_count` | `integer` | no | the declared default | — | — |
+| `excluded_count` | `integer` | no | the declared default | — | — |
+| `extras` | `object` | no | the declared default | — | — |
+| `folder_count` | `integer` | no | the declared default | — | — |
+| `no_metadata_count` | `integer` | no | the declared default | — | — |
+| `previously_seen_count` | `integer` | yes | rejected | — | — |
+| `processed_count` | `integer` | yes | rejected | — | — |
+| `relative_to_path` | `string` | no | the declared default | — | — |
+| `running_time` | `integer` | yes | rejected | — | — |
+| `scan_path` | `string` | no | the declared default | — | — |
+| `started_at` | `string` | yes | rejected | — | `format=date-time` |
+| `total_count` | `integer` | no | the declared default | — | — |
+| `unsupported_file_count` | `integer` | no | the declared default | — | — |
+| `worker_name` | `string` | yes | rejected | — | — |
+| `worker_type` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -1408,7 +3703,7 @@ This endpoint reads no database tables.
 - `search-transcripts-page-1` (`/api/search/transcripts?offset=0&q=the&size=25`): ERROR — expected status [200], got 503
 - `search-transcripts-deep-page` (`/api/search/transcripts?offset=9975&q=the&size=25`): ERROR — expected status [200], got 503 — last page inside the default 10,000 max_result_window
   - offset=9975 requested directly
-- `search-transcripts-past-window` (`/api/search/transcripts?offset=10000&q=the&size=25`): p50 2ms · p95 4ms · 54B · n=7 — deliberately past max_result_window; records how the failure surfaces
+- `search-transcripts-past-window` (`/api/search/transcripts?offset=10000&q=the&size=25`): p50 2ms · p95 3ms · 54B · n=7 — deliberately past max_result_window; records how the failure surfaces
   - offset=10000 requested directly
   - responded 503; the probe accepted any of [200, 500, 503], so read the status before the timing
 
@@ -1466,13 +3761,13 @@ Own probe responses carried 3 to 500 items; the largest was 120.1KB (`streams-ma
 
 #### Measured
 
-- `streams-page-1` (`/api/streams?limit=50`): p50 97ms · p95 103ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
-- `streams-max-page` (`/api/streams?limit=500`): p50 117ms · p95 191ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
-- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 93ms · p95 118ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
+- `streams-page-1` (`/api/streams?limit=50`): p50 99ms · p95 107ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
+- `streams-max-page` (`/api/streams?limit=500`): p50 119ms · p95 123ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
+- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 90ms · p95 105ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
 
 #### Risk
 
-- unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,210 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,212 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 
 ---
 
@@ -1510,7 +3805,92 @@ Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for eac
 
 #### Measured
 
-- `stream-one` (`/api/streams/2117`): p50 88ms · p95 96ms · 231B · n=7
+- `stream-one` (`/api/streams/2117`): p50 90ms · p95 96ms · 231B · n=7
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/streams/{stream_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Stream |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.streams.update_stream` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `StreamRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `stream_index?: int | None`, `codec_type: str`, `codec_name?: str | None`, `language?: str | None`, `width?: int | None`, `height?: int | None`, `frame_rate?: float | None`, `channels?: int | None`, `sample_rate?: int | None`, `is_default?: bool | None`, `is_forced?: bool | None`, `title?: str | None`, `asset_id: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | StreamPatchPublic | n/a | — |
+| `stream_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `streams` in `SQLAlchemyStreamRepository.update` (app/repositories/stream_repository.py:58)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `streams` in `SQLAlchemyStreamRepository.update` (app/repositories/stream_repository.py:69)
+
+#### Data shape
+
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `channels` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `codec_name` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `codec_type` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `frame_rate` | `number` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `height` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `is_default` | `boolean` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `is_forced` | `boolean` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `language` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `sample_rate` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `stream_index` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `title` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `width` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -1563,12 +3943,86 @@ Own probe responses carried 42 item(s); the largest was 7.7KB (`tags-page-1`).
 
 #### Measured
 
-- `tags-page-1` (`/api/tags?limit=50`): p50 99ms · p95 104ms · 7.7KB · 42 items · n=7
+- `tags-page-1` (`/api/tags?limit=50`): p50 99ms · p95 106ms · 7.7KB · 42 items · n=7
 
 #### Risk
 
 - unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 46 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 - filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 46 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+
+---
+
+### POST /api/tags
+
+> **CAUTION** — Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures (409) come back with nothing a user could be shown, so the form needs its own message for them.
+
+| | |
+|---|---|
+| **Purpose** | Create Tag |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.tags.create_tag` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TagRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `tags` in `SQLAlchemyTagRepository.create` (app/repositories/tag_repository.py:61)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `tags` in `SQLAlchemyTagRepository.create` (app/repositories/tag_repository.py:63)
+- `get` on `tags` in `SQLAlchemyTagRepository.exists` (app/repositories/tag_repository.py:67)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `color` | `string` | no | the declared default | — | `maxLength=7`, `pattern=^#[0-9a-fA-F]{6}$` |
+| `description` | `string` | no | the declared default | — | `maxLength=255` |
+| `name` | `string` | yes | rejected | — | `maxLength=50` |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | guarded — probed -- the second identical request is refused with 409; a retry after a dropped connection must treat that conflict as success, not as a new error to show the user |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated."}` | **no** |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
@@ -1606,7 +4060,161 @@ Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `tag-detail` (`/api/tags/1`): p50 92ms · p95 99ms · 212B · n=7
+- `tag-detail` (`/api/tags/1`): p50 87ms · p95 99ms · 212B · n=7
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/tags/{tag_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Tag |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.tags.update_tag` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TagRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagPatchPublic | n/a | — |
+| `tag_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:142)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:153)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `color` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=7`, `pattern=^#[0-9a-fA-F]{6}$` |
+| `description` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=255` |
+| `name` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=50` |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PUT /api/tags/{tag_id}
+
+> **NOT SAFE** — Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Tag By Put |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.tags.update_tag_by_put` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TagRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagPatchPublic | n/a | — |
+| `tag_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:142)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:153)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `color` | `string` | no | set to null | set to null | `maxLength=7`, `pattern=^#[0-9a-fA-F]{6}$` |
+| `description` | `string` | no | set to null | set to null | `maxLength=255` |
+| `name` | `string` | no | set to null | set to null | `maxLength=50` |
+
+Every field of the model is written, whether the caller sent it or not: an omitted field is applied as `null`. A partial form submitted here **erases the fields it did not include**. Send a complete object, read from the server immediately before the write.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -1660,7 +4268,7 @@ Own probe responses carried 0 item(s); the largest was 45B (`child-tags`).
 
 #### Measured
 
-- `child-tags` (`/api/tags/1/tags?limit=50`): p50 120ms · p95 128ms · 45B · 0 items · n=7 — keyset like the parent listing; first screen of one tag's children
+- `child-tags` (`/api/tags/1/tags?limit=50`): p50 120ms · p95 144ms · 45B · 0 items · n=7 — keyset like the parent listing; first screen of one tag's children
 
 #### Risk
 
@@ -1669,9 +4277,86 @@ Own probe responses carried 0 item(s); the largest was 45B (`child-tags`).
 
 ---
 
+### POST /api/tags/{tag_id}/tags
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Child Tag |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.tags.create_child_tag` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TagRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagCreatePublic | n/a | — |
+| `tag_id` | path | int | n/a | — |
+
+#### Queries
+
+- `add` on `tags` in `SQLAlchemyTagRepository.create` (app/repositories/tag_repository.py:61)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `tags` in `SQLAlchemyTagRepository.create` (app/repositories/tag_repository.py:63)
+- `get` on `tags` in `SQLAlchemyTagRepository.exists` (app/repositories/tag_repository.py:67)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `color` | `string` | no | the declared default | — | `maxLength=7`, `pattern=^#[0-9a-fA-F]{6}$` |
+| `description` | `string` | no | the declared default | — | `maxLength=255` |
+| `name` | `string` | yes | rejected | — | `maxLength=50` |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/title_types
 
-> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1698,7 +4383,7 @@ Own probe responses carried 8 item(s); the largest was 497B (`title-types-all`).
 
 #### Measured
 
-- `title-types-all` (`/api/title_types`): p50 90ms · p95 96ms · 497B · 8 items · n=7 — bounded by the number of title types, which is small and fixed
+- `title-types-all` (`/api/title_types`): p50 90ms · p95 97ms · 497B · 8 items · n=7 — bounded by the number of title types, which is small and fixed
 
 #### Risk
 
@@ -1706,9 +4391,163 @@ Own probe responses carried 8 item(s); the largest was 497B (`title-types-all`).
 
 ---
 
+### POST /api/title_types
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Title Type |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.title_types.create_title_type` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleTypeRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `code: str`, `label: str`, `description?: str | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleTypeCreatePublic | n/a | — |
+
+#### Queries
+
+- `add` on `title_types` in `SQLAlchemyTitleTypeRepository.create` (app/repositories/title_type_repository.py:19)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_types` in `SQLAlchemyTitleTypeRepository.create` (app/repositories/title_type_repository.py:21)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `code` | `string` | yes | rejected | — | `maxLength=32` |
+| `description` | `string` | no | the declared default | — | — |
+| `label` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/title_types/{title_type_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Title Type |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.title_types.delete_title_type` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - the title type is still used by one or more titles, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `title_type_id` | path | int | n/a | — |
+| `titles.title_type_id` | lookup | — | yes (`ix_titles_title_type_id`) | served by ix_titles_title_type_id |
+
+#### Queries
+
+- `execute` on `titles` in `SQLAlchemyTitleTypeRepository.usage_count` (app/repositories/title_type_repository.py:70)
+- `get` on `title_types` in `SQLAlchemyTitleTypeRepository.delete` (app/repositories/title_type_repository.py:58)
+- `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.delete` (app/repositories/title_type_repository.py:61)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `title_types` in `SQLAlchemyTitleTypeRepository.exists` (app/repositories/title_type_repository.py:29)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | the Title type |
+| **Detaches** | nothing |
+| **Children** | blocked |
+| **Reachable with references** | UNKNOWN |
+| **The button must say** | Delete type -- blocked while any Title uses it |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - the title type is still used by one or more titles | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/title_types/{title_type_id}
 
-> **SAFE** — p95 91ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -1740,7 +4579,83 @@ Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix
 
 #### Measured
 
-- `title-type-one` (`/api/title_types/4`): p50 89ms · p95 91ms · 66B · n=7
+- `title-type-one` (`/api/title_types/4`): p50 93ms · p95 99ms · 66B · n=7
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/title_types/{title_type_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Title Type |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.title_types.update_title_type` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleTypeRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `code: str`, `label: str`, `description?: str | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleTypePatchPublic | n/a | — |
+| `title_type_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `title_types` in `SQLAlchemyTitleTypeRepository.update` (app/repositories/title_type_repository.py:45)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_types` in `SQLAlchemyTitleTypeRepository.update` (app/repositories/title_type_repository.py:54)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `code` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=32` |
+| `description` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `label` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -1750,7 +4665,7 @@ None identified by this run.
 
 ### GET /api/titles/
 
-> **SAFE** — cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 140ms. Suitable as the backing query for a virtualised full-library scroll.
+> **SAFE** — cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 151ms. Suitable as the backing query for a virtualised full-library scroll.
 
 | | |
 |---|---|
@@ -1804,29 +4719,108 @@ Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · 
 - `tags` — populated only with `include=tags`
 - `references` — populated only with `include=references`
 
-Own probe responses carried 50 to 200 items; the largest was 139.0KB (`titles-poster-scaling-200-rows`).
+Own probe responses carried 0 to 200 items; the largest was 139.0KB (`titles-poster-scaling-200-rows`).
 
 #### Measured
 
-- `titles-page-1` (`/api/titles/?limit=50`): p50 110ms · p95 131ms · 41.3KB · 50 items · n=7
-- `titles-page-1-with-poster` (`/api/titles/?include=poster&limit=50`): p50 110ms · p95 132ms · 41.3KB · 50 items · n=7 — first screen a browse grid would issue, with a poster per title
-- `titles-poster-scaling-200-rows` (`/api/titles/?include=poster&limit=200`): p50 127ms · p95 140ms · 139.0KB · 200 items · n=7 — poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost
-- `titles-newest-page` (`/api/titles/?limit=50&sort=id:desc`): p50 105ms · p95 109ms · 26.1KB · 50 items · n=7 — baseline for the pair below -- same rows, no resolution
-- `titles-newest-page-with-poster` (`/api/titles/?include=poster&limit=50&sort=id:desc`): p50 102ms · p95 106ms · 26.1KB · 50 items · n=7 — poster resolution where it finds a row for most of the page; the gap from `titles-newest-page` is the hit path, against the miss path measured above
-- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 109ms · p95 128ms · 43.1KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
+- `titles-page-1` (`/api/titles/?limit=50`): p50 106ms · p95 120ms · 41.3KB · 50 items · n=7
+- `titles-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=True`): p50 139ms · p95 151ms · 37.0KB · 50 items · n=7 — the hit path -- 50 rows that each resolve a display image, every one of them borrowed from a contained asset. Pairs with `titles-not-resolving-page-1`, and the gap between them is what the walk costs when it fails.
+- `titles-not-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=False`): p50 138ms · p95 142ms · 41.3KB · 50 items · n=7 — the miss path -- rows where the walk ascends to its depth cap and finds nothing. 181 of 1,136 library roots are in this state, and every one of them is a hole in the grid that needs the typographic treatment.
+- `titles-owning-artwork` (`/api/titles/?has_artwork=True&limit=50`): p50 93ms · p95 98ms · 45B · 0 items · n=7 — not a timing measurement -- a recorded fact. This returns an empty page on the whole library: no Title holds artwork of its own, so every image the grid shows is borrowed from an asset through the resolution chain. A design that assumes a title can own its poster has nothing behind it.
+- `titles-poster-scaling-200-rows` (`/api/titles/?include=poster&limit=200`): p50 120ms · p95 135ms · 139.0KB · 200 items · n=7 — poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost
+- `titles-newest-page` (`/api/titles/?limit=50&sort=id:desc`): p50 103ms · p95 112ms · 28.6KB · 50 items · n=7 — the newest page, which a "recently added" view would issue. Compare against `titles-page-1` for the effect of sort order, and against the `has_artwork` pair above for the cost of resolution itself.
+- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 112ms · p95 118ms · 43.1KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
 - `titles-deep-page` (`/api/titles/?limit=50`): UNAVAILABLE — the collection ran out after 32 pages of 50, so there is no page 41 to measure on this instance
 
 #### Risk
 
-- queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)
-- filters that cannot use an index (`membership`, `resolves_display_image`); each forces a sequential scan, though `title_contents` holds only 1,907 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- static analysis flags queries inside a loop — **contradicted by measurement** and downgraded: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension). `titles-page-1` returns 50 rows at p50 106ms and `titles-poster-scaling-200-rows` returns 200 at p50 120ms — 15ms for 150 extra rows, against the ~3.7s a genuine query-per-row would cost at the measured 25ms round trip. The queries inside these comprehensions are issued once for the page, not once per row.
+- filters that cannot use an index (`membership`, `resolves_display_image`); each forces a sequential scan, though `title_contents` holds only 1,908 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
+
+---
+
+### POST /api/titles/
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Title |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.core.create_title` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleRead` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `title_type: str`, `release_year?: int | None`, `synopsis?: str | None`, `library_root?: bool`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleCreatePublic | n/a | — |
+| `title_types.code` | lookup | — | yes (`ix_title_types_code`) | served by ix_title_types_code |
+
+#### Queries
+
+- `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.get_by_code` (app/repositories/title_type_repository.py:33)
+- `add` on `titles` in `SQLAlchemyTitleRepository.create` (app/repositories/title_repository.py:30)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `titles` in `SQLAlchemyTitleRepository.create` (app/repositories/title_repository.py:32)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `library_root` | `boolean` | no | the declared default | — | — |
+| `name` | `string` | yes | rejected | — | — |
+| `release_year` | `integer` | no | the declared default | — | — |
+| `synopsis` | `string` | no | the declared default | — | — |
+| `title_type` | `string` | yes | rejected | — | `maxLength=32` |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/titles/by-scheme/{scheme_id}/{external_id}
 
-> **CAUTION** — the lookup is not index-covered and measures p95 106ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
+> **CAUTION** — the lookup is not index-covered and measures p95 104ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -1860,7 +4854,7 @@ Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `title-by-scheme` (`/api/titles/by-scheme/2/capinv-probe-no-such-external-id`): p50 93ms · p95 106ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
+- `title-by-scheme` (`/api/titles/by-scheme/2/capinv-probe-no-such-external-id`): p50 94ms · p95 104ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -1870,7 +4864,7 @@ Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 ### GET /api/titles/{parent_title_id}/contents
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 204ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1907,20 +4901,447 @@ Own probe responses carried 1 item(s); the largest was 542B (`title-contents`).
 
 #### Measured
 
-- `title-contents` (`/api/titles/1/contents`): p50 184ms · p95 204ms · 542B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
+- `title-contents` (`/api/titles/1/contents`): p50 178ms · p95 201ms · 542B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
 
 #### Risk
 
 - one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`
 - one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`
 - no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
-- measured p95 of 204ms on `title-contents` is too slow to drive from a keystroke
+- measured p95 of 201ms on `title-contents` is too slow to drive from a keystroke
+
+---
+
+### POST /api/titles/{parent_title_id}/contents
+
+> **CAUTION** — Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures (409, 422) come back with nothing a user could be shown, so the form needs its own message for them.
+
+| | |
+|---|---|
+| **Purpose** | Link Title Contents |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.link_title_contents` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentInsert | n/a | — |
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+
+#### Queries
+
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
+- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:439)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:442)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `asset_id` | `integer` | no | the declared default | — | — |
+| `child_title_id` | `integer` | no | the declared default | — | — |
+| `kind` | `string` | yes | rejected | — | `enum=['asset', 'title']` |
+| `label` | `string` | no | the declared default | — | — |
+| `membership` | `string` | no | the declared default | — | `enum=['intrinsic', 'curated']` |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | guarded — probed -- the second identical request is refused with 409; a retry after a dropped connection must treat that conflict as success, not as a new error to show the user |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated."}` | **no** |
+| `409` | the same request is sent a second time | `{"detail": "Title N already has an intrinsic parent, recorded by containment row N. A title has one home; to list it elsewhere as well, add the edge as curated."}` | yes |
+| `409` | violates `no_self_containment_chk` | `{"detail": "A title cannot contain itself."}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `422` | violates `one_target_chk` | `{"detail": [{"loc": [], "msg": "CHECK constraint violated.", "type": "domain_error"}]}` | **no** |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### POST /api/titles/{parent_title_id}/contents/positioned
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Title Content Positioned |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.create_title_content_positioned` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentInsert | n/a | — |
+| `parent_title_id` | path | int | n/a | — |
+| `after_id` | query | int \| None | n/a | Place after this id |
+| `before_id` | query | int \| None | n/a | Place before this id |
+| `position` | query | str \| None | n/a | Special position: 'start' or 'end' |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+
+#### Queries
+
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
+- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:439)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:442)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `asset_id` | `integer` | no | the declared default | — | — |
+| `child_title_id` | `integer` | no | the declared default | — | — |
+| `kind` | `string` | yes | rejected | — | `enum=['asset', 'title']` |
+| `label` | `string` | no | the declared default | — | — |
+| `membership` | `string` | no | the declared default | — | `enum=['intrinsic', 'curated']` |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Unlink Title Contents |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.unlink_title_contents` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents_id` | path | int | n/a | — |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+
+#### Queries
+
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:205)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:209)
+- `flush` on unresolved table in `SQLAlchemyBaseRepository._safe_flush` (app/repositories/base_repository.py:55)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | nothing -- the contained Title or Asset survives |
+| **Detaches** | one containment edge, and renumbers the surviving siblings |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Remove from this collection (never 'Delete') |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Partial Title Content Update |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.partial_title_content_update` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentPatchPublic | n/a | — |
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents_id` | path | int | n/a | — |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+
+#### Queries
+
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.update` (app/repositories/title_content_repository.py:162)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.update` (app/repositories/title_content_repository.py:190)
+- `flush` on unresolved table in `SQLAlchemyBaseRepository._safe_flush` (app/repositories/base_repository.py:55)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `asset_id` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `child_title_id` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `kind` | `ContentKind` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `label` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Reorder Title Content |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.reorder_title_content` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents_id` | path | int | n/a | — |
+| `after_id` | query | int \| None | n/a | Place after this id |
+| `before_id` | query | int \| None | n/a | Place before this id |
+| `position` | query | str \| None | n/a | Special position: 'start' or 'end' |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+
+#### Queries
+
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:367)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:393)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/titles/{title_id}
 
-> **CAUTION** — p95 239ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
+> **CAUTION** — p95 236ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
 
 | | |
 |---|---|
@@ -1961,20 +5382,178 @@ Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · 
 
 #### Measured
 
-- `title-detail` (`/api/titles/1`): p50 215ms · p95 239ms · 751B · n=7
-- `title-detail-with-poster` (`/api/titles/1?include=poster`): p50 216ms · p95 229ms · 751B · n=7 — pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own
+- `title-detail` (`/api/titles/1`): p50 225ms · p95 236ms · 751B · n=7
+- `title-detail-with-poster` (`/api/titles/1?include=poster`): p50 220ms · p95 227ms · 751B · n=7 — pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)
-- measured p95 of 239ms on `title-detail` is too slow to drive from a keystroke
+- measured p95 of 236ms on `title-detail` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
+
+---
+
+### PATCH /api/titles/{title_id}
+
+> **SAFE** — Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible.
+
+| | |
+|---|---|
+| **Purpose** | Partial Title Update |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.core.partial_title_update` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `title_type: str`, `release_year?: int | None`, `synopsis?: str | None`, `library_root?: bool`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitlePatchPublic | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+| `title_types.code` | lookup | — | yes (`ix_title_types_code`) | served by ix_title_types_code |
+
+#### Queries
+
+- `execute` on `titles` in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:226)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:237)
+- `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.get_by_code` (app/repositories/title_type_repository.py:33)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `library_root` | `boolean` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `name` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `release_year` | `integer` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `synopsis` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `title_type` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `maxLength=32` |
+
+`synopsis` survives both an empty body and an explicit null, so a partial form is safe and there is no request that clears the field. (Confirmed by probe `title-patch-omission`.)
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PUT /api/titles/{title_id}
+
+> **NOT SAFE** — Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest.
+
+| | |
+|---|---|
+| **Purpose** | Update Title |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.core.update_title` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `name: str`, `title_type: str`, `release_year?: int | None`, `synopsis?: str | None`, `library_root?: bool`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitlePatchPublic | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+| `title_types.code` | lookup | — | yes (`ix_title_types_code`) | served by ix_title_types_code |
+
+#### Queries
+
+- `execute` on `titles` in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:226)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:237)
+- `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.get_by_code` (app/repositories/title_type_repository.py:33)
+
+#### Data shape
+
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `library_root` | `boolean` | no | set to null | set to null | — |
+| `name` | `string` | no | set to null | set to null | — |
+| `release_year` | `integer` | no | set to null | set to null | — |
+| `synopsis` | `string` | no | set to null | set to null | — |
+| `title_type` | `string` | no | set to null | set to null | `maxLength=32` |
+
+`synopsis` did not survive a body that omitted it (was 'capinv probe original synopsis', now None): a partial form erases it. (Confirmed by probe `title-put-omission`.)
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/titles/{title_id}/artwork
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 151ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2012,8 +5591,8 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-artwork`).
 
 #### Measured
 
-- `title-artwork` (`/api/titles/1/artwork`): p50 117ms · p95 129ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
-- `title-artwork-by-kind` (`/api/titles/1/artwork?kind=poster`): p50 150ms · p95 169ms · 2B · 0 items · n=7 — the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it
+- `title-artwork` (`/api/titles/1/artwork`): p50 117ms · p95 135ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
+- `title-artwork-by-kind` (`/api/titles/1/artwork?kind=poster`): p50 144ms · p95 151ms · 2B · 0 items · n=7 — the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it
 
 #### Risk
 
@@ -2021,9 +5600,104 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-artwork`).
 
 ---
 
+### POST /api/titles/{title_id}/artwork
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Upload Title Artwork |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.artwork.upload_title_artwork` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `ArtworkRead` |
+| **Declares** | `400` Bad Request - the file is empty, or is not a readable image, `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `413` Payload Too Large - the file exceeds the size or pixel cap, `415` Unsupported Media Type - the file is not a supported image, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `artwork_kind: str`, `storage_path: str`, `mime: str`, `width: int`, `height: int`, `is_primary?: bool`, `source_scheme_id?: int | None`, `source_external_id?: str | None`, `source_url?: str | None`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | Body_upload_title_artwork | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
+| `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
+| `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
+| `artwork.is_primary` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, artwork_kind_id, so the composite index applies from its leading column |
+
+#### Queries
+
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+- `execute` on `artwork_kinds` in `SQLAlchemyArtworkKindRepository.get_by_code` (app/repositories/artwork_repository.py:166)
+- `add` on `artwork` in `SQLAlchemyArtworkRepository.create` (app/repositories/artwork_repository.py:218)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.create` (app/repositories/artwork_repository.py:220)
+- `get` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:333)
+- `flush` on unresolved table in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:350)
+- `refresh` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:354)
+- `execute` on `artwork` in `SQLAlchemyArtworkRepository.set_primary` (app/repositories/artwork_repository.py:337)
+
+#### Data shape
+
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `artwork_kind` | `string` | yes | rejected | — | — |
+| `file` | `string` | yes | rejected | — | `format=binary` |
+| `is_primary` | `boolean` | no | the declared default | — | — |
+| `source_external_id` | `string` | no | the declared default | — | — |
+| `source_scheme_id` | `integer` | no | the declared default | — | — |
+| `source_url` | `string` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | silently ignored -- a misspelled field name is accepted and does nothing |
+| **Repeat** | UNKNOWN — probe `title-artwork-upload-twice` did not run: touches the filesystem and no scratch media root is configured; not run against a real one |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `400` | Bad Request - the file is empty, or is not a readable image | `{"detail": ...}` | yes |
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `413` | Payload Too Large - the file exceeds the size or pixel cap | `{"detail": ...}` | yes |
+| `415` | Unsupported Media Type - the file is not a supported image | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/titles/{title_id}/ids
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 96ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2057,7 +5731,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-ids`).
 
 #### Measured
 
-- `title-ids` (`/api/titles/1/ids`): p50 89ms · p95 96ms · 2B · 0 items · n=7 — uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier
+- `title-ids` (`/api/titles/1/ids`): p50 89ms · p95 102ms · 2B · 0 items · n=7 — uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier
 
 #### Risk
 
@@ -2066,9 +5740,240 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-ids`).
 
 ---
 
+### POST /api/titles/{title_id}/ids
+
+> **CAUTION** — Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures (409) come back with nothing a user could be shown, so the form needs its own message for them.
+
+| | |
+|---|---|
+| **Purpose** | Create Title Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.external_ids.create_title_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `ExternalIdentifierRead` |
+| **Declares** | `404` Title not found, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `external_id: str`, `scheme_id: int`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ExternalIdentifierCreatePublic | n/a | — |
+| `title_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `add` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.create` (app/repositories/external_identifier_repository.py:119)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.create` (app/repositories/external_identifier_repository.py:121)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`external_identifiers`](#table-external_identifiers) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `external_id` | `string` | yes | rejected | — | — |
+| `scheme_id` | `integer` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | guarded — probed -- the second identical request is refused with 409; a retry after a dropped connection must treat that conflict as success, not as a new error to show the user |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Title not found | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated. This external ID may already exist."}` | **no** |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### DELETE /api/titles/{title_id}/ids/{record_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Delete Title Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.external_ids.delete_title_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 204** | `no model declared` |
+| **Declares** | `404` External ID not found or doesn't belong to this title, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `record_id` | path | int | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `external_identifiers.id` | lookup | — | yes (`external_identifiers_pkey`) | served by external_identifiers_pkey |
+
+#### Queries
+
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.get` (app/repositories/external_identifier_repository.py:74)
+- `execute` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.delete` (app/repositories/external_identifier_repository.py:143)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+
+#### Data shape
+
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | the external identifier record |
+| **Detaches** | nothing else |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Delete identifier |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | External ID not found or doesn't belong to this title | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/titles/{title_id}/ids/{record_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Title Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.external_ids.update_title_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `ExternalIdentifierRead` |
+| **Declares** | `404` External ID not found or doesn't belong to this title, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `external_id: str`, `scheme_id: int`, `entity_type: EntityTypeEnum`, `entity_id: int`, `created_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | ExternalIdentifierPatchPublic | n/a | — |
+| `record_id` | path | int | n/a | — |
+| `title_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.get` (app/repositories/external_identifier_repository.py:74)
+- `get` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.update` (app/repositories/external_identifier_repository.py:128)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `external_identifiers` in `SQLAlchemyExternalIdentifierRepository.update` (app/repositories/external_identifier_repository.py:137)
+
+#### Data shape
+
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `external_id` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | External ID not found or doesn't belong to this title | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/titles/{title_id}/parents
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 158ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2104,7 +6009,7 @@ Own probe responses carried 1 item(s); the largest was 275B (`title-parents`).
 
 #### Measured
 
-- `title-parents` (`/api/titles/1/parents`): p50 149ms · p95 158ms · 275B · 1 items · n=7 — uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing
+- `title-parents` (`/api/titles/1/parents`): p50 150ms · p95 164ms · 275B · 1 items · n=7 — uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing
 
 #### Risk
 
@@ -2150,7 +6055,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-references`).
 
 #### Measured
 
-- `title-references` (`/api/titles/1/references`): p50 117ms · p95 133ms · 2B · 0 items · n=7
+- `title-references` (`/api/titles/1/references`): p50 127ms · p95 133ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -2158,9 +6063,162 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-references`).
 
 ---
 
+### POST /api/titles/{title_id}/references
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Title Reference |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.references.create_title_reference` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleReferenceRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `reference_type: TitleReferenceTypeEnum`, `reference_url: str`, `label?: str | None`, `title_id: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleReferenceCreatePublic | n/a | — |
+| `title_id` | path | int | n/a | — |
+
+#### Queries
+
+- `add` on `title_references` in `SQLAlchemyTitleReferenceRepository.create` (app/repositories/title_reference_repository.py:24)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_references` in `SQLAlchemyTitleReferenceRepository.create` (app/repositories/title_reference_repository.py:26)
+
+#### Data shape
+
+Reads [`title_references`](#table-title_references) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `label` | `string` | no | the declared default | — | — |
+| `reference_type` | `string` | yes | rejected | — | `enum=['review', 'metadata', 'article', 'summary', 'other']` |
+| `reference_url` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/titles/{title_id}/references/{reference_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Partial Title Reference Update |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.references.partial_title_reference_update` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleReferenceRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `reference_type: TitleReferenceTypeEnum`, `reference_url: str`, `label?: str | None`, `title_id: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleReferencePatchPublic | n/a | — |
+| `reference_id` | path | int | n/a | — |
+| `title_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `title_references` in `SQLAlchemyTitleReferenceRepository.update` (app/repositories/title_reference_repository.py:64)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `title_references` in `SQLAlchemyTitleReferenceRepository.update` (app/repositories/title_reference_repository.py:75)
+
+#### Data shape
+
+Reads [`title_references`](#table-title_references) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `label` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `reference_type` | `TitleReferenceTypeEnum` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `reference_url` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/titles/{title_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 136ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 125ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2196,12 +6254,247 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-tags`).
 
 #### Measured
 
-- `title-tags` (`/api/titles/1/tags`): p50 117ms · p95 136ms · 2B · 0 items · n=7
+- `title-tags` (`/api/titles/1/tags`): p50 123ms · p95 125ms · 2B · 0 items · n=7
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTagRepository.get_title_tags (comprehension)
 - no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
+
+---
+
+### POST /api/titles/{title_id}/tags
+
+> **SAFE** — Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible.
+
+| | |
+|---|---|
+| **Purpose** | Tag Title By Name |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.tags.tag_title_by_name` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TaggingReport` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`added_tags: list[TagRead]`, `tagging_errors: list[str]`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagNameSet | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+| `tags.name` | lookup | — | yes (`ix_tags_name`) | served by ix_tags_name |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository.get_or_create_by_names` (app/repositories/tag_repository.py:136)
+- `flush` on unresolved table in `SQLAlchemyTagRepository.get_or_create_by_names` (app/repositories/tag_repository.py:137)
+- `execute` on `tags` in `SQLAlchemyTagRepository.get_by_names` (app/repositories/tag_repository.py:92)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:249)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:234)
+- `execute` on unresolved table in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:245)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `auto_tag_create` | `boolean` | no | the declared default | — | — |
+| `tag_names` | `array[string]` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | idempotent — probed -- the second identical request returns 200 and changes nothing; safe to retry blindly |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PUT /api/titles/{title_id}/tags
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Tag Title |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.tags.tag_title` |
+| **Pagination** | none — returns the entire collection in one response; there is no page size to be stable across |
+| **Response 200** | `list[TagRead]`, rows are `TagRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | returns an unbounded list; the response grows with the number of related rows |
+
+#### Fields
+
+`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TagSet | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
+
+#### Queries
+
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:249)
+- `execute` on `tags` in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:234)
+- `execute` on unresolved table in `SQLAlchemyTagRepository._link_tags` (app/repositories/tag_repository.py:245)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+
+#### Data shape
+
+Reads [`tags`](#table-tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `tag_ids` | `array[integer]` | yes | rejected | — | — |
+
+Whole-collection replacement: `tag_ids` is required and replaces the existing set outright. Omission does not arise -- but sending an empty list is a well-formed request that removes everything, so a form must never submit `tag_ids` it did not populate from a prior read.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- no pagination, but the largest collection measured is only 46 rows (at most all 46 rows of `tags`), so the absent cap is currently latent
+
+---
+
+### DELETE /api/titles/{title_id}/tags/{tag_id}
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Untag Title By Id |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.tags.untag_title_by_id` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `no model declared` |
+| **Declares** | `404` Title does not exist, `422` Validation Error |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `tag_id` | path | int | n/a | — |
+| `title_id` | path | int | n/a | — |
+| `title_tags.tag_id` | lookup | — | yes (`ix_title_tags_tag_id`) | served by ix_title_tags_tag_id |
+| `title_tags.title_id` | lookup | — | yes (`ix_title_tags_title_id`) | served by ix_title_tags_title_id |
+
+#### Queries
+
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `title_tags` in `SQLAlchemyTagRepository.remove_title_tag` (app/repositories/tag_repository.py:334)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+
+#### Data shape
+
+Reads [`title_tags`](#table-title_tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Delete semantics**
+
+| | |
+|---|---|
+| **Destroys** | nothing -- the Tag itself is untouched |
+| **Detaches** | the edge between this Title and the Tag |
+| **Children** | none |
+| **Reachable with references** | yes |
+| **The button must say** | Remove tag from this Title (never 'Delete tag') |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Title does not exist | `{"detail": ...}` | yes |
+| `422` | Validation Error | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
@@ -2247,22 +6540,99 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-tags`).
 
 Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
-Own probe responses carried 50 item(s); the largest was 45.6KB (`transform-requests-page-1`).
+Own probe responses carried 50 item(s); the largest was 45.4KB (`transform-requests-page-1`).
 
 #### Measured
 
-- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 178ms · p95 196ms · 45.6KB · 50 items · n=7
+- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 185ms · p95 198ms · 45.4KB · 50 items · n=7
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,291 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,291 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,294 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,294 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+
+---
+
+### POST /api/transform_requests/claim
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Claim Next Request |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.transform_requests.claim_next_request` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TransformRequestReadExpanded` |
+| **Declares** | `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `transform_type: str`, `parameters?: object | None`, `actioned?: bool`, `processed_at?: str(date-time) | None`, `worker_notes?: str | None`, `external_job_id?: str | None`, `duration?: float | None`, `outcome?: OutcomeEnum | None`, `worker?: str | None`, `on_success?: object | None`, `on_failure?: object | None`, `asset_id: int`, `parent_transform_request_id?: int | None`, `created_at: str(date-time)`, `first_heartbeat?: str(date-time) | None`, `last_heartbeat?: str(date-time) | None`, `asset: AssetRead`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TransformRequestClaim | n/a | — |
+| `media_transform_requests.actioned` | lookup | — | **no** | no index on media_transform_requests.actioned; requires a sequential scan |
+| `media_transform_requests.transform_type` | lookup | — | **no** | no index on media_transform_requests.transform_type; requires a sequential scan |
+| `media_transform_requests.worker` | lookup | — | **no** | no index on media_transform_requests.worker; requires a sequential scan |
+
+#### Queries
+
+- `flush` on unresolved table in `SQLAlchemyTransformRequestRepository.claim_next` (app/repositories/transform_request_repository.py:135)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.claim_next` (app/repositories/transform_request_repository.py:129)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `external_job_id` | `string` | no | the declared default | — | — |
+| `transform_type` | `string` | yes | rejected | — | `pattern=^[^\s.]+\.[^\s]+$` |
+| `worker` | `string` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- unindexed lookup on `media_transform_requests.actioned`, `media_transform_requests.transform_type`, `media_transform_requests.worker`; the read is a sequential scan
 
 ---
 
 ### GET /api/transform_requests/{request_id}
 
-> **SAFE** — p95 104ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2294,7 +6664,245 @@ Reads [`media_transform_requests`](#table-media_transform_requests) — see the 
 
 #### Measured
 
-- `transform-request-detail` (`/api/transform_requests/4`): p50 96ms · p95 104ms · 411B · n=7
+- `transform-request-detail` (`/api/transform_requests/21337`): p50 98ms · p95 106ms · 568B · n=7
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/transform_requests/{request_id}
+
+> **CAUTION** — Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must not offer a way to clear an optional field it cannot actually clear; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Update Request |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.transform_requests.update_request` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TransformRequestRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `transform_type: str`, `parameters?: object | None`, `actioned?: bool`, `processed_at?: str(date-time) | None`, `worker_notes?: str | None`, `external_job_id?: str | None`, `duration?: float | None`, `outcome?: OutcomeEnum | None`, `worker?: str | None`, `on_success?: object | None`, `on_failure?: object | None`, `asset_id: int`, `parent_transform_request_id?: int | None`, `created_at: str(date-time)`, `first_heartbeat?: str(date-time) | None`, `last_heartbeat?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TransformRequestPatchPublic | n/a | — |
+| `request_id` | path | int | n/a | — |
+| `media_transform_requests.id` | lookup | — | yes (`media_transform_requests_pkey`) | served by media_transform_requests_pkey |
+
+#### Queries
+
+- `execute` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.update` (app/repositories/transform_request_repository.py:90)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTransformRequestRepository.update` (app/repositories/transform_request_repository.py:101)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `actioned` | `boolean` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `duration` | `number` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `external_job_id` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `on_failure` | `object` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `on_success` | `object` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `outcome` | `OutcomeEnum` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `parameters` | `object` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `processed_at` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `format=date-time` |
+| `transform_type` | `string` | no | unchanged | unchanged -- the field cannot be cleared | `pattern=^[^\s.]+\.[^\s]+$` |
+| `worker` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+| `worker_notes` | `string` | no | unchanged | unchanged -- the field cannot be cleared | — |
+
+Omitted fields are left unchanged, so a partial form is safe. An explicit `null` is discarded by the same rule, so **a nullable field cannot be cleared through this route at all** -- there is no request body that sets one back to null.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### PATCH /api/transform_requests/{request_id}/heartbeat
+
+> **CAUTION** — Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Mark Heartbeat |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.transform_requests.mark_heartbeat` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `no model declared` |
+| **Declares** | `400` Heartbeat rejected, `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `request_id` | path | int | n/a | — |
+| `media_transform_requests.id` | lookup | — | yes (`media_transform_requests_pkey`) | served by media_transform_requests_pkey |
+
+#### Queries
+
+- `execute` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.mark_heartbeat` (app/repositories/transform_request_repository.py:40)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | worker fleet |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `400` | Heartbeat rejected | `{"detail": ...}` | yes |
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
+### POST /api/transform_requests/{request_id}/link
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Create Linked Request |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.transform_requests.create_linked_request` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TransformRequestRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `transform_type: str`, `parameters?: object | None`, `actioned?: bool`, `processed_at?: str(date-time) | None`, `worker_notes?: str | None`, `external_job_id?: str | None`, `duration?: float | None`, `outcome?: OutcomeEnum | None`, `worker?: str | None`, `on_success?: object | None`, `on_failure?: object | None`, `asset_id: int`, `parent_transform_request_id?: int | None`, `created_at: str(date-time)`, `first_heartbeat?: str(date-time) | None`, `last_heartbeat?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TransformRequestCreatePublic | n/a | — |
+| `request_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.get` (app/repositories/transform_request_repository.py:32)
+- `add` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:26)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:28)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `actioned` | `boolean` | no | the declared default | — | — |
+| `duration` | `number` | no | the declared default | — | — |
+| `external_job_id` | `string` | no | the declared default | — | — |
+| `on_failure` | `object` | no | the declared default | — | — |
+| `on_success` | `object` | no | the declared default | — | — |
+| `outcome` | `OutcomeEnum` | no | the declared default | — | — |
+| `parameters` | `object` | no | the declared default | — | — |
+| `processed_at` | `string` | no | the declared default | — | `format=date-time` |
+| `transform_type` | `string` | yes | rejected | — | `pattern=^[^\s.]+\.[^\s]+$` |
+| `worker` | `string` | no | the declared default | — | — |
+| `worker_notes` | `string` | no | the declared default | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
 
 #### Risk
 
@@ -2304,7 +6912,7 @@ None identified by this run.
 
 ### GET /api/transform_requests/{request_id}/logs
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 107ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2334,20 +6942,93 @@ None identified by this run.
 
 Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
+Own probe responses carried 0 item(s); the largest was 2B (`transform-request-logs`).
+
 #### Measured
 
-- `transform-request-logs` (`/api/transform_requests/4/logs`): ERROR — expected status [200], got 409 — uncapped; the collection size behind it was never measured
+- `transform-request-logs` (`/api/transform_requests/21337/logs`): p50 96ms · p95 107ms · 2B · 0 items · n=7 — an external round-trip to the orchestration backend, not a database read. Capped at the provider's log limit (100 by default), so the worst case is bounded by that rather than by the collection size. An item count of 0 means the backend returned no lines -- the endpoint did its work, but the timing is then the cost of reaching an orchestration backend that had nothing to give, not of rendering a full log.
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
-- probe `transform-request-logs` failed: expected status [200], got 409
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
+
+---
+
+### PATCH /api/transform_requests/{request_id}/retry
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Retry Request |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.transform_requests.retry_request` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TransformRequestRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `transform_type: str`, `parameters?: object | None`, `actioned?: bool`, `processed_at?: str(date-time) | None`, `worker_notes?: str | None`, `external_job_id?: str | None`, `duration?: float | None`, `outcome?: OutcomeEnum | None`, `worker?: str | None`, `on_success?: object | None`, `on_failure?: object | None`, `asset_id: int`, `parent_transform_request_id?: int | None`, `created_at: str(date-time)`, `first_heartbeat?: str(date-time) | None`, `last_heartbeat?: str(date-time) | None`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `request_id` | path | int | n/a | — |
+
+#### Queries
+
+- `get` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.get` (app/repositories/transform_request_repository.py:32)
+- `add` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:26)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on `media_transform_requests` in `SQLAlchemyTransformRequestRepository.create` (app/repositories/transform_request_repository.py:28)
+
+#### Data shape
+
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
 
 ---
 
 ### GET /api/version
 
-> **SAFE** — p95 10ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 9ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2364,7 +7045,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `version` (`/api/version`): p50 9ms · p95 10ms · 87B · n=7
+- `version` (`/api/version`): p50 4ms · p95 9ms · 77B · n=7
 
 #### Risk
 
@@ -2372,100 +7053,35 @@ This endpoint reads no database tables.
 
 ---
 
-## Write endpoints
-
-58 mutating endpoints are single-row writes that issue no per-item queries and touch no filesystem. There is nothing endpoint-specific for a UI to get wrong beyond ordinary error handling, so they are collapsed here rather than given a section each. Any write that loops or touches the filesystem keeps a full section above.
-
-| Endpoint | Handler | Body | Returns | Errors | Filesystem | Loops |
-|---|---|---|---|---|---|---|
-| `DELETE /api/artwork/{artwork_id}` | `artwork.delete_artwork` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/artwork/{artwork_id}` | `artwork.update_artwork` | `ArtworkPatchPublic` | `ArtworkRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/assets/` | `core.create_asset` | `AssetCreatePublic` | `AssetRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/assets/seen` | `core.mark_assets_seen` | `AssetSeenBatch` | — | `409`, `422`, `423` | no | no |
-| `POST /api/assets/{asset_id}/artwork` | `artwork.upload_asset_artwork` | `Body_upload_asset_artwork` | `ArtworkRead` | `400`, `404`, `409`, `413`, `415`, `422`, `423` | no | no |
-| `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | `relationships.declare_derived_asset` | — | `AssetRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/assets/{asset_id}/ids` | `external_ids.create_asset_id` | `ExternalIdentifierCreatePublic` | `ExternalIdentifierRead` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/assets/{asset_id}/ids/{record_id}` | `external_ids.delete_asset_id` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/assets/{asset_id}/ids/{record_id}` | `external_ids.update_asset_id` | `ExternalIdentifierPatchPublic` | `ExternalIdentifierRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/assets/{asset_id}/metadata` | `metadata.create_asset_metadata` | `MetadataCreatePublic` | `MetadataRead` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | `metadata.delete_asset_metadata` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | `metadata.update_asset_metadata` | `MetadataPatchPublic` | `MetadataRead` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/assets/{asset_id}/streams` | `streams.delete_asset_streams` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/assets/{asset_id}/streams` | `streams.create_asset_stream` | `StreamCreatePublic` | `StreamRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/assets/{asset_id}/tags` | `tags.tag_asset_by_name` | `TagNameSet` | `TaggingReport` | `404`, `409`, `422`, `423` | no | no |
-| `PUT /api/assets/{asset_id}/tags` | `tags.tag_asset` | `TagSet` | `list[TagRead]` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/assets/{asset_id}/tags/{tag_id}` | `tags.untag_asset_by_id` | — | — | `404`, `422` | no | no |
-| `POST /api/assets/{asset_id}/transform_requests` | `transform_requests.create_asset_transform_request` | `TransformRequestCreatePublic` | `TransformRequestRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/id_schemes` | `id_schemes.create_id_scheme` | `IdSchemeCreatePublic` | `IdSchemeRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/id_schemes/{scheme_id}` | `id_schemes.update_scheme` | `IdSchemePatchPublic` | `IdSchemeRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/jobs` | `jobs.create_job` | — | `JobRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/jobs/{job_key}/completed` | `jobs.mark_completed` | — | `JobRead` | `409`, `422`, `423` | no | no |
-| `PUT /api/jobs/{job_key}/heartbeat` | `jobs.mark_heartbeat` | — | `JobRead` | `409`, `422`, `423` | no | no |
-| `POST /api/log` | `logs.client_traces` | — | — | — | no | no |
-| `POST /api/run_summaries` | `run_summaries.create_run_summary` | `RunSummaryCreatePublic` | `RunSummaryRead` | `409`, `422`, `423` | no | no |
-| `POST /api/runner_state` | `runner_state.create_runner_state` | `RunnerStateCreatePublic` | `RunnerStateRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/runner_state/{runner_key}` | `runner_state.partial_runner_update` | `RunnerStatePatchPublic` | `RunnerStateRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/scanner_run_summaries` | `scanner_run_summaries.create_scanner_run_summary` | `ScannerRunSummaryCreatePublic` | `ScannerRunSummaryRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/streams/{stream_id}` | `streams.update_stream` | `StreamPatchPublic` | `StreamRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/tags` | `tags.create_tag` | `TagCreatePublic` | `TagRead` | `409`, `422`, `423` | no | no |
-| `PATCH /api/tags/{tag_id}` | `tags.update_tag` | `TagPatchPublic` | `TagRead` | `404`, `409`, `422`, `423` | no | no |
-| `PUT /api/tags/{tag_id}` | `tags.update_tag_by_put` | `TagPatchPublic` | `TagRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/tags/{tag_id}/tags` | `tags.create_child_tag` | `TagCreatePublic` | `TagRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/title_types` | `title_types.create_title_type` | `TitleTypeCreatePublic` | `TitleTypeRead` | `409`, `422`, `423` | no | no |
-| `DELETE /api/title_types/{title_type_id}` | `title_types.delete_title_type` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/title_types/{title_type_id}` | `title_types.update_title_type` | `TitleTypePatchPublic` | `TitleTypeRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/titles/` | `core.create_title` | `TitleCreatePublic` | `TitleRead` | `409`, `422`, `423` | no | no |
-| `POST /api/titles/{parent_title_id}/contents` | `contents.link_title_contents` | `TitleContentInsert` | `TitleContentRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/titles/{parent_title_id}/contents/positioned` | `contents.create_title_content_positioned` | `TitleContentInsert` | `TitleContentRead` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | `contents.unlink_title_contents` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | `contents.partial_title_content_update` | `TitleContentPatchPublic` | `TitleContentRead` | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | `contents.reorder_title_content` | — | `TitleContentRead` | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/titles/{title_id}` | `core.partial_title_update` | `TitlePatchPublic` | `TitleRead` | `404`, `409`, `422`, `423` | no | no |
-| `PUT /api/titles/{title_id}` | `core.update_title` | `TitlePatchPublic` | `TitleRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/titles/{title_id}/artwork` | `artwork.upload_title_artwork` | `Body_upload_title_artwork` | `ArtworkRead` | `400`, `404`, `409`, `413`, `415`, `422`, `423` | no | no |
-| `POST /api/titles/{title_id}/ids` | `external_ids.create_title_id` | `ExternalIdentifierCreatePublic` | `ExternalIdentifierRead` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/titles/{title_id}/ids/{record_id}` | `external_ids.delete_title_id` | — | — | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/titles/{title_id}/ids/{record_id}` | `external_ids.update_title_id` | `ExternalIdentifierPatchPublic` | `ExternalIdentifierRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/titles/{title_id}/references` | `references.create_title_reference` | `TitleReferenceCreatePublic` | `TitleReferenceRead` | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/titles/{title_id}/references/{reference_id}` | `references.partial_title_reference_update` | `TitleReferencePatchPublic` | `TitleReferenceRead` | `404`, `409`, `422`, `423` | no | no |
-| `POST /api/titles/{title_id}/tags` | `tags.tag_title_by_name` | `TagNameSet` | `TaggingReport` | `404`, `409`, `422`, `423` | no | no |
-| `PUT /api/titles/{title_id}/tags` | `tags.tag_title` | `TagSet` | `list[TagRead]` | `404`, `409`, `422`, `423` | no | no |
-| `DELETE /api/titles/{title_id}/tags/{tag_id}` | `tags.untag_title_by_id` | — | — | `404`, `422` | no | no |
-| `POST /api/transform_requests/claim` | `transform_requests.claim_next_request` | `TransformRequestClaim` | `TransformRequestReadExpanded` | `409`, `422`, `423` | no | no |
-| `PATCH /api/transform_requests/{request_id}` | `transform_requests.update_request` | `TransformRequestPatchPublic` | `TransformRequestRead` | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/transform_requests/{request_id}/heartbeat` | `transform_requests.mark_heartbeat` | — | — | `400`, `404`, `409`, `422`, `423` | no | no |
-| `POST /api/transform_requests/{request_id}/link` | `transform_requests.create_linked_request` | `TransformRequestCreatePublic` | `TransformRequestRead` | `404`, `409`, `422`, `423` | no | no |
-| `PATCH /api/transform_requests/{request_id}/retry` | `transform_requests.retry_request` | — | `TransformRequestRead` | `404`, `409`, `422`, `423` | no | no |
-
 ## Tables
 
 Row counts, fill rates, cardinality and collection-size distributions are properties of a table rather than of any endpoint that reads it, so they are recorded once here and linked from each endpoint's **Data shape**.
 
 ### Table: artwork
 
-**1,205 rows.**
+**1,206 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `source_external_id` | 0% | 0 | 0 | — |
 | `source_scheme_id` | 0% | 0 | — | — |
 | `source_url` | 0% | 1 | 1 | yes |
-| `artwork_kind_id` | 100% | 1,205 | — | — |
-| `created_at` | 100% | 1,205 | — | — |
-| `entity_id` | 100% | 1,205 | — | — |
-| `entity_type` | 100% | 1,205 | 1 | yes |
-| `height` | 100% | 1,205 | — | — |
-| `id` | 100% | 1,205 | — | — |
-| `is_primary` | 100% | 1,205 | 1 | yes |
-| `mime` | 100% | 1,205 | 2 | yes |
-| `storage_path` | 100% | 1,205 | 1,156 | — |
-| `width` | 100% | 1,205 | — | — |
+| `artwork_kind_id` | 100% | 1,206 | — | — |
+| `created_at` | 100% | 1,206 | — | — |
+| `entity_id` | 100% | 1,206 | — | — |
+| `entity_type` | 100% | 1,206 | 1 | yes |
+| `height` | 100% | 1,206 | — | — |
+| `id` | 100% | 1,206 | — | — |
+| `is_primary` | 100% | 1,206 | 1 | yes |
+| `mime` | 100% | 1,206 | 2 | yes |
+| `storage_path` | 100% | 1,206 | 1,157 | — |
+| `width` | 100% | 1,206 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `artwork_kinds` | `artwork_kind_id` | 1 | 1 | 1070 | 1,070 | 4 of 8 |
+| `artwork_kinds` | `artwork_kind_id` | 1 | 1 | 1071 | 1,071 | 4 of 8 |
 
 ### Table: artwork_kinds
 
@@ -2484,64 +7100,64 @@ Children per parent:
 
 ### Table: asset_tags
 
-**2,860 rows.**
+**2,862 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `asset_id` | 100% | 2,860 | — | — |
-| `created_at` | 100% | 2,860 | — | — |
-| `tag_id` | 100% | 2,860 | — | — |
+| `asset_id` | 100% | 2,862 | — | — |
+| `created_at` | 100% | 2,862 | — | — |
+| `tag_id` | 100% | 2,862 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 2 | 3 | 4 | 1,381 of 13,343 |
-| `tags` | `tag_id` | 1 | 30 | 504 | 738 | 35 of 46 |
+| `assets` | `asset_id` | 1 | 2 | 3 | 4 | 1,382 of 13,344 |
+| `tags` | `tag_id` | 1 | 30 | 504 | 739 | 35 of 46 |
 
 ### Table: assets
 
-**13,343 rows.**
+**13,344 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `master_asset_id` | 0% | 10 | — | — |
 | `edition` | 1% | 146 | 10 | yes |
-| `container_format` | 99% | 13,195 | 4 | yes |
-| `mtime` | 99% | 13,213 | — | — |
-| `last_seen` | 100% | 13,293 | — | — |
-| `bitrate` | 100% | 13,343 | — | — |
-| `created_at` | 100% | 13,343 | — | — |
-| `duration` | 100% | 13,343 | — | — |
-| `filename` | 100% | 13,343 | ≥5,000 | — |
-| `id` | 100% | 13,343 | — | — |
-| `path` | 100% | 13,343 | ≥5,000 | — |
-| `size` | 100% | 13,343 | — | — |
+| `container_format` | 99% | 13,196 | 4 | yes |
+| `mtime` | 99% | 13,214 | — | — |
+| `last_seen` | 100% | 13,294 | — | — |
+| `bitrate` | 100% | 13,344 | — | — |
+| `created_at` | 100% | 13,344 | — | — |
+| `duration` | 100% | 13,344 | — | — |
+| `filename` | 100% | 13,344 | ≥5,000 | — |
+| `id` | 100% | 13,344 | — | — |
+| `path` | 100% | 13,344 | ≥5,000 | — |
+| `size` | 100% | 13,344 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `master_asset_id` | 1 | 1 | 4 | 4 | 6 of 13,343 |
+| `assets` | `master_asset_id` | 1 | 1 | 4 | 4 | 6 of 13,344 |
 
 ### Table: external_identifiers
 
-**1,514 rows.**
+**1,515 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 1,514 | — | — |
-| `entity_id` | 100% | 1,514 | — | — |
-| `entity_type` | 100% | 1,514 | 2 | yes |
-| `external_id` | 100% | 1,514 | 1,514 | — |
-| `id` | 100% | 1,514 | — | — |
-| `scheme_id` | 100% | 1,514 | — | — |
+| `created_at` | 100% | 1,515 | — | — |
+| `entity_id` | 100% | 1,515 | — | — |
+| `entity_type` | 100% | 1,515 | 2 | yes |
+| `external_id` | 100% | 1,515 | 1,515 | — |
+| `id` | 100% | 1,515 | — | — |
+| `scheme_id` | 100% | 1,515 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `id_schemes` | `scheme_id` | 133 | 670 | 711 | 711 | 3 of 3 |
+| `id_schemes` | `scheme_id` | 133 | 671 | 711 | 711 | 3 of 3 |
 
 ### Table: id_schemes
 
@@ -2556,82 +7172,82 @@ Children per parent:
 
 ### Table: jobs
 
-**3,124 rows.**
+**3,128 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `heartbeat_at` | 55% | 1,708 | — | — |
-| `completed_at` | 100% | 3,121 | — | — |
-| `created_at` | 100% | 3,124 | — | — |
-| `job_key` | 100% | 3,124 | 3,124 | — |
+| `heartbeat_at` | 55% | 1,712 | — | — |
+| `completed_at` | 100% | 3,125 | — | — |
+| `created_at` | 100% | 3,128 | — | — |
+| `job_key` | 100% | 3,128 | 3,128 | — |
 
 ### Table: media_transform_requests
 
-**18,291 rows.**
+**18,294 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `parent_transform_request_id` | 16% | 2,963 | — | — |
-| `first_heartbeat` | 20% | 3,650 | — | — |
-| `last_heartbeat` | 20% | 3,650 | — | — |
-| `on_failure` | 25% | 4,483 | — | — |
-| `on_success` | 25% | 4,483 | — | — |
+| `parent_transform_request_id` | 16% | 2,965 | — | — |
+| `first_heartbeat` | 20% | 3,653 | — | — |
+| `last_heartbeat` | 20% | 3,653 | — | — |
+| `on_failure` | 25% | 4,486 | — | — |
+| `on_success` | 25% | 4,486 | — | — |
 | `worker_notes` | 77% | 14,166 | ≥5,000 | — |
-| `external_job_id` | 90% | 16,518 | 2,717 | — |
-| `duration` | 97% | 17,707 | — | — |
-| `parameters` | 99% | 18,192 | — | — |
-| `worker` | 100% | 18,239 | 1,068 | — |
-| `actioned` | 100% | 18,291 | 1 | yes |
-| `asset_id` | 100% | 18,291 | — | — |
-| `created_at` | 100% | 18,291 | — | — |
-| `id` | 100% | 18,291 | — | — |
-| `outcome` | 100% | 18,291 | 3 | yes |
-| `processed_at` | 100% | 18,291 | — | — |
-| `transform_type` | 100% | 18,291 | 11 | yes |
+| `external_job_id` | 90% | 16,521 | 2,720 | — |
+| `duration` | 97% | 17,710 | — | — |
+| `parameters` | 99% | 18,195 | — | — |
+| `worker` | 100% | 18,242 | 1,071 | — |
+| `actioned` | 100% | 18,294 | 1 | yes |
+| `asset_id` | 100% | 18,294 | — | — |
+| `created_at` | 100% | 18,294 | — | — |
+| `id` | 100% | 18,294 | — | — |
+| `outcome` | 100% | 18,294 | 3 | yes |
+| `processed_at` | 100% | 18,294 | — | — |
+| `transform_type` | 100% | 18,294 | 11 | yes |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 4 | 17 | 13,328 of 13,343 |
-| `media_transform_requests` | `parent_transform_request_id` | 1 | 2 | 3 | 4 | 1,493 of 18,291 |
+| `assets` | `asset_id` | 1 | 1 | 4 | 17 | 13,329 of 13,344 |
+| `media_transform_requests` | `parent_transform_request_id` | 1 | 2 | 3 | 4 | 1,494 of 18,294 |
 
 ### Table: metadata
 
-**14,576 rows.**
+**14,578 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `asset_id` | 100% | 14,576 | — | — |
-| `created_at` | 100% | 14,576 | — | — |
-| `data` | 100% | 14,576 | — | — |
-| `id` | 100% | 14,576 | — | — |
-| `metadata_type` | 100% | 14,576 | 7 | yes |
-| `updated_at` | 100% | 14,576 | — | — |
+| `asset_id` | 100% | 14,578 | — | — |
+| `created_at` | 100% | 14,578 | — | — |
+| `data` | 100% | 14,578 | — | — |
+| `id` | 100% | 14,578 | — | — |
+| `metadata_type` | 100% | 14,578 | 7 | yes |
+| `updated_at` | 100% | 14,578 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 2 | 4 | 13,231 of 13,343 |
+| `assets` | `asset_id` | 1 | 1 | 2 | 4 | 13,232 of 13,344 |
 
 ### Table: run_summaries
 
-**1,131 rows.**
+**1,134 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 1,131 | — | — |
-| `extras` | 100% | 1,131 | — | — |
-| `failed_count` | 100% | 1,131 | — | — |
-| `id` | 100% | 1,131 | — | — |
-| `processed_count` | 100% | 1,131 | — | — |
-| `running_time` | 100% | 1,131 | — | — |
-| `started_at` | 100% | 1,131 | — | — |
-| `success_count` | 100% | 1,131 | — | — |
-| `transform_type` | 100% | 1,131 | 6 | yes |
-| `worker_name` | 100% | 1,131 | 1,131 | — |
-| `worker_type` | 100% | 1,131 | 6 | yes |
+| `created_at` | 100% | 1,134 | — | — |
+| `extras` | 100% | 1,134 | — | — |
+| `failed_count` | 100% | 1,134 | — | — |
+| `id` | 100% | 1,134 | — | — |
+| `processed_count` | 100% | 1,134 | — | — |
+| `running_time` | 100% | 1,134 | — | — |
+| `started_at` | 100% | 1,134 | — | — |
+| `success_count` | 100% | 1,134 | — | — |
+| `transform_type` | 100% | 1,134 | 6 | yes |
+| `worker_name` | 100% | 1,134 | 1,134 | — |
+| `worker_type` | 100% | 1,134 | 6 | yes |
 
 ### Table: runner_state
 
@@ -2645,7 +7261,7 @@ Children per parent:
 
 ### Table: scanner_run_summaries
 
-**167 rows.**
+**171 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
@@ -2656,45 +7272,45 @@ Children per parent:
 | `scan_path` | 0% | 0 | 0 | — |
 | `total_count` | 0% | 0 | — | — |
 | `unsupported_file_count` | 0% | 0 | — | — |
-| `excluded_count` | 14% | 23 | — | — |
-| `error_count` | 66% | 111 | — | — |
-| `created_at` | 100% | 167 | — | — |
-| `dry_run` | 100% | 167 | 2 | yes |
-| `extras` | 100% | 167 | — | — |
-| `id` | 100% | 167 | — | — |
-| `previously_seen_count` | 100% | 167 | — | — |
-| `processed_count` | 100% | 167 | — | — |
-| `running_time` | 100% | 167 | — | — |
-| `started_at` | 100% | 167 | — | — |
-| `worker_name` | 100% | 167 | 29 | yes |
-| `worker_type` | 100% | 167 | 8 | yes |
+| `excluded_count` | 13% | 23 | — | — |
+| `error_count` | 66% | 113 | — | — |
+| `created_at` | 100% | 171 | — | — |
+| `dry_run` | 100% | 171 | 2 | yes |
+| `extras` | 100% | 171 | — | — |
+| `id` | 100% | 171 | — | — |
+| `previously_seen_count` | 100% | 171 | — | — |
+| `processed_count` | 100% | 171 | — | — |
+| `running_time` | 100% | 171 | — | — |
+| `started_at` | 100% | 171 | — | — |
+| `worker_name` | 100% | 171 | 29 | yes |
+| `worker_type` | 100% | 171 | 8 | yes |
 
 ### Table: streams
 
-**65,210 rows.**
+**65,212 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `title` | 22% | 14,185 | 12 | yes |
-| `frame_rate` | 29% | 18,673 | — | — |
-| `height` | 29% | 18,840 | — | — |
-| `width` | 29% | 18,840 | — | — |
-| `channels` | 32% | 21,166 | — | — |
-| `sample_rate` | 32% | 21,166 | — | — |
-| `language` | 92% | 59,743 | 60 | yes |
-| `codec_name` | 100% | 65,205 | 21 | yes |
-| `asset_id` | 100% | 65,210 | — | — |
-| `codec_type` | 100% | 65,210 | 4 | yes |
-| `id` | 100% | 65,210 | — | — |
-| `is_default` | 100% | 65,210 | 1 | yes |
-| `is_forced` | 100% | 65,210 | 1 | yes |
-| `stream_index` | 100% | 65,210 | — | — |
+| `frame_rate` | 29% | 18,674 | — | — |
+| `height` | 29% | 18,841 | — | — |
+| `width` | 29% | 18,841 | — | — |
+| `channels` | 32% | 21,167 | — | — |
+| `sample_rate` | 32% | 21,167 | — | — |
+| `language` | 92% | 59,745 | 60 | yes |
+| `codec_name` | 100% | 65,207 | 21 | yes |
+| `asset_id` | 100% | 65,212 | — | — |
+| `codec_type` | 100% | 65,212 | 4 | yes |
+| `id` | 100% | 65,212 | — | — |
+| `is_default` | 100% | 65,212 | 1 | yes |
+| `is_forced` | 100% | 65,212 | 1 | yes |
+| `stream_index` | 100% | 65,212 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 3 | 20 | 79 | 12,997 of 13,343 |
+| `assets` | `asset_id` | 1 | 3 | 20 | 79 | 12,998 of 13,344 |
 
 ### Table: tags
 
@@ -2718,26 +7334,26 @@ Children per parent:
 
 ### Table: title_contents
 
-**1,907 rows.**
+**1,908 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `child_title_id` | 27% | 509 | — | — |
-| `asset_id` | 73% | 1,398 | — | — |
-| `label` | 99% | 1,888 | 271 | — |
-| `id` | 100% | 1,907 | — | — |
-| `kind` | 100% | 1,907 | 2 | yes |
-| `membership` | 100% | 1,907 | 2 | yes |
-| `parent_title_id` | 100% | 1,907 | — | — |
-| `position` | 100% | 1,907 | — | — |
+| `asset_id` | 73% | 1,399 | — | — |
+| `label` | 99% | 1,889 | 271 | — |
+| `id` | 100% | 1,908 | — | — |
+| `kind` | 100% | 1,908 | 2 | yes |
+| `membership` | 100% | 1,908 | 2 | yes |
+| `parent_title_id` | 100% | 1,908 | — | — |
+| `position` | 100% | 1,908 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 1 | 1 | 1,398 of 13,343 |
-| `titles` | `child_title_id` | 1 | 1 | 1 | 1 | 509 of 1,597 |
-| `titles` | `parent_title_id` | 1 | 1 | 2 | 35 | 1,584 of 1,597 |
+| `assets` | `asset_id` | 1 | 1 | 1 | 1 | 1,399 of 13,344 |
+| `titles` | `child_title_id` | 1 | 1 | 1 | 1 | 509 of 1,598 |
+| `titles` | `parent_title_id` | 1 | 1 | 2 | 35 | 1,585 of 1,598 |
 
 ### Table: title_references
 
@@ -2753,20 +7369,20 @@ Children per parent:
 
 ### Table: title_tags
 
-**870 rows.**
+**871 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 870 | — | — |
-| `tag_id` | 100% | 870 | — | — |
-| `title_id` | 100% | 870 | — | — |
+| `created_at` | 100% | 871 | — | — |
+| `tag_id` | 100% | 871 | — | — |
+| `title_id` | 100% | 871 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `tags` | `tag_id` | 1 | 3 | 721 | 721 | 9 of 46 |
-| `titles` | `title_id` | 1 | 1 | 1 | 4 | 858 of 1,597 |
+| `tags` | `tag_id` | 1 | 3 | 722 | 722 | 9 of 46 |
+| `titles` | `title_id` | 1 | 1 | 1 | 4 | 859 of 1,598 |
 
 ### Table: title_types
 
@@ -2781,22 +7397,87 @@ Children per parent:
 
 ### Table: titles
 
-**1,597 rows.**
+**1,598 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `release_year` | 56% | 887 | — | — |
-| `synopsis` | 96% | 1,526 | 1,444 | — |
-| `id` | 100% | 1,597 | — | — |
-| `library_root` | 100% | 1,597 | 2 | yes |
-| `name` | 100% | 1,597 | 1,293 | — |
-| `title_type_id` | 100% | 1,597 | — | — |
+| `release_year` | 56% | 888 | — | — |
+| `synopsis` | 96% | 1,527 | 1,445 | — |
+| `id` | 100% | 1,598 | — | — |
+| `library_root` | 100% | 1,598 | 2 | yes |
+| `name` | 100% | 1,598 | 1,294 | — |
+| `title_type_id` | 100% | 1,598 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `title_types` | `title_type_id` | 11 | 107 | 740 | 740 | 6 of 8 |
+| `title_types` | `title_type_id` | 11 | 107 | 741 | 741 | 6 of 8 |
+
+## Error taxonomy
+
+Every non-2xx response the 61 write endpoints can produce, grouped by status and condition rather than by endpoint. A front end needs one handler for this table, not one per route.
+
+**3 of these 21 conditions come back with nothing a user could be shown.** They are distinguishable by status, but the body names neither the field nor the cause, so an interface can only print something generic. That is a back-end issue: the front end cannot work around it.
+
+| Status | Condition | Body | Usable message | Endpoints |
+|---|---|---|---|---|
+| `400` | Bad Request - the file is empty, or is not a readable image | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
+| `400` | Heartbeat rejected | `{"detail": ...}` | yes | `PATCH /api/transform_requests/{request_id}/heartbeat` |
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+56 more)* |
+| `404` | Asset does not exist | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/tags/{tag_id}` |
+| `404` | Asset not found | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/ids` |
+| `404` | External ID not found or doesn't belong to this asset | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/ids/{record_id}`, `PATCH /api/assets/{asset_id}/ids/{record_id}` |
+| `404` | External ID not found or doesn't belong to this title | `{"detail": ...}` | yes | `DELETE /api/titles/{title_id}/ids/{record_id}`, `PATCH /api/titles/{title_id}/ids/{record_id}` |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams`, `DELETE /api/title_types/{title_type_id}` *(+33 more)* |
+| `404` | Title does not exist | `{"detail": ...}` | yes | `DELETE /api/titles/{title_id}/tags/{tag_id}` |
+| `404` | Title not found | `{"detail": ...}` | yes | `POST /api/titles/{title_id}/ids` |
+| `409` | Conflict - the title type is still used by one or more titles | `{"detail": ...}` | yes | `DELETE /api/title_types/{title_type_id}` |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+53 more)* |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated. This external ID may already exist."}` | **no** | `POST /api/id_schemes`, `POST /api/tags`, `POST /api/titles/{parent_title_id}/contents`, `POST /api/titles/{title_id}/ids` |
+| `409` | violates `no_self_containment_chk` | `{"detail": "A title cannot contain itself."}` | yes | `POST /api/titles/{parent_title_id}/contents` |
+| `413` | Payload Too Large - the file exceeds the size or pixel cap | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
+| `415` | Unsupported Media Type - the file is not a supported image | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+54 more)* |
+| `422` | Validation Error | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/tags/{tag_id}`, `DELETE /api/titles/{title_id}/tags/{tag_id}` |
+| `422` | violates `id_schemes.code varchar(16)` | `{"detail": [{"loc": [], "msg": "Invalid enum value.", "type": "domain_error"}]}` | **no** | `POST /api/id_schemes` |
+| `422` | violates `one_target_chk` | `{"detail": [{"loc": [], "msg": "CHECK constraint violated.", "type": "domain_error"}]}` | **no** | `POST /api/titles/{parent_title_id}/contents` |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+54 more)* |
+
+## Constraint map
+
+26 unique, check and foreign-key constraints the models declare. 2 were reached by a write probe in this run; the rest are listed with their definition and no observed response, because assuming one would be inventing it.
+
+**1 produce a response a UI cannot turn into a message.** Those rows are the actionable ones: they need a distinguishable error at the source, not a workaround in the client.
+
+| Constraint | Table | Kind | Definition | Status | UI can show | Message |
+|---|---|---|---|---|---|---|
+| `ck_artwork_source_pair` | `artwork` | check | CHECK (source_scheme_id IS NULL) = (source_external_id IS NULL) | not probed | UNKNOWN | — |
+| `ck_artwork_valid_height` | `artwork` | check | CHECK height > 0 | not probed | UNKNOWN | — |
+| `ck_artwork_valid_width` | `artwork` | check | CHECK width > 0 | not probed | UNKNOWN | — |
+| `entity_type_enum` | `artwork` | check | CHECK artwork.entity_type IN (__[POSTCOMPILE_param_1]) | not probed | UNKNOWN | — |
+| `uq_artwork_entity_storage_path` | `artwork` | unique (index) | UNIQUE (entity_type, entity_id, storage_path) | not probed | UNKNOWN | — |
+| `uq_artwork_one_primary_per_kind` | `artwork` | unique (partial index) | UNIQUE (entity_type, entity_id, artwork_kind_id) WHERE artwork.is_primary IS true | not probed | UNKNOWN | — |
+| `ix_artwork_kinds_code` | `artwork_kinds` | unique (index) | UNIQUE (code) | not probed | UNKNOWN | — |
+| `ck_asset_not_own_master` | `assets` | check | CHECK master_asset_id IS NULL OR master_asset_id <> id | not probed | UNKNOWN | — |
+| `ck_asset_valid_bitrate` | `assets` | check | CHECK bitrate >= 0 | not probed | UNKNOWN | — |
+| `ck_asset_valid_duration` | `assets` | check | CHECK duration >= 0 | not probed | UNKNOWN | — |
+| `ck_asset_valid_size` | `assets` | check | CHECK size >= 0 | not probed | UNKNOWN | — |
+| `uq_asset_scheme` | `external_asset_ids` | unique | UNIQUE (asset_id, scheme_id) | not probed | UNKNOWN | — |
+| `uq_scheme_external_id` | `external_asset_ids` | unique | UNIQUE (scheme_id, external_id) | not probed | UNKNOWN | — |
+| `entity_type_enum` | `external_identifiers` | check | CHECK external_identifiers.entity_type IN (__[POSTCOMPILE_param_1]) | not probed | UNKNOWN | — |
+| `uq_external_identifier_scheme_id` | `external_identifiers` | unique | UNIQUE (scheme_id, external_id) | not probed | UNKNOWN | — |
+| `ix_id_schemes_code` | `id_schemes` | unique (index) | UNIQUE (code) | not probed | UNKNOWN | — |
+| `check_processed_at_matches_actioned` | `media_transform_requests` | check | CHECK ((actioned = true) AND (processed_at IS NOT NULL) AND (outcome IS NOT NULL)) OR ((actioned = false) AND (processed_at IS NULL) AND (outcome IS NULL)) | not probed | UNKNOWN | — |
+| `uniq_pending_transform_per_asset_and_type` | `media_transform_requests` | unique (partial index) | UNIQUE (asset_id, transform_type) WHERE (actioned = false) | not probed | UNKNOWN | — |
+| `ix_tags_name` | `tags` | unique (index) | UNIQUE (name) | not probed | UNKNOWN | — |
+| `no_self_containment_chk` | `title_contents` | check | CHECK child_title_id IS DISTINCT FROM parent_title_id | `409` | yes | {"detail": "A title cannot contain itself."} |
+| `one_target_chk` | `title_contents` | check | CHECK (  (kind = 'asset' AND asset_id IS NOT NULL AND child_title_id IS NULL)  OR  (kind = 'title' AND child_title_id IS NOT NULL AND asset_id IS NULL)) | `422` | **no** | nothing usable -- the body names neither the field nor the cause |
+| `uq_one_intrinsic_parent` | `title_contents` | unique (partial index) | UNIQUE (child_title_id) WHERE title_contents.child_title_id IS NOT NULL AND title_contents.membership = :param_1 | not probed | UNKNOWN | — |
+| `uq_parent_asset_once` | `title_contents` | unique (partial index) | UNIQUE (parent_title_id, asset_id) WHERE title_contents.asset_id IS NOT NULL | not probed | UNKNOWN | — |
+| `uq_parent_child_title_once` | `title_contents` | unique (partial index) | UNIQUE (parent_title_id, child_title_id) WHERE title_contents.child_title_id IS NOT NULL | not probed | UNKNOWN | — |
+| `uq_parent_position` | `title_contents` | unique | UNIQUE (parent_title_id, position) | not probed | UNKNOWN | — |
+| `ix_title_types_code` | `title_types` | unique (index) | UNIQUE (code) | not probed | UNKNOWN | — |
 
 ## Candidates for removal
 
@@ -2814,11 +7495,13 @@ Nothing has been deleted. This is a list of questions, not actions.
 
 ## Gaps
 
-1 value(s) could not be established. Each is listed with the specific thing that would settle it.
+3 value(s) could not be established. Each is listed with the specific thing that would settle it.
 
 | Scope | Not known | What would settle it |
 |---|---|---|
 | `Phase 5` | whether an endpoint has any real caller | re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories |
+| `Phase 6` | what a repeated request does to 54 of 61 write endpoints | declare a `repeat` scenario for them under `write_probes` in probes.yaml. Their contracts are otherwise derived from the code; only repetition is unmeasured, and it cannot be read off the verb — of the routes probed here, one is idempotent and four are guarded, none of which the method predicted |
+| `Phase 6` | what the API returns when 24 of 26 constraints are violated | declare a `violation` scenario naming the constraint. Until then the Constraint map lists them with their definition and no observed response, because assuming one would invent it: `check_processed_at_matches_actioned`, `ck_artwork_source_pair`, `ck_artwork_valid_height`, `ck_artwork_valid_width`, `ck_asset_not_own_master`, `ck_asset_valid_bitrate` and others |
 
 ## Index inventory
 

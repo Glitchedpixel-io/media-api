@@ -31,8 +31,12 @@ from . import (
     render,
     static_surface,
     verdict,
+    write_assemble,
+    write_contracts,
+    write_probes,
+    write_semantics,
 )
-from .models import DataShape, Inventory, ProbeResult, Unknown
+from .models import DataShape, EndpointRecord, Inventory, ProbeResult, Unknown, WriteContract
 
 _DEFAULT_MARKDOWN = Path("docs/capability-inventory.md")
 _DEFAULT_JSON = Path("docs/capability-inventory.json")
@@ -71,6 +75,24 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "skip Phase 3. No database is contacted; row counts, fill rates and "
             "collection sizes read UNKNOWN."
+        ),
+    )
+    parser.add_argument(
+        "--skip-writes",
+        action="store_true",
+        help=(
+            "skip Phase 6. No write is attempted; every write contract reports what "
+            "the code implies and UNKNOWN for what only a request could settle."
+        ),
+    )
+    parser.add_argument(
+        "--allow-writes",
+        action="store_true",
+        help=(
+            "permit Phase 6 to mutate the disposable target named by "
+            f"{write_semantics.BASE_URL_ENV} and {write_semantics.DATABASE_URL_ENV}. "
+            "Required in addition to those variables: Phase 6 never writes on the "
+            "strength of configuration alone."
         ),
     )
     parser.add_argument(
@@ -283,12 +305,18 @@ def _rerender(args: argparse.Namespace, root: Path) -> Inventory:
     inventory = load.from_json(source)
 
     endpoints = tuple(
-        verdict.apply(
-            surface=record.surface,
-            annotation=record.annotation,
-            probes=record.probes,
-            shape=inventory.data_shape,
-            usage=record.usage,
+        _with_write_contract(
+            verdict.apply(
+                surface=record.surface,
+                annotation=record.annotation,
+                probes=record.probes,
+                shape=inventory.data_shape,
+                usage=record.usage,
+            ),
+            # Carried across from the stored artefact rather than re-derived: the
+            # static half would come back the same, but the probed half cannot be
+            # reproduced without writing, and --from-json writes nothing.
+            record.write_contract,
         )
         for record in inventory.endpoints
     )
@@ -479,13 +507,106 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
         )
     phases_run.append("5 (dead surface)")
 
+    # -- Phase 6 -----------------------------------------------------------
+    # Contracts are derived for every write route whether or not the phase runs.
+    # The static half needs nothing but the code, and reporting UNKNOWN for facts
+    # the repository already answers would be a gap the harness invented.
+    write_routes = [route for route in routes if route.method not in ("GET", "HEAD")]
+    contracts: dict[str, WriteContract] = {
+        route.key: write_contracts.derive(route, annotations[route.key], _spec, graph)
+        for route in write_routes
+    }
+    constraints = write_contracts.constraints_from_metadata()
+
+    if args.skip_writes:
+        phases_skipped.append("6 (write semantics)")
+        unknowns.append(write_semantics.skipped_unknown("--skip-writes was passed"))
+    else:
+        try:
+            target = write_semantics.resolve_target(allow_writes=args.allow_writes)
+            write_semantics.bind_check(target)
+        except write_semantics.WriteTargetError as exc:
+            phases_skipped.append("6 (write semantics)")
+            unknowns.append(write_semantics.skipped_unknown(str(exc)))
+            notes.append(
+                "Phase 6 did not probe: "
+                f"{exc}. Write contracts below are derived from the code; what only a "
+                "request could settle reads UNKNOWN."
+            )
+        else:
+            scenarios = probes.load_write_scenarios(args.probes_file)
+            # Named apart from Phase 4's `results`. Reusing that name worked --
+            # Phase 6 runs after Phase 4 and only reads its own -- but it left two
+            # unrelated result types sharing one identifier in one function, which
+            # is how a later edit silently hands one phase the other's data.
+            write_results, write_unknowns = write_probes.run_suite(scenarios, target)
+            unknowns.extend(write_unknowns)
+            by_endpoint: dict[str, list[write_probes.WriteProbeResult]] = {}
+            for write_result in write_results:
+                by_endpoint.setdefault(write_result.endpoint_key, []).append(write_result)
+            contracts = {
+                key: write_assemble.apply_probes(contract, tuple(by_endpoint.get(key, ())))
+                for key, contract in contracts.items()
+            }
+            constraints = write_assemble.constraint_map(write_results, constraints)
+            unprobed = sorted(k for k, c in contracts.items() if not c.probed)
+            if unprobed:
+                unknowns.append(
+                    Unknown(
+                        scope="Phase 6",
+                        question=(
+                            f"what a repeated request does to {len(unprobed)} of "
+                            f"{len(contracts)} write endpoints"
+                        ),
+                        resolution=(
+                            "declare a `repeat` scenario for them under `write_probes` in "
+                            "probes.yaml. Their contracts are otherwise derived from the "
+                            "code; only repetition is unmeasured, and it cannot be read "
+                            "off the verb — of the routes probed here, one is idempotent "
+                            "and four are guarded, none of which the method predicted"
+                        ),
+                    )
+                )
+            unreached = sorted(c.name for c in constraints if c.status is None)
+            if unreached:
+                unknowns.append(
+                    Unknown(
+                        scope="Phase 6",
+                        question=(
+                            f"what the API returns when {len(unreached)} of "
+                            f"{len(constraints)} constraints are violated"
+                        ),
+                        resolution=(
+                            "declare a `violation` scenario naming the constraint. Until "
+                            "then the Constraint map lists them with their definition and "
+                            "no observed response, because assuming one would invent it: "
+                            + ", ".join(f"`{name}`" for name in unreached[:6])
+                            + (" and others" if len(unreached) > 6 else "")
+                        ),
+                    )
+                )
+            phases_run.append("6 (write semantics)")
+            notes.append(
+                f"Phase 6 probed `{target.base_url}` against a disposable database "
+                f"(fingerprint `{target.fingerprint.split('/')[0]}`), verified bound to it "
+                f"by sentinel before any write. {write_assemble.summarise(write_results)}."
+            )
+            if target.media_root is None:
+                notes.append(
+                    "No scratch media root was configured, so filesystem-touching write "
+                    "probes were skipped rather than run against a real one."
+                )
+
     records = tuple(
-        verdict.apply(
-            surface=route,
-            annotation=annotations[route.key],
-            probes=tuple(probe_results.get(route.key, ())),
-            shape=shape,
-            usage=usage.get(route.key),
+        _with_write_contract(
+            verdict.apply(
+                surface=route,
+                annotation=annotations[route.key],
+                probes=tuple(probe_results.get(route.key, ())),
+                shape=shape,
+                usage=usage.get(route.key),
+            ),
+            contracts.get(route.key),
         )
         for route in routes
     )
@@ -499,8 +620,30 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
         indexes=index_inventory,
         data_shape=shape,
         unknowns=tuple(unknowns),
+        constraint_map=constraints,
         notes=tuple(notes),
     )
+
+
+def _with_write_contract(record: EndpointRecord, contract: WriteContract | None) -> EndpointRecord:
+    """Attach a write contract and let it decide the endpoint's verdict.
+
+    A write's verdict used to be a property of its query shape, which is why
+    fifty-eight of them shared one sentence. It is a property of its contract,
+    so once the contract exists it replaces that sentence -- and with it the
+    ``write`` class the renderer used to collapse them by.
+
+    Args:
+        record: The record :func:`verdict.apply` produced.
+        contract: The endpoint's write contract, or None for a read.
+
+    Returns:
+        The record, with the contract and its verdict attached when there is one.
+    """
+    if contract is None:
+        return record
+    text, severity = write_assemble.verdict_for(contract, record.surface.method)
+    return replace(record, write_contract=contract, verdict=text, verdict_class=severity)
 
 
 def _tables_for(annotation: object) -> set[str]:

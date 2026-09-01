@@ -419,9 +419,110 @@ def _endpoint_section(
     out += _param_table(record)
     out += _queries_block(record)
     out += _data_shape_block(record, shape, present)
+    out += _write_contract_block(record)
     out += _measured_block(record)
     out += _risk_block(record)
     out += ["---", ""]
+    return out
+
+
+def _write_contract_block(record: EndpointRecord) -> list[str]:
+    """What a form building on this endpoint has to send, and handle.
+
+    Rendered for every mutating endpoint. This replaced the collapsed **Write
+    endpoints** table, which said the same sentence about fifty-eight routes and
+    so said nothing about any of them: the query shape they shared was never what
+    a form gets wrong.
+    """
+    contract = record.write_contract
+    if contract is None:
+        return []
+
+    out = ["#### Write contract", ""]
+
+    if contract.fields:
+        out += [
+            "| Field | Type | Required | Omitted means | Explicit null means | Constraints |",
+            "|---|---|---|---|---|---|",
+        ]
+        for f in contract.fields:
+            constraints = ", ".join(f"`{k}={v}`" for k, v in sorted(f.constraints.items())) or "—"
+            name = f"`{f.name}`" + (" *(server-controlled)*" if f.server_controlled else "")
+            out.append(
+                f"| {name} | `{_escape(f.type_)}` | {'yes' if f.required else 'no'} | "
+                f"{_escape(f.omitted_means)} | {_escape(f.null_means or '—')} | "
+                f"{_escape(constraints)} |"
+            )
+        out.append("")
+    else:
+        out += ["No request body.", ""]
+
+    out += [f"{_escape(contract.omission_semantics)}", ""]
+
+    facts = [
+        ("Unknown fields", contract.unknown_fields),
+        ("Repeat", f"{contract.idempotency} — {contract.idempotency_evidence}"),
+        (
+            "Atomic",
+            ("UNKNOWN" if contract.atomic is None else ("yes" if contract.atomic else "no"))
+            + f" — {contract.atomicity_note}",
+        ),
+        ("Concurrency", contract.concurrency),
+        ("Auth", contract.auth),
+        ("Audience", contract.audience),
+    ]
+    out += ["| | |", "|---|---|"]
+    for label, value in facts:
+        out.append(f"| **{label}** | {_escape(str(value))} |")
+    out.append("")
+
+    if contract.side_effects:
+        out += ["**Side effects**", ""]
+        for effect in contract.side_effects:
+            out.append(f"- *{effect.kind}* — {_escape(effect.detail)}")
+        out.append("")
+
+    delete = contract.delete
+    if delete is not None:
+        out += [
+            "**Delete semantics**",
+            "",
+            "| | |",
+            "|---|---|",
+            f"| **Destroys** | {_escape(delete.destroys)} |",
+            f"| **Detaches** | {_escape(delete.detaches)} |",
+            f"| **Children** | {_escape(delete.children)} |",
+            f"| **Reachable with references** | "
+            f"{'UNKNOWN' if delete.reachable_with_references is None else ('yes' if delete.reachable_with_references else 'no')} |",
+            f"| **The button must say** | {_escape(delete.ui_vocabulary)} |",
+            "",
+        ]
+
+    if contract.errors:
+        out += [
+            "**Errors**",
+            "",
+            "| Status | Condition | Body | Usable message |",
+            "|---|---|---|---|",
+        ]
+        for error in sorted(contract.errors, key=lambda e: (e.status, e.condition)):
+            usable = (
+                "UNKNOWN"
+                if error.usable_message is None
+                else ("yes" if error.usable_message else "**no**")
+            )
+            out.append(
+                f"| `{error.status}` | {_escape(error.condition)} | "
+                f"{_escape(error.body)} | {usable} |"
+            )
+        out.append("")
+
+    if not contract.probed:
+        out += [
+            "> Derived from the code alone — no write probe exercised this endpoint, so "
+            "repetition and the response to a constraint violation read UNKNOWN.",
+            "",
+        ]
     return out
 
 
@@ -591,6 +692,135 @@ def _tables_appendix(shape: DataShape | None, present: set[str]) -> list[str]:
     return out
 
 
+def _coverage_block(shape: DataShape | None) -> list[str]:
+    """The coverage figures the library surface's design turns on.
+
+    Given a section of its own rather than a line in the Tables appendix,
+    because these are not properties of a table. They are properties of the
+    population one surface renders, and a reader should not have to divide two
+    numbers with different denominators to get them.
+    """
+    if shape is None or not shape.coverage:
+        return []
+    out = [
+        "## Coverage",
+        "",
+        "Measured over the rows a surface actually renders, not over whole tables. "
+        "The library grid shows `library_root=true` Titles and makes first-class views "
+        "out of what they are missing, so these are the figures its design depends on.",
+        "",
+        "| Population | Attribute | Covered | Of | Share |",
+        "|---|---|---|---|---|",
+    ]
+    for metric in shape.coverage:
+        out.append(
+            f"| {_escape(metric.population)} | {_escape(metric.attribute)} | "
+            f"{metric.covered:,} | {metric.total:,} | **{metric.fraction * 100:.0f}%** |"
+        )
+    out.append("")
+    for metric in shape.coverage:
+        if metric.note:
+            out.append(f"- **{_escape(metric.attribute)}** — {_escape(metric.note)}.")
+    out.append("")
+    return out
+
+
+def _error_taxonomy(records: tuple[EndpointRecord, ...]) -> list[str]:
+    """One row per distinct status and condition, across every write endpoint.
+
+    The per-endpoint tables answer "what can this route return?". This inverts
+    them to answer the question a front end actually asks once: "what can *any*
+    write return, and which of those can I show a user?" -- so it builds one
+    error handler rather than sixty-one.
+    """
+    from .write_assemble import error_taxonomy  # noqa: PLC0415 -- avoids a cycle.
+
+    contracts = {r.key: r.write_contract for r in records if r.write_contract is not None}
+    if not contracts:
+        return []
+    rows = error_taxonomy(contracts)  # type: ignore[arg-type]
+    if not rows:
+        return []
+
+    unusable = [r for r in rows if r[3] is False]
+    out = [
+        "## Error taxonomy",
+        "",
+        f"Every non-2xx response the {len(contracts)} write endpoints can produce, "
+        "grouped by status and condition rather than by endpoint. A front end needs "
+        "one handler for this table, not one per route.",
+        "",
+    ]
+    if unusable:
+        out += [
+            f"**{len(unusable)} of these {len(rows)} conditions come back with nothing a "
+            "user could be shown.** They are distinguishable by status, but the body "
+            "names neither the field nor the cause, so an interface can only print "
+            "something generic. That is a back-end issue: the front end cannot work "
+            "around it.",
+            "",
+        ]
+    out += [
+        "| Status | Condition | Body | Usable message | Endpoints |",
+        "|---|---|---|---|---|",
+    ]
+    for status, condition, body, usable, endpoints in rows:
+        shown = ", ".join(f"`{k}`" for k in endpoints[:4])
+        if len(endpoints) > 4:
+            shown += f" *(+{len(endpoints) - 4} more)*"
+        label = "UNKNOWN" if usable is None else ("yes" if usable else "**no**")
+        out.append(f"| `{status}` | {_escape(condition)} | {_escape(body)} | {label} | {shown} |")
+    out.append("")
+    return out
+
+
+def _constraint_map(inventory: Inventory) -> list[str]:
+    """Every constraint a user could reach, and what the API makes of it.
+
+    The last column is the reason this appendix exists. A violation that arrives
+    as a 409 carrying a sentence is something a form can handle; one that arrives
+    with an empty ``loc`` and the words "CHECK constraint violated" is not, and no
+    front-end work recovers it.
+    """
+    constraints = inventory.constraint_map
+    if not constraints:
+        return []
+    probed = [c for c in constraints if c.status is not None]
+    generic = [c for c in probed if c.distinguishable is False]
+
+    out = [
+        "## Constraint map",
+        "",
+        f"{len(constraints)} unique, check and foreign-key constraints the models "
+        f"declare. {len(probed)} were reached by a write probe in this run; the rest "
+        "are listed with their definition and no observed response, because assuming "
+        "one would be inventing it.",
+        "",
+    ]
+    if generic:
+        out += [
+            f"**{len(generic)} produce a response a UI cannot turn into a message.** "
+            "Those rows are the actionable ones: they need a distinguishable error at "
+            "the source, not a workaround in the client.",
+            "",
+        ]
+    out += [
+        "| Constraint | Table | Kind | Definition | Status | UI can show | Message |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for c in constraints:
+        status = f"`{c.status}`" if c.status is not None else "not probed"
+        can_show = (
+            "UNKNOWN" if c.distinguishable is None else ("yes" if c.distinguishable else "**no**")
+        )
+        out.append(
+            f"| `{c.name}` | `{c.table}` | {c.kind} | {_escape(c.definition)} | "
+            f"{status} | {can_show} | {_escape(c.ui_message or '—')} |"
+        )
+    out.append("")
+    return out
+
+
 def _candidates_for_removal(records: tuple[EndpointRecord, ...]) -> list[str]:
     """The Candidates for removal section."""
     lines = ["## Candidates for removal", ""]
@@ -748,7 +978,9 @@ def to_markdown(inventory: Inventory) -> str:
     lines += ["## Summary", ""]
     lines += _summary_table(records)
     lines.append("")
+    lines += _coverage_block(shape)
 
+    writes = sum(1 for r in records if r.write_contract is not None)
     lines += ["## Endpoints", ""]
     if collapsed:
         lines += [
@@ -757,11 +989,25 @@ def to_markdown(inventory: Inventory) -> str:
             "[Write endpoints](#write-endpoints).",
             "",
         ]
+    elif writes:
+        lines += [
+            f"All {len(records)} endpoints have a section below, including each of the "
+            f"{writes} that write. Writes used to be collapsed into one table on the "
+            "grounds that a single-row write has nothing endpoint-specific to get "
+            "wrong. That was true of their query shape and false of their contract: "
+            "what a form gets wrong is whether a partial submit erases fields, whether "
+            "a retry duplicates, and whether a failure is legible — and those differ "
+            "per route. Each now carries a "
+            "[Write contract](#post-apititles) block saying so.",
+            "",
+        ]
     for record in detailed:
         lines += _endpoint_section(record, shape, present)
 
     lines += _write_table(collapsed)
     lines += _tables_appendix(shape, present)
+    lines += _error_taxonomy(records)
+    lines += _constraint_map(inventory)
     lines += _candidates_for_removal(records)
     lines += _gaps(inventory)
     lines += _index_inventory(inventory)

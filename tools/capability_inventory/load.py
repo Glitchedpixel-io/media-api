@@ -21,8 +21,13 @@ from typing import Any
 from .models import (
     CollectionStats,
     ColumnStats,
+    ConstraintMapping,
+    CoverageMetric,
     DataShape,
+    DeleteSemantics,
     EndpointRecord,
+    ErrorCase,
+    FieldContract,
     FieldInfo,
     FilterCoverage,
     IndexInfo,
@@ -34,9 +39,11 @@ from .models import (
     ResponseInfo,
     RouteAnnotation,
     RouteSurface,
+    SideEffect,
     Timing,
     Unknown,
     UsageEvidence,
+    WriteContract,
 )
 
 
@@ -218,12 +225,97 @@ def _usage(payload: dict[str, Any] | None) -> UsageEvidence | None:
     )
 
 
+def _field_contract(payload: dict[str, Any]) -> FieldContract:
+    return FieldContract(
+        name=payload["name"],
+        type_=payload.get("type_", "any"),
+        required=bool(payload.get("required")),
+        nullable=bool(payload.get("nullable")),
+        default=payload.get("default"),
+        omitted_means=payload.get("omitted_means", "UNKNOWN"),
+        null_means=payload.get("null_means"),
+        constraints=dict(payload.get("constraints") or {}),
+        server_controlled=bool(payload.get("server_controlled")),
+    )
+
+
+def _error_case(payload: dict[str, Any]) -> ErrorCase:
+    return ErrorCase(
+        status=str(payload["status"]),
+        condition=payload.get("condition", ""),
+        body=payload.get("body", ""),
+        usable_message=payload.get("usable_message"),
+        source=payload.get("source", "declared"),
+        note=payload.get("note", ""),
+    )
+
+
+def _side_effect(payload: dict[str, Any]) -> SideEffect:
+    return SideEffect(kind=payload.get("kind", ""), detail=payload.get("detail", ""))
+
+
+def _delete_semantics(payload: dict[str, Any] | None) -> DeleteSemantics | None:
+    if not payload:
+        return None
+    return DeleteSemantics(
+        destroys=payload.get("destroys", "UNKNOWN"),
+        detaches=payload.get("detaches", "UNKNOWN"),
+        children=payload.get("children", "UNKNOWN"),
+        reachable_with_references=payload.get("reachable_with_references"),
+        ui_vocabulary=payload.get("ui_vocabulary", ""),
+    )
+
+
+def _write_contract(payload: dict[str, Any] | None) -> WriteContract | None:
+    """Rebuild a Phase 6 contract.
+
+    Without this, ``--from-json`` would silently drop every write contract the
+    next time anyone re-rendered the committed document for presentation alone --
+    the loader reads field by field, so anything it does not know about vanishes.
+    """
+    if not payload:
+        return None
+    return WriteContract(
+        fields=tuple(_field_contract(f) for f in payload.get("fields") or ()),
+        unknown_fields=payload.get("unknown_fields", "UNKNOWN"),
+        omission_semantics=payload.get("omission_semantics", "UNKNOWN"),
+        idempotency=payload.get("idempotency", "UNKNOWN"),
+        idempotency_evidence=payload.get("idempotency_evidence", ""),
+        atomic=payload.get("atomic"),
+        atomicity_note=payload.get("atomicity_note", ""),
+        concurrency=payload.get("concurrency", "UNKNOWN"),
+        side_effects=tuple(_side_effect(s) for s in payload.get("side_effects") or ()),
+        delete=_delete_semantics(payload.get("delete")),
+        auth=payload.get("auth", "UNKNOWN"),
+        audience=payload.get("audience", "UNKNOWN"),
+        errors=tuple(_error_case(e) for e in payload.get("errors") or ()),
+        probed=bool(payload.get("probed")),
+        unknowns=tuple(_unknown(u) for u in payload.get("unknowns") or ()),
+    )
+
+
+def _constraint_mapping(payload: dict[str, Any]) -> ConstraintMapping:
+    return ConstraintMapping(
+        name=payload["name"],
+        table=payload.get("table", ""),
+        kind=payload.get("kind", ""),
+        definition=payload.get("definition", ""),
+        endpoints=tuple(payload.get("endpoints") or ()),
+        status=payload.get("status"),
+        body=payload.get("body", ""),
+        distinguishable=payload.get("distinguishable"),
+        ui_message=payload.get("ui_message", ""),
+        note=payload.get("note", ""),
+    )
+
+
 def _endpoint(payload: dict[str, Any]) -> EndpointRecord:
     return EndpointRecord(
         surface=_surface(_require(payload, "surface", "an endpoint record")),
         annotation=_annotation(payload.get("annotation")),
         probes=tuple(_probe(p) for p in payload.get("probes") or ()),
         usage=_usage(payload.get("usage")),
+        write_contract=_write_contract(payload.get("write_contract")),
         risks=tuple(payload.get("risks") or ()),
         verdict=payload.get("verdict", "UNKNOWN"),
         verdict_class=payload.get("verdict_class", "unknown"),
@@ -286,6 +378,17 @@ def _data_shape(payload: dict[str, Any] | None) -> DataShape | None:
         captured_from=payload["captured_from"],
         unknowns=tuple(_unknown(u) for u in payload.get("unknowns") or ()),
         baseline_rtt_ms=payload.get("baseline_rtt_ms"),
+        coverage=tuple(_coverage_metric(c) for c in payload.get("coverage") or ()),
+    )
+
+
+def _coverage_metric(payload: dict[str, Any]) -> CoverageMetric:
+    return CoverageMetric(
+        population=payload.get("population", ""),
+        attribute=payload.get("attribute", ""),
+        covered=int(payload.get("covered", 0)),
+        total=int(payload.get("total", 0)),
+        note=payload.get("note", ""),
     )
 
 
@@ -321,6 +424,9 @@ def from_json(path: Path) -> Inventory:
             indexes=tuple(_index(i) for i in payload.get("indexes") or ()),
             data_shape=_data_shape(payload.get("data_shape")),
             unknowns=tuple(_unknown(u) for u in payload.get("unknowns") or ()),
+            constraint_map=tuple(
+                _constraint_mapping(c) for c in payload.get("constraint_map") or ()
+            ),
             notes=tuple(payload.get("notes") or ()),
         )
     except KeyError as exc:
