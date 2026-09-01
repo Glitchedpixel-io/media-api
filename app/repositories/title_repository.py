@@ -7,7 +7,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from app.models import ArtworkORM, TitleContentORM, TitleORM, TitleTagORM, TitleTypeORM
 from app.models.sort_configs import TITLE_SORT
-from app.schemas.enums import EntityTypeEnum
+from app.schemas.enums import EntityTypeEnum, MembershipKind
 from app.schemas import (
     PaginatedResponse,
     TitleCreateInternal,
@@ -197,6 +197,38 @@ class SQLAlchemyTitleRepository(SQLAlchemyBaseRepository, TitleRepository):
             if params.membership is not None:
                 contained = contained.where(TitleContentORM.membership == params.membership)
             stmt = stmt.where(contained)
+
+        if params.has_intrinsic_parent is not None:
+            # The other half of `membership`. A filter that matches an edge cannot match
+            # its absence, so `membership=intrinsic` could ask which titles have a home
+            # and nothing could ask which have none -- which is the queue the whole
+            # placement workflow starts from (#177).
+            #
+            # Kept as its own filter rather than folded into `membership` as a negation,
+            # because the two compose: `?has_intrinsic_parent=false&membership=curated`
+            # is "listed somewhere but living nowhere", which is a real state and a
+            # different one from either half.
+            #
+            # `library_root` is deliberately *not* implied here. Rootness is stored
+            # rather than derived from having a parent (#91), so "has no home" and "is
+            # not an entry point" are separate questions and the unparented queue is
+            # their conjunction: `?has_intrinsic_parent=false&library_root=false`.
+            # Bundling them would make the narrower question unaskable.
+            #
+            # Index-covered, and by two candidates. EXPLAIN against a populated table
+            # picks `uq_one_intrinsic_parent`, whose partial predicate is exactly this
+            # condition -- child_title_id IS NOT NULL AND membership = 'intrinsic' --
+            # so it is the smaller index and an index-only scan; the harness reports
+            # `ix_title_contents_child_membership`, which leads with the same column and
+            # would serve it too. Either is correct and the planner may swap between them
+            # as the table grows, so neither name is load-bearing. Stated from EXPLAIN
+            # rather than from the index definitions: #94 records four occasions where
+            # coverage was claimed and absent.
+            has_home = exists().where(
+                TitleContentORM.child_title_id == TitleORM.id,
+                TitleContentORM.membership == MembershipKind.intrinsic,
+            )
+            stmt = stmt.where(has_home if params.has_intrinsic_parent else ~has_home)
 
         # Apply sorting
         stmt = apply_ordering(stmt, TITLE_SORT, params.sort)

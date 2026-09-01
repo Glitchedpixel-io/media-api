@@ -24,6 +24,20 @@ class AssetFilters(UTCBaseModel):
             "Only assets that have artwork of any kind (true), or only those with " "none (false)"
         ),
     )
+    has_intrinsic_parent: bool | None = Field(
+        None,
+        description=(
+            "Only assets that have a home -- a Title containing them intrinsically "
+            "(true) -- or only those that have none (false). `false` is the unplaced "
+            "queue: the loose material a library-management screen exists to place. "
+            "**Curated membership does not count.** An asset that appears only in "
+            "curated lists still reads as unplaced, because a curated appearance is a "
+            "listing rather than a home, and the same asset can hold any number of "
+            "them. That matches the rest of the API: intrinsic containment is what "
+            "breadcrumbs walk, what `TitleMediaTotals` sums, and what display images "
+            "are borrowed across"
+        ),
+    )
 
     @field_validator("size_max")
     @classmethod

@@ -76,6 +76,22 @@ class TitleFilters(BaseModel):
             "without one, it asks whether any such edge exists"
         ),
     )
+    has_intrinsic_parent: bool | None = Field(
+        None,
+        description=(
+            "Only titles that have a home -- a parent Title containing them "
+            "intrinsically (true) -- or only those that have none (false). Curated "
+            "membership does not count, on the same reasoning as the identically named "
+            "filter on GET /api/assets/: a curated appearance is a listing, not a home. "
+            "**Pair it with `library_root=false` for the unparented queue** -- titles "
+            "with nowhere to sit that are not deliberate entry points either. Rootness "
+            "is stored rather than derived from having a parent (#91), so the two "
+            "questions are genuinely separate and this filter does not answer both. "
+            "`true` is the negation of `membership=intrinsic` and returns the same set; "
+            "`false` is the half `membership` alone cannot express, since a filter that "
+            "matches an edge cannot match its absence"
+        ),
+    )
 
 
 class TitleListParams(KeysetPagination, TitleFilters):
