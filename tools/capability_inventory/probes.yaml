@@ -854,6 +854,62 @@ write_probes:
         constraint probe. Note the scheme code is 13 characters: `id_schemes.code`
         is varchar(16) and a longer one fails in a way worth reading below.
 
+    - name: contents-move-twice
+      endpoint: POST /api/titles/{destination_title_id}/contents/{title_contents_id}/move
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe move source
+            title_type: collection
+          capture:
+            source: id
+          sql_cleanup:
+            table: titles
+            id_var: source
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe move destination
+            title_type: collection
+          capture:
+            destination: id
+          sql_cleanup:
+            table: titles
+            id_var: destination
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe move child
+            title_type: movie
+          capture:
+            child: id
+          sql_cleanup:
+            table: titles
+            id_var: child
+        - method: POST
+          path: /api/titles/{source}/contents
+          body:
+            kind: title
+            child_title_id: "{child}"
+          capture:
+            edge: id
+          sql_cleanup:
+            table: title_contents
+            id_var: edge
+      act:
+        method: POST
+        path: /api/titles/{destination}/contents/{edge}/move
+      note: >-
+        the drag a tree retries after a dropped connection, and the one write in
+        this API whose second attempt is *expected* to succeed rather than
+        conflict: the edge is already where the request asks it to be, so the
+        repeat repositions it within the destination and changes nothing else.
+        A conflict here would mean a UI has to treat its own retry as a failure,
+        and a second row would mean the move is a copy. Neither is what #178
+        asked for, and this is what says which one shipped.
+
     # -- 6c / 6d: constraint violations, and what the API makes of them ------
 
     - name: title-contains-itself

@@ -149,6 +149,52 @@ def create_title_content_positioned(
     )
 
 
+@router.post(
+    "/{destination_title_id}/contents/{title_contents_id}/move",
+    response_model=TitleContentRead,
+    operation_id="move_title_content",
+    responses={
+        **COMMON_READ_RESPONSES,
+        **COMMON_WRITE_RESPONSES,
+        200: {"description": "Title content moved successfully"},
+        409: {
+            "description": (
+                "Conflict — the move would close a containment cycle "
+                "(`containment_cycle`), the child already has an intrinsic parent "
+                "(`intrinsic_parent_conflict`), or the destination position is taken "
+                "(`position_conflict`). The discriminator is in `detail[0].type`"
+            )
+        },
+    },
+)
+def move_title_content(
+    destination_title_id: int,
+    title_contents_id: int,
+    before_id: int | None = Query(None, description="Place before this id"),
+    after_id: int | None = Query(None, description="Place after this id"),
+    position: str | None = Query(None, description="Special position: 'start' or 'end'"),
+    service: TitleContentService = Depends(get_title_content_service),
+) -> TitleContentRead:
+    """Move a containment edge under a different parent, atomically.
+
+    The path title is the **destination**, not the edge's current parent -- the one
+    route in this file where that is so, which is why it is a route of its own rather
+    than a flag on `reorder`. Absent an anchor the edge appends to the destination's
+    list; its old position is never carried across.
+
+    `POST` rather than `PATCH` because this is an operation on a resource rather than an
+    edit to its representation: the request body is empty and the interesting arguments
+    are where to land, which is the same shape `/contents/positioned` already uses.
+    """
+    return service.move_content(
+        destination_title_id,
+        title_contents_id,
+        before_id=before_id,
+        after_id=after_id,
+        anchor=position,
+    )
+
+
 @router.patch(
     "/{parent_title_id}/contents/{title_contents_id}/reorder",
     response_model=TitleContentRead,
