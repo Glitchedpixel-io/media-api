@@ -201,6 +201,52 @@ probes:
       the grid shows is borrowed from an asset through the resolution chain.
       A design that assumes a title can own its poster has nothing behind it.
 
+  # -- the placement queue (#177) ----------------------------------------
+  # Four probes rather than two, because the pair on each resource is the whole
+  # point: `false` is a negated correlated EXISTS and `true` is the plain one,
+  # they should partition the collection, and the item counts recorded here are
+  # what says whether they do on the real library. Two numbers that do not sum
+  # to the collection are a filter that has stopped being a negation.
+  #
+  # The counts also answer a design question the report cannot otherwise state:
+  # how much loose material there actually is. A queue holding four assets and a
+  # queue holding four thousand are different screens.
+  - name: assets-unplaced-page-1
+    path: /api/assets/
+    query: {limit: 50, has_intrinsic_parent: false}
+    note: >-
+      the drag source -- assets with no intrinsic home, which is the queue the
+      whole placement workflow starts from. Curated listings deliberately do not
+      count as placed, so an asset sitting only in a collection appears here.
+      Pairs with `assets-placed-page-1`; the two should partition `assets`.
+
+  - name: assets-placed-page-1
+    path: /api/assets/
+    query: {limit: 50, has_intrinsic_parent: true}
+    note: >-
+      the other half of the pair. Both directions are served by
+      `ix_title_contents_asset_membership`, whose leading column is `asset_id` --
+      nothing indexed that column before #177, and `uq_parent_asset_once` cannot
+      serve it because it leads with `parent_title_id`.
+
+  - name: titles-unparented-page-1
+    path: /api/titles/
+    query: {limit: 50, has_intrinsic_parent: false, library_root: false}
+    note: >-
+      titles with no home that are not deliberate entry points either. Rootness
+      is stored rather than derived from having a parent (#91), so this is the
+      conjunction of two filters and not one -- a library root with no parent is
+      not misplaced. Served by `uq_one_intrinsic_parent`, whose partial predicate
+      is exactly this condition.
+
+  - name: titles-parented-page-1
+    path: /api/titles/
+    query: {limit: 50, has_intrinsic_parent: true}
+    note: >-
+      the pair's other half, and a cross-check: this returns the same set as
+      `membership=intrinsic`, which is the half the containment filter could
+      already express. A divergence between them is a bug in one of the two.
+
   - name: titles-poster-scaling-200-rows
     path: /api/titles/
     query: {limit: 200, include: "poster"}

@@ -8,10 +8,10 @@ from sqlalchemy import exists, func, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.models import ArtworkORM, AssetORM, AssetTagORM
+from app.models import ArtworkORM, AssetORM, AssetTagORM, TitleContentORM
 from app.models.asset import filename_extension
 from app.models.sort_configs import ASSET_SORT
-from app.schemas.enums import EntityTypeEnum
+from app.schemas.enums import EntityTypeEnum, MembershipKind
 from app.schemas import (
     AssetCreateInternal,
     AssetListParams,
@@ -109,6 +109,38 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
                 ArtworkORM.entity_id == AssetORM.id,
             )
             stmt = stmt.where(has_artwork if params.has_artwork else ~has_artwork)
+
+        if params.has_intrinsic_parent is not None:
+            # "What have I not placed yet?" -- the work queue a library-management
+            # screen is built around, and the question this endpoint could not express
+            # at all before #177.
+            #
+            # Intrinsic only, deliberately. An asset appearing in a curated list has
+            # been *listed*, not placed, and the two are different states a UI has to
+            # be able to tell apart: curated membership is unlimited by design, so
+            # counting it would report an asset that lives nowhere as placed the moment
+            # anyone dropped it into a collection. It also keeps this filter agreeing
+            # with the rest of the API, which follows intrinsic edges only when it
+            # walks breadcrumbs, sums `TitleMediaTotals`, or borrows a display image.
+            #
+            # Correlated EXISTS rather than a join, matching `has_artwork` above: an
+            # asset can sit under several titles (the same file under two cuts), and a
+            # join would return it once per edge and turn `limit` into a cap on edges.
+            # Being a correlated EXISTS rather than `id IN (subquery)` also keeps the
+            # `false` direction safe -- `NOT IN` over a subquery yielding a NULL returns
+            # no rows at all, which is the trap `titles_resolving_artwork` documents.
+            #
+            # Served by ix_title_contents_asset_membership, whose leading column is
+            # asset_id -- confirmed by EXPLAIN against a populated table, an index-only
+            # scan in both directions, not read off the index definition (#94). Nothing
+            # indexed asset_id before this: `uq_parent_asset_once` leads with
+            # parent_title_id, so it answers "what is under this parent", never "where
+            # does this asset live".
+            has_home = exists().where(
+                TitleContentORM.asset_id == AssetORM.id,
+                TitleContentORM.membership == MembershipKind.intrinsic,
+            )
+            stmt = stmt.where(has_home if params.has_intrinsic_parent else ~has_home)
 
         # tag filtering
         if params.tag_ids:

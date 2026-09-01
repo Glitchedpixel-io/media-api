@@ -169,4 +169,25 @@ class TitleContentORM(Base):
             postgresql_where=(child_title_id.isnot(None))
             & (membership == MembershipKind.intrinsic),
         ),
+        # Containment asked from the *asset's* side: "does this asset have a home?",
+        # which is `GET /api/assets/?has_intrinsic_parent=` and the unplaced queue the
+        # placement workflow starts from (#177).
+        #
+        # Nothing indexed `asset_id` before this. `uq_parent_asset_once` is keyed on
+        # (parent_title_id, asset_id), so it answers "what is under this parent" and can
+        # never serve a lookup that pins only the asset -- the same leading-column trap
+        # that left the curated half of the child-side question uncovered until
+        # `ix_title_contents_child_membership` was added.
+        #
+        # Not the mirror of `uq_one_intrinsic_parent`, deliberately: an asset may have
+        # several intrinsic parents (the same file under two cuts), so this cannot be
+        # unique and cannot be partial on `intrinsic` without losing the `true`
+        # direction's other half. A plain composite keyed on (asset_id, membership)
+        # serves both directions of the filter and the membership-agnostic lookup that
+        # `GET /api/assets/{id}/titles` issues.
+        Index(
+            "ix_title_contents_asset_membership",
+            "asset_id",
+            "membership",
+        ),
     )
