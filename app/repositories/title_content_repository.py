@@ -175,11 +175,14 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         # ordered lists, and both have to stay contiguous afterwards. The row keeps no
         # meaningful place in a list it has just joined, so it appends.
         #
-        # Worth doing here rather than only in `reorder`: the service sets
-        # `parent_title_id` on *every* patch, from the URL, so this path can move a row
-        # without ever calling the one that knows about ordering. Under the previous
-        # scheme the row simply carried its old key across, which was harmless only
-        # because nothing required those keys to mean anything.
+        # No API path reaches this any more. `update_title_content` used to set
+        # `parent_title_id` on *every* patch, from the URL, which meant a request that
+        # changed only a label silently relocated the row -- #185 -- and it no longer
+        # forwards the field at all. Kept because this method takes a partial
+        # `TitleContentUpdateInternal` in which `parent_title_id` is settable, so a
+        # caller that does set it must not be able to leave two lists with holes in
+        # them. Under the previous scheme the row simply carried its old key across,
+        # which was harmless only because nothing required those keys to mean anything.
         if orm.parent_title_id != source_parent_id:
             self._safe_flush()
             lists = self._locked_lists({source_parent_id, orm.parent_title_id})
