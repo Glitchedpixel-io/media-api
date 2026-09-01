@@ -62,6 +62,10 @@ artwork-dimensions = "tools.artwork_dimensions.cli:main"
 # backfill mislabelled onto the kinds their measured sizes say they are (#138), once
 # #127 settled what those kinds mean. One-shot, dry-run by default.
 artwork-reclassify = "tools.artwork_reclassify.cli:main"
+# The design fixture generator (tools/design_fixtures). Captures real API responses
+# verbatim for front-end design work. Read-only: GETs plus SELECTs, no writes. Runs
+# the app in process so it needs no server and claims no port.
+design-fixtures = "tools.design_fixtures.cli:main"
 
 [project.entry-points."media_api.orchestration_providers"]
 prefect = "app.orchestration.prefect:PrefectProvider"
