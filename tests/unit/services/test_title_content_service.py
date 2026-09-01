@@ -29,6 +29,22 @@ from app.services import TitleContentService
 from tests.factories import TitleContentReadFactory
 
 
+def _edge_is_under(c_repo, *, parent: int, edge: int) -> None:
+    """Wire the mock so containment row ``edge`` is a row under title ``parent``.
+
+    Every contents write resolves the row first and refuses one that is not under the
+    parent named in the URL (#185). An autospec mock's ``get`` returns a truthy Mock
+    whose ``parent_title_id`` matches nothing, so without this the write under test
+    404s before reaching the behaviour the test is about.
+
+    Args:
+        c_repo: The autospec ``TitleContentRepository`` mock.
+        parent: The title the write will be addressed to.
+        edge: The containment row it will name.
+    """
+    c_repo.get.return_value = TitleContentReadFactory(id=edge, parent_title_id=parent)
+
+
 class TestInsertPositioned:
     """Tests for TitleContentService.insert_positioned."""
 
@@ -340,6 +356,7 @@ class TestUpdateTitleContent:
         updated_content = TitleContentReadFactory(id=7, parent_title_id=3, label="Updated")
         c_repo.update.return_value = updated_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="Updated")
 
@@ -349,12 +366,15 @@ class TestUpdateTitleContent:
         assert result.id == 7
         assert result.label == "Updated"
 
-        # Verify internal DTO includes parent_title_id
+        # The internal DTO must *not* carry parent_title_id. It used to, taken from the
+        # URL on every patch, which relocated the edge to whichever title the caller
+        # addressed -- a label edit that moved the row (#185). The parent is now read as
+        # the edge's current one and verified, so there is nothing to write.
         c_repo.update.assert_called_once()
         call_args = c_repo.update.call_args[0]
         assert call_args[0] == 7
         assert isinstance(call_args[1], TitleContentUpdateInternal)
-        assert call_args[1].parent_title_id == 3
+        assert call_args[1].parent_title_id is None
 
     @pytest.mark.unit
     def test_update_title_content_success_without_exclude_none(self) -> None:
@@ -369,6 +389,7 @@ class TestUpdateTitleContent:
         updated_content = TitleContentReadFactory(id=7)
         c_repo.update.return_value = updated_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="Label")
 
@@ -389,6 +410,7 @@ class TestUpdateTitleContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.return_value = TitleContentReadFactory()
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="New Label")
 
@@ -396,7 +418,8 @@ class TestUpdateTitleContent:
 
         call_arg = c_repo.update.call_args[0][1]
         assert hasattr(call_arg, "label")
-        assert call_arg.parent_title_id == 3
+        # Not forwarded -- see the DTO assertion above, and #185.
+        assert call_arg.parent_title_id is None
 
     @pytest.mark.unit
     def test_update_title_content_not_found(self) -> None:
@@ -410,6 +433,7 @@ class TestUpdateTitleContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = NotFoundError("Content not found")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=999)
 
         patch = TitleContentPatchPublic(label="Label")
 
@@ -417,7 +441,9 @@ class TestUpdateTitleContent:
             svc.update_title_content(3, 999, patch, exclude_none=True)
 
         assert exc_info.value.status_code == 404
-        assert "Title Reference not found" in exc_info.value.detail
+        # "Title Reference" until #185 -- a copy-paste from the sibling service, on a
+        # route that has never touched a title reference.
+        assert "Title Content not found" in exc_info.value.detail
 
     @pytest.mark.unit
     def test_update_title_content_unique_violation(self) -> None:
@@ -431,6 +457,7 @@ class TestUpdateTitleContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = UniqueViolation("Unique constraint")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="Label")
 
@@ -452,6 +479,7 @@ class TestUpdateTitleContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = DatabaseLocked("Database locked")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="Label")
 
@@ -483,6 +511,7 @@ class TestUpdateTitleContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         c_repo.update.side_effect = exc_class("Constraint error")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=3, edge=7)
 
         patch = TitleContentPatchPublic(label="Label")
 
@@ -509,6 +538,7 @@ class TestReorderContent:
         reordered_content = TitleContentReadFactory(id=77, parent_title_id=4)
         c_repo.reorder.return_value = reordered_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         result = svc.reorder_content(4, title_content_id=77, after_id=2)
 
@@ -531,6 +561,7 @@ class TestReorderContent:
         reordered_content = TitleContentReadFactory(id=77)
         c_repo.reorder.return_value = reordered_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         result = svc.reorder_content(4, title_content_id=77, before_id=5)
 
@@ -551,6 +582,7 @@ class TestReorderContent:
         reordered_content = TitleContentReadFactory(id=77)
         c_repo.reorder.return_value = reordered_content
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         result = svc.reorder_content(4, title_content_id=77, anchor="start")
 
@@ -569,6 +601,7 @@ class TestReorderContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=999, edge=77)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(999, title_content_id=77)
@@ -591,6 +624,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = NotFoundError("Content not found")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=999)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=999)
@@ -611,6 +645,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.return_value = None
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=99)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=99, anchor="start")
@@ -631,6 +666,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = UniqueViolation("Unique constraint")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=77, after_id=2)
@@ -651,6 +687,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = DatabaseLocked("Database locked")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=77)
@@ -681,6 +718,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = exc_class("Constraint error")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=77)
@@ -700,6 +738,7 @@ class TestReorderContent:
         t_repo.exists.return_value = True
         c_repo.reorder.side_effect = RuntimeError("Unexpected error")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=4, edge=77)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.reorder_content(4, title_content_id=77)
@@ -815,6 +854,7 @@ class TestUnlinkContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=8, edge=123)
 
         # Should not raise an exception
         svc.unlink_content(8, 123)
@@ -834,6 +874,7 @@ class TestUnlinkContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = True
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=50, edge=75)
 
         svc.unlink_content(parent_title_id=50, title_content_id=75)
 
@@ -852,6 +893,7 @@ class TestUnlinkContent:
         m_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         t_repo.exists.return_value = False
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=999, edge=123)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.unlink_content(999, 123)
@@ -874,6 +916,7 @@ class TestUnlinkContent:
         t_repo.exists.return_value = True
         c_repo.delete_title_content.side_effect = DatabaseLocked("Database locked")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=8, edge=123)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.unlink_content(8, 123)
@@ -894,6 +937,7 @@ class TestUnlinkContent:
         t_repo.exists.return_value = True
         c_repo.delete_title_content.side_effect = RuntimeError("Unexpected error")
         svc = TitleContentService(t_repo, c_repo, m_repo)
+        _edge_is_under(c_repo, parent=8, edge=123)
 
         with pytest.raises(HTTPException) as exc_info:
             svc.unlink_content(8, 123)
