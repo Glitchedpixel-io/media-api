@@ -103,6 +103,48 @@ class TitleContentService:
                 ),
             )
 
+    def _edge_under(self, parent_title_id: int, title_content_id: int) -> TitleContentRead:
+        """The containment row, confirmed to sit under this parent.
+
+        ``{parent_title_id}`` in the contents routes names **the edge's current
+        parent**, and this is the one place that is enforced. Before #185 nothing
+        checked it, and the segment had drifted into meaning three different things:
+        the destination on ``PATCH .../contents/{id}`` and on ``.../reorder``, both of
+        which relocated the edge to whatever title the URL named, and nothing at all on
+        ``DELETE``, which removed by id alone.
+
+        That was not merely untidy. ``reorder`` moved an edge across parents without
+        calling :meth:`_reject_cycle`, so an edge ``POST`` refuses to create could be
+        arrived at by moving one that already existed -- measured, and the substance of
+        #185. Scoping every write to the edge's own parent closes that by construction
+        rather than by adding a fourth guard: a route that cannot change the parent
+        cannot open a cycle. Moving an edge deliberately is a separate operation with
+        its own endpoint and its own checks (#178).
+
+        404 rather than 403 for a mismatch, and the same 404 as an edge that does not
+        exist: from the caller's position the two are the same statement -- there is no
+        such entry under that title -- and distinguishing them would confirm the
+        existence of a row addressed through a title that does not own it.
+
+        Args:
+            parent_title_id: The title the caller addressed the write to.
+            title_content_id: The containment row it named.
+
+        Returns:
+            TitleContentRead: The row, which is guaranteed to be under
+                ``parent_title_id``.
+
+        Raises:
+            HTTPException: 404 if the title does not exist, the row does not exist, or
+                the row is not under that title.
+        """
+        if not self.title_repository.exists(parent_title_id):
+            raise HTTPException(status_code=404, detail="Title not found")
+        edge = self.title_content_repository.get(title_content_id)
+        if edge is None or edge.parent_title_id != parent_title_id:
+            raise HTTPException(status_code=404, detail="Title Content not found")
+        return edge
+
     def _reject_second_intrinsic_parent(
         self,
         child_title_id: int | None,
@@ -178,7 +220,7 @@ class TitleContentService:
             raise HTTPException(status_code=404, detail="Title not found")
         return self.title_content_repository.list_title_content(parent_title_id, True)
 
-    @translate_repository_errors(not_found_message="Title Reference not found")
+    @translate_repository_errors(not_found_message="Title Content not found")
     def update_title_content(
         self,
         parent_title_id: int,
@@ -186,6 +228,7 @@ class TitleContentService:
         update: TitleContentPatchPublic,  # type: ignore
         exclude_none: bool,
     ) -> TitleContentRead:
+        existing_row = self._edge_under(parent_title_id, title_contents_id)
         # A patch can repoint an existing row at a different child, which reaches the
         # same invalid state as inserting one. Guarding only the insert would leave
         # the shorter path to a cycle open.
@@ -197,17 +240,20 @@ class TitleContentService:
         # comes from the stored row rather than the patch: a patch cannot carry one,
         # which is why TitleContentPatchPublic omits the field.
         if new_child_title_id is not None:
-            existing_row = self.title_content_repository.get(title_contents_id)
-            if existing_row is not None:
-                self._reject_second_intrinsic_parent(
-                    new_child_title_id,
-                    existing_row.membership,
-                    excluding_edge_id=title_contents_id,
-                )
+            self._reject_second_intrinsic_parent(
+                new_child_title_id,
+                existing_row.membership,
+                excluding_edge_id=title_contents_id,
+            )
+        # `parent_title_id` is deliberately **not** forwarded. It used to be, from the
+        # URL, on every patch -- so a request that changed only a label relocated the
+        # edge to whichever title the caller happened to address, which is #185. The
+        # segment is now read as the edge's current parent and verified above, so
+        # there is nothing left to write; changing a parent is a move, and has its own
+        # endpoint.
         return self.title_content_repository.update(
             title_contents_id,
             TitleContentUpdateInternal(
-                parent_title_id=parent_title_id,
                 **update.model_dump(exclude_none=exclude_none),  # type: ignore
             ),
         )
@@ -221,8 +267,11 @@ class TitleContentService:
         after_id: int | None = None,
         anchor: str | None = None,
     ) -> TitleContentRead:
-        if not self.title_repository.exists(parent_title_id):
-            raise HTTPException(status_code=404, detail="Title not found")
+        # Same-parent only. The repository's `reorder` can move a row between parents,
+        # and this route used to reach that with no cycle check at all (#185); scoping
+        # the edge to the parent named in the URL means the id passed below is always
+        # the parent the row already has, so this call can only reposition.
+        self._edge_under(parent_title_id, title_content_id)
         try:
             updated = self.title_content_repository.reorder(
                 parent_title_id,
@@ -256,9 +305,10 @@ class TitleContentService:
             return updated
 
     def unlink_content(self, parent_title_id: int, title_content_id: int) -> None:
-        # First check if the title exists
-        if not self.title_repository.exists(parent_title_id):
-            raise HTTPException(status_code=404, detail="Title not found")
+        # The edge has to be under this parent. Before #185 only the title's existence
+        # was checked and the row was then deleted by id alone, so any title in the
+        # library served as a URL for removing any containment edge in it.
+        self._edge_under(parent_title_id, title_content_id)
         try:
             self.title_content_repository.delete_title_content(title_content_id)
         except DatabaseLocked as e:
