@@ -1908,6 +1908,35 @@ def test_a_write_scenario_may_only_clean_up_listed_tables() -> None:
             assert scenario["act_sql_table"] in write_probes._CLEANABLE_TABLES
 
 
+def test_a_batch_write_response_yields_every_row_it_created() -> None:
+    """The rows a batch creates are in `items`, not at the top level.
+
+    Reading only the top-level `id` recorded nothing for a batch, so its
+    `title_contents` rows survived teardown and the fixture asset they
+    referenced could not be deleted -- the run reported that
+    `contents-batch-attach-twice` "could not remove everything it created".
+    """
+    batch = {"count": 2, "items": [{"id": 11}, {"id": 12}]}
+    assert write_probes._created_ids(batch) == [11, 12]
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"id": 7}, [7]),
+        ({"count": 0, "items": []}, []),
+        ([{"id": 3}, {"id": 4}], [3, 4]),
+        ({"detail": "nope"}, []),
+        ({"items": [{"id": 5}, {"no_id": True}]}, [5]),
+        (None, []),
+        ("", []),
+    ],
+)
+def test_created_ids_reads_every_response_shape(payload: object, expected: list[int]) -> None:
+    """A detach reports a count and no items; an error body carries neither."""
+    assert write_probes._created_ids(payload) == expected
+
+
 # -- the contract derivation ------------------------------------------------
 
 

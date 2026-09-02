@@ -318,15 +318,14 @@ class WriteProbeRunner:
         cleanup = scenario.get("act_cleanup")
         act_table = scenario.get("act_sql_table")
         for payload in (first_body, second_body):
-            if not isinstance(payload, dict) or payload.get("id") is None:
-                continue
-            if cleanup:
-                ledger.record(
-                    str(cleanup.get("method") or "DELETE"),
-                    _substitute(str(cleanup["path"]), {**context, "id": payload["id"]}),
-                )
-            if act_table and str(act_table) in _CLEANABLE_TABLES:
-                ledger.record_sql(str(act_table), payload["id"])
+            for row_id in _created_ids(payload):
+                if cleanup:
+                    ledger.record(
+                        str(cleanup.get("method") or "DELETE"),
+                        _substitute(str(cleanup["path"]), {**context, "id": row_id}),
+                    )
+                if act_table and str(act_table) in _CLEANABLE_TABLES:
+                    ledger.record_sql(str(act_table), row_id)
 
         first_id = first_body.get("id") if isinstance(first_body, dict) else None
         second_id = second_body.get("id") if isinstance(second_body, dict) else None
@@ -380,14 +379,14 @@ class WriteProbeRunner:
         status, body = self._send(scenario["act"], context)
         cleanup = scenario.get("act_cleanup")
         act_table = scenario.get("act_sql_table")
-        if isinstance(body, dict) and body.get("id") is not None:
+        for row_id in _created_ids(body):
             if cleanup:
                 ledger.record(
                     str(cleanup.get("method") or "DELETE"),
-                    _substitute(str(cleanup["path"]), {**context, "id": body["id"]}),
+                    _substitute(str(cleanup["path"]), {**context, "id": row_id}),
                 )
             if act_table and str(act_table) in _CLEANABLE_TABLES:
-                ledger.record_sql(str(act_table), body["id"])
+                ledger.record_sql(str(act_table), row_id)
         distinguishable = status < 500
         detail = f"returns {status}" + (
             " -- a clean client error the interface can branch on and show"
@@ -501,6 +500,33 @@ class WriteProbeRunner:
                 }
             ),
         )
+
+
+def _created_ids(payload: Any) -> list[Any]:
+    """The row ids a write response reports, whatever shape it reports them in.
+
+    A single-row write answers with the row itself, so its id is at the top
+    level. A batch write answers with :class:`TitleContentBatchResult` --
+    ``{"count": n, "items": [...]}`` -- which has no top-level ``id`` at all.
+    Reading only the top level therefore recorded nothing for a batch, and the
+    rows it created survived teardown; the fixture asset they referenced then
+    could not be deleted, and the scenario reported that it "could not remove
+    everything it created".
+
+    Returns:
+        Every id found, in the order the response gave them. Empty when the
+        payload carries none -- an error body, or a detach, which reports a
+        count and no items because the rows are gone.
+    """
+    if isinstance(payload, dict):
+        if payload.get("id") is not None:
+            return [payload["id"]]
+        payload = payload.get("items")
+    if isinstance(payload, list):
+        return [
+            item["id"] for item in payload if isinstance(item, dict) and item.get("id") is not None
+        ]
+    return []
 
 
 def _substitute(text: str, context: dict[str, Any]) -> str:
