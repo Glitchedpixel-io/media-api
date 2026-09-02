@@ -953,6 +953,113 @@ write_probes:
         they were. A duplicating verdict here would mean bulk placement doubles
         a directory on a retry, which is the worst outcome of the three.
 
+    - name: contents-batch-move-twice
+      endpoint: POST /api/titles/{destination_title_id}/contents/batch/move
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch move source
+            title_type: collection
+          capture:
+            source: id
+          sql_cleanup:
+            table: titles
+            id_var: source
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch move destination
+            title_type: collection
+          capture:
+            destination: id
+          sql_cleanup:
+            table: titles
+            id_var: destination
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch move child
+            title_type: movie
+          capture:
+            child: id
+          sql_cleanup:
+            table: titles
+            id_var: child
+        - method: POST
+          path: /api/titles/{source}/contents
+          body:
+            kind: title
+            child_title_id: "{child}"
+          capture:
+            edge: id
+          sql_cleanup:
+            table: title_contents
+            id_var: edge
+      act:
+        method: POST
+        path: /api/titles/{destination}/contents/batch/move
+        body:
+          title_contents_ids:
+            - "{edge}"
+      note: >-
+        the multi-select drag, retried after a dropped connection. The single
+        move is idempotent by design -- the edge is already where the request
+        asks it to be -- and the bulk form travels the same route through
+        `move_many`, so it should answer the same way. If it does not, the two
+        gestures disagree about their own retry semantics, and a UI cannot use
+        one rule for both.
+
+    - name: contents-batch-detach-twice
+      endpoint: POST /api/titles/{parent_title_id}/contents/batch/detach
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch detach parent
+            title_type: collection
+          capture:
+            parent: id
+          sql_cleanup:
+            table: titles
+            id_var: parent
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch detach child
+            title_type: movie
+          capture:
+            child: id
+          sql_cleanup:
+            table: titles
+            id_var: child
+        - method: POST
+          path: /api/titles/{parent}/contents
+          body:
+            kind: title
+            child_title_id: "{child}"
+          capture:
+            edge: id
+          sql_cleanup:
+            table: title_contents
+            id_var: edge
+      act:
+        method: POST
+        path: /api/titles/{parent}/contents/batch/detach
+        body:
+          title_contents_ids:
+            - "{edge}"
+      note: >-
+        the bulk remove, retried after a dropped connection. This one cannot be
+        idempotent by repeating its effect: the row is gone, and the route
+        requires every id to be a current entry of the title, so the second
+        attempt should be *refused* rather than quietly succeeding. That makes a
+        retrying client's job the opposite of the move's -- it has to read the
+        refusal as "already done" -- which is exactly the kind of asymmetry a
+        front end has to be told about rather than discover.
+
     # -- 6c / 6d: constraint violations, and what the API makes of them ------
 
     - name: title-contains-itself
