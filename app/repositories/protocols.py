@@ -203,6 +203,19 @@ class TitleContentRepository(Protocol):
         anchor: str | None = None,
     ) -> TitleContentRead | None: ...
 
+    # Batch writes (#179). Each applies as one transaction under one set of parent
+    # locks; the service validates every item before calling them, so these do not
+    # re-check what a single write's service path checks.
+    def create_many_positioned(
+        self, parent_title_id: int, inserts: Sequence[TitleContentInsert]
+    ) -> list[TitleContentRead]: ...
+
+    def delete_many(self, parent_title_id: int, title_content_ids: Sequence[int]) -> int: ...
+
+    def move_many(
+        self, destination_title_id: int, title_content_ids: Sequence[int]
+    ) -> list[TitleContentRead]: ...
+
 
 class TransformRequestRepository(Protocol):
     def create(self, request: TransformRequestCreateInternal) -> TransformRequestRead: ...

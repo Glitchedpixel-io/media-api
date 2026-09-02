@@ -516,6 +516,135 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         self.db.refresh(orm)
         return TitleContentRead.model_validate(orm)
 
+    def create_many_positioned(
+        self, parent_title_id: int, inserts: Sequence[TitleContentInsert]
+    ) -> list[TitleContentRead]:
+        """Append several entries to one parent's list, in one transaction (#179).
+
+        The whole point is the single transaction and the single lock. N calls to
+        :meth:`create_positioned` are N transactions, N parent-lock acquisitions and N
+        renumbers, and a failure part-way leaves an arbitrary prefix committed with no
+        way for the caller to tell which. That shape is what #52 fixed for by-name
+        tagging, one table over.
+
+        Entries are appended in the order given, after whatever the parent already
+        holds. There is no per-item anchor: placing forty items individually is what
+        this exists to avoid, and a caller that wants a particular arrangement can
+        reorder afterwards, or send them in the order it wants.
+
+        Args:
+            parent_title_id: The parent to append under.
+            inserts: The entries, already validated by the service.
+
+        Returns:
+            list[TitleContentRead]: The created rows, in the order given.
+        """
+        rows = self._locked_lists({parent_title_id})[parent_title_id]
+
+        created: list[TitleContentORM] = []
+        for offset, insert in enumerate(inserts):
+            orm = TitleContentORM(
+                parent_title_id=parent_title_id,
+                kind=insert.kind,
+                child_title_id=insert.child_title_id,
+                asset_id=insert.asset_id,
+                label=insert.label,
+                membership=insert.membership,
+                position=len(rows) + offset,
+            )
+            self.db.add(orm)
+            created.append(orm)
+
+        # One renumber over the combined list rather than one per item. Every existing
+        # row already holds its target position, so `_renumber` dirties only the new
+        # ones -- the same property that makes a single append cheap.
+        self._renumber(rows + created)
+        self._safe_commit()
+        for orm in created:
+            self.db.refresh(orm)
+        return [TitleContentRead.model_validate(orm) for orm in created]
+
+    def delete_many(self, parent_title_id: int, title_content_ids: Sequence[int]) -> int:
+        """Remove several entries from one parent's list, in one transaction (#179).
+
+        Args:
+            parent_title_id: The parent whose entries these are.
+            title_content_ids: The entries to remove, already scoped to that parent by
+                the service.
+
+        Returns:
+            int: How many rows were removed. Fewer than asked for means a concurrent
+                caller got there first, which is not an error -- the requested state is
+                the state that results.
+        """
+        wanted = set(title_content_ids)
+        rows = self._locked_lists({parent_title_id})[parent_title_id]
+
+        doomed = [row for row in rows if row.id in wanted]
+        for orm in doomed:
+            self.db.delete(orm)
+        # Flushed before the renumber for the reason `delete_title_content` gives: the
+        # survivors have to be numbered without the rows on their way out.
+        self._safe_flush()
+        self._renumber([row for row in rows if row.id not in wanted])
+        self._safe_commit()
+        return len(doomed)
+
+    def move_many(
+        self, destination_title_id: int, title_content_ids: Sequence[int]
+    ) -> list[TitleContentRead]:
+        """Move several entries under one destination, in one transaction (#179).
+
+        The bulk form of :meth:`reorder`'s cross-parent case, and the reason it needs
+        its own method rather than a loop: every source parent has to be locked in the
+        same statement as the destination, or two batches touching overlapping sources
+        deadlock in exactly the way #193 fixed for single writes.
+
+        Sources are read with a column-only select first, so nothing enters the identity
+        map holding a pre-lock parent -- see :meth:`reorder` for why that matters -- and
+        the rows themselves are taken from the locked lists.
+
+        Args:
+            destination_title_id: The parent the entries should belong to afterwards.
+            title_content_ids: The entries to move, already validated by the service.
+
+        Returns:
+            list[TitleContentRead]: The moved rows, in the order given.
+        """
+        wanted = list(dict.fromkeys(title_content_ids))
+        sources: dict[int, int] = {
+            row_id: parent_id
+            for row_id, parent_id in self.db.execute(
+                select(TitleContentORM.id, TitleContentORM.parent_title_id).where(
+                    TitleContentORM.id.in_(wanted)
+                )
+            ).all()
+        }
+        if len(sources) != len(wanted):
+            raise NotFoundError
+
+        lists = self._locked_lists(set(sources.values()) | {destination_title_id})
+
+        by_id = {row.id: row for parent in lists.values() for row in parent}
+        moving = [by_id[edge_id] for edge_id in wanted if edge_id in by_id]
+        if len(moving) != len(wanted):
+            # A concurrent move took one of them somewhere neither list covers. Reported
+            # rather than half-applied, on the same reasoning as `reorder`.
+            raise NotFoundError
+
+        destination_rows = [row for row in lists[destination_title_id] if row.id not in set(wanted)]
+        for orm in moving:
+            orm.parent_title_id = destination_title_id
+        self._renumber(destination_rows + moving)
+
+        for source_parent_id in set(sources.values()) - {destination_title_id}:
+            self._renumber([row for row in lists[source_parent_id] if row.id not in set(wanted)])
+
+        self._safe_commit()
+        for orm in moving:
+            self.db.refresh(orm)
+        return [TitleContentRead.model_validate(orm) for orm in moving]
+
     def counts_for_titles(self, title_ids: Sequence[int]) -> dict[int, TitleContentCounts]:
         """Count the titles and assets each title directly contains.
 

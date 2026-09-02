@@ -5,6 +5,9 @@ from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_title_content_service
 from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
+    TitleContentBatchIds,
+    TitleContentBatchInsert,
+    TitleContentBatchResult,
     TitleContentInsert,
     TitleContentPatchPublic,
     TitleContentRead,
@@ -77,8 +80,131 @@ def link_title_contents(
     return service.insert_positioned(parent_title_id, contents, anchor="end")
 
 
+@router.post(
+    "/{parent_title_id}/contents/batch",
+    response_model=TitleContentBatchResult,
+    status_code=201,
+    operation_id="attach_title_contents_batch",
+    responses={
+        **COMMON_READ_RESPONSES,
+        **COMMON_WRITE_RESPONSES,
+        201: {"description": "All entries appended"},
+        409: {
+            "description": (
+                "Conflict — one or more items would close a containment cycle "
+                "(`containment_cycle`) or give a title a second intrinsic parent "
+                "(`intrinsic_parent_conflict`). Nothing is written. `detail` lists "
+                "**every** offending item, each with its index in `loc`"
+            )
+        },
+    },
+)
+def attach_title_contents_batch(
+    parent_title_id: int,
+    payload: TitleContentBatchInsert,
+    service: TitleContentService = Depends(get_title_content_service),
+) -> TitleContentBatchResult:
+    """Append many entries to this title's contents, as one transaction.
+
+    The bulk form of `POST /{parent_title_id}/contents`, and the operation the placement
+    queue needs: 11,945 assets are waiting to be placed, spread over directories whose
+    median size is 14 and whose largest is 796.
+
+    **All-or-nothing.** Every item is validated first; if any fails, nothing is written
+    and the error names *all* of them, not the first. Following #52, which fixed the
+    opposite choice one table over — by-name tagging committed once per tag, so a
+    failure part-way left an arbitrary prefix written and no way to tell which.
+
+    Failures come back in FastAPI's own validation-error shape, with the item's index in
+    `loc`, so a form can highlight the offending row:
+
+    ```json
+    {"detail": [
+      {"loc": ["items", 3], "msg": "Asset 91 does not exist.", "type": "target_missing"},
+      {"loc": ["items", 7], "msg": "Title 4 already contains title 2, ...",
+       "type": "containment_cycle"}
+    ]}
+    ```
+
+    Entries land in the order given, appended after whatever the title already holds.
+    There is no per-item anchor: placing forty items individually is what this exists to
+    avoid, and a caller wanting a particular arrangement sends them in that order.
+    """
+    return service.attach_many(parent_title_id, payload.items)
+
+
+@router.post(
+    "/{parent_title_id}/contents/batch/detach",
+    response_model=TitleContentBatchResult,
+    operation_id="detach_title_contents_batch",
+    responses={
+        **COMMON_READ_RESPONSES,
+        **COMMON_WRITE_RESPONSES,
+        200: {"description": "All entries removed"},
+    },
+)
+def detach_title_contents_batch(
+    parent_title_id: int,
+    payload: TitleContentBatchIds,
+    service: TitleContentService = Depends(get_title_content_service),
+) -> TitleContentBatchResult:
+    """Remove many entries from this title's contents, as one transaction.
+
+    Every id must already be an entry of this title; one that is not fails the whole
+    batch with a 422 naming it, on the same reasoning as the single `DELETE` (#185).
+    Repeats are collapsed — asking twice for a row to be gone is not a conflict.
+
+    `POST` rather than `DELETE` because the ids travel in a body, and a `DELETE` with a
+    body is inconsistently supported by proxies and clients. The response reports how
+    many rows went; there are no items to return.
+    """
+    return service.detach_many(parent_title_id, payload.title_contents_ids)
+
+
+@router.post(
+    "/{destination_title_id}/contents/batch/move",
+    response_model=TitleContentBatchResult,
+    operation_id="move_title_contents_batch",
+    responses={
+        **COMMON_READ_RESPONSES,
+        **COMMON_WRITE_RESPONSES,
+        200: {"description": "All entries moved"},
+        409: {
+            "description": (
+                "Conflict — one or more items would close a containment cycle "
+                "(`containment_cycle`) or give a title a second intrinsic parent "
+                "(`intrinsic_parent_conflict`). Nothing is moved. `detail` lists every "
+                "offending item, each with its index in `loc`"
+            )
+        },
+    },
+)
+def move_title_contents_batch(
+    destination_title_id: int,
+    payload: TitleContentBatchIds,
+    service: TitleContentService = Depends(get_title_content_service),
+) -> TitleContentBatchResult:
+    """Move many entries under this title, as one transaction.
+
+    The multi-select drag. The path title is the **destination**, matching the single
+    `POST .../{id}/move` and unlike every other route here, where it is the entry's
+    current parent (#185).
+
+    Entries may come from any number of source parents; all of them land here, appended
+    in the order given, and every list they leave is renumbered. Positions are never
+    carried across.
+
+    **One destination is deliberate, not a limitation.** A batch that sent each item
+    somewhere different would need whole-batch cycle detection — moving A under B and B
+    under A is a cycle that neither item creates alone. With a single destination every
+    new edge leaves the same parent, so checking each item against the stored graph is
+    complete.
+    """
+    return service.move_many(destination_title_id, payload.title_contents_ids)
+
+
 @router.patch(
-    "/{parent_title_id}/contents/{title_contents_id}",
+    "/{parent_title_id}/contents/{title_contents_id:int}",
     response_model=TitleContentRead,
     operation_id="update_title_content",
     responses={
@@ -102,7 +228,7 @@ def partial_title_content_update(
 
 
 @router.delete(
-    "/{parent_title_id}/contents/{title_contents_id}",
+    "/{parent_title_id}/contents/{title_contents_id:int}",
     status_code=204,
     operation_id="delete_title_content",
     responses={
@@ -150,7 +276,7 @@ def create_title_content_positioned(
 
 
 @router.post(
-    "/{destination_title_id}/contents/{title_contents_id}/move",
+    "/{destination_title_id}/contents/{title_contents_id:int}/move",
     response_model=TitleContentRead,
     operation_id="move_title_content",
     responses={
@@ -196,7 +322,7 @@ def move_title_content(
 
 
 @router.patch(
-    "/{parent_title_id}/contents/{title_contents_id}/reorder",
+    "/{parent_title_id}/contents/{title_contents_id:int}/reorder",
     response_model=TitleContentRead,
     operation_id="reorder_title_content",
     responses={
