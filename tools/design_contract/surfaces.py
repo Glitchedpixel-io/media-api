@@ -190,12 +190,14 @@ def load_surface_map(path: Path, inventory: Inventory) -> SurfaceMap:
         )
         for key, body in (raw.get("surfaces") or {}).items()
     ]
+    # A null reason means the entry is covered by another line's reason; it is
+    # still listed so the "every operation is accounted for" check stays honest.
     do_not_call = [
-        Note(operation=n["operation"], reason=" ".join(str(n["reason"]).split()))
+        Note(operation=n["operation"], reason=" ".join(str(n["reason"] or "").split()))
         for n in raw.get("do_not_call") or []
     ]
     unassigned = [
-        Note(operation=n["operation"], reason=" ".join(str(n["reason"]).split()))
+        Note(operation=n["operation"], reason=" ".join(str(n["reason"] or "").split()))
         for n in raw.get("unassigned") or []
     ]
 

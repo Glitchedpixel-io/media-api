@@ -240,11 +240,11 @@ do_not_call:
   - operation: ingest_client_traces
     reason: Telemetry sink. Not a data route.
   - operation: get_health
-    reason: Infrastructure probe.
+    reason: Infrastructure probe, with `GET /api/ping` and `GET /api/version`.
   - operation: ping
-    reason: Infrastructure probe.
+    reason: null
   - operation: get_version
-    reason: Infrastructure probe.
+    reason: null
 
 # Endpoints deliberately not placed on a surface, with why. These are the ones
 # to review: each is a judgement call rather than a mechanical assignment.
@@ -323,6 +323,16 @@ not_available:
     detail: >-
       Titles sort by `id`, `name` or `title_type` only. Anything else the grid
       offers has to be a filter, not a sort.
+  - capability: Reordering a set of siblings in one call
+    issue: none raised
+    absent_op: reorder_title_contents_batch
+    detail: >-
+      Reorder is per edge, so moving one item within a sibling set is one call
+      and rearranging N of them is N calls with no transaction around them.
+      `position_conflict` is a real `409`: two edges cannot hold one position,
+      so an interrupted drag can leave the set half-ordered. Design the reorder
+      gesture to settle one item at a time against a server response, not to
+      commit a whole reordered list optimistically.
   - capability: A count of matching rows on a listing
     issue: none raised
     detail: >-

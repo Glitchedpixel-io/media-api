@@ -38,6 +38,23 @@ GENERIC_CONDITIONS = frozenset(
     }
 )
 
+#: Omission rules carried by nearly every write. Stated once in the legend, so a
+#: per-endpoint line appears only where the rule actually differs.
+STANDARD_OMISSION = frozenset(
+    {
+        "Create: an omitted optional field takes its declared default.",
+        "No request body: the route carries its arguments in the path.",
+        "Omitted fields are left unchanged, so a partial form is safe. An "
+        "explicit `null` is discarded by the same rule, so **a nullable field "
+        "cannot be cleared through this route at all** -- there is no request "
+        "body that sets one back to null.",
+    }
+)
+
+#: The error codes the legend states for every write. A supporting endpoint
+#: whose codes are exactly these adds nothing by repeating them.
+STANDARD_CODES = frozenset({"401", "404", "409", "422", "423"})
+
 #: Provenance the inventory records but a designer does not need.
 _PROBE_NOTE = re.compile(r"\s*\((?:Confirmed|Measured|Probed)[^)]*\)")
 
@@ -215,11 +232,11 @@ def _fields_table(endpoint: Endpoint, inventory: Inventory, table: str | None) -
     total = inventory.row_counts.get(table or "", 0)
     heading = f"Fields — `{endpoint.row_model or endpoint.response_model}`"
     if table:
-        heading += f" (fill rate over {total:,} rows)"
+        heading += f" (n={total:,})"
     lines = [heading, "", "| field | type | filled |", "|---|---|---|"]
     for f in fields:
         rate = _fmt_pct(inventory.fill_rate(table, f.name))
-        note = f" *needs `{f.conditional_on}`*" if f.conditional_on else ""
+        note = f" *{f.conditional_on}*" if f.conditional_on else ""
         lines.append(f"| `{f.name}`{note} | {_type(f.type_)} | {rate} |")
     lines.append("")
     return lines
@@ -249,9 +266,9 @@ def _write_block(endpoint: Endpoint) -> list[str]:
     if not body_fields:
         lines.append("No request body.")
 
-    omission = contract.get("omission_semantics")
-    if omission:
-        lines.append(f"Omitted field: {_prose(omission)}")
+    omission = _prose(str(contract.get("omission_semantics") or ""))
+    if omission and omission not in STANDARD_OMISSION:
+        lines.append(f"Omitted field: {omission}")
 
     if contract.get("atomic") is False:
         note = contract.get("atomicity_note") or "not atomic"
@@ -292,7 +309,11 @@ def _error_lines(errors: list[dict[str, object]]) -> list[str]:
         condition = str(error["condition"])
         if condition not in GENERIC_CONDITIONS:
             specific.append(f"`{code}` {_prose(condition)}")
-    lines = ["Errors: " + " · ".join(f"`{c}`" for c in sorted(codes))]
+    # The legend states the standard five for every write, so repeating them
+    # adds nothing; anything else is listed.
+    lines = []
+    if set(codes) != STANDARD_CODES:
+        lines.append("Errors: " + " · ".join(f"`{c}`" for c in sorted(codes)))
     lines.extend(f"  - {s}" for s in specific)
     return lines
 
@@ -328,10 +349,9 @@ def _endpoint_block(
     timing = _representative(endpoint)
     if timing:
         count = timing.item_count
-        rows = f", {count} row{'' if count == 1 else 's'}" if count else ""
+        rows = f" ({count} row{'' if count == 1 else 's'})" if count else ""
         lines.append(
-            f"Measured: p50 {_fmt_ms(timing.p50_ms)} / p95 {_fmt_ms(timing.p95_ms)}"
-            f" (n={timing.runs}{rows})"
+            f"Measured: p50 {_fmt_ms(timing.p50_ms)} / p95 " f"{_fmt_ms(timing.p95_ms)}{rows}"
         )
 
     lines.extend(_write_block(endpoint))
@@ -347,17 +367,54 @@ def _endpoint_block(
     return lines
 
 
-def _also_line(endpoint: Endpoint) -> str:
-    """Render a one-line entry for a supporting endpoint.
+def _also_line(endpoint: Endpoint) -> list[str]:
+    """Render a compact entry for a supporting endpoint.
+
+    A write carries its contract rather than its response model: a designer
+    laying out a form needs the required fields and the failure codes, not the
+    name of the schema that comes back.
 
     Args:
         endpoint: The endpoint to describe.
 
     Returns:
-        A Markdown list item.
+        Markdown lines, one list item plus any indented exceptions.
     """
-    detail = _returns_line(endpoint).removeprefix("Returns: ").rstrip(".")
-    return f"- `{endpoint.route}` — {detail}"
+    if not endpoint.write_contract:
+        detail = (
+            _returns_line(endpoint)
+            .removeprefix("Returns: ")
+            .rstrip(".")
+            .replace(" rows", "[]")
+            .replace("page of ", "page of ")
+        )
+        return [f"- `{endpoint.route}` — {detail}"]
+
+    contract = endpoint.write_contract
+    body = endpoint.request_body_fields
+    required = [f["name"] for f in body if f.get("required")]
+    parts: list[str] = []
+    if required:
+        parts.append("required " + ", ".join(f"`{n}`" for n in required))
+    elif body:
+        parts.append("all fields optional")
+    else:
+        parts.append("no body")
+
+    codes = sorted({str(e["status"]) for e in contract.get("errors") or []})
+    if codes and set(codes) != STANDARD_CODES:
+        parts.append("errors " + " ".join(f"`{c}`" for c in codes))
+
+    lines = [f"- `{endpoint.route}` — " + "; ".join(parts)]
+
+    omission = _prose(str(contract.get("omission_semantics") or ""))
+    if omission and omission not in STANDARD_OMISSION:
+        lines.append(f"  - {omission}")
+    for error in contract.get("errors") or []:
+        condition = str(error["condition"])
+        if condition not in GENERIC_CONDITIONS:
+            lines.append(f"  - `{error['status']}` {_prose(condition)}")
+    return lines
 
 
 def _supporting_ceiling(inventory: Inventory, surface_map: SurfaceMap) -> float:
@@ -432,11 +489,12 @@ def _surface_section(
     # Curated surface is almost entirely Organise's containment routes.
     for owner, operations in elsewhere.items():
         routes = ", ".join(f"`{inventory.endpoints[op].route}`" for op in operations)
-        lines.extend([f"Used here, specified under **{titles.get(owner, owner)}**: {routes}", ""])
+        lines.extend([f"From **{titles.get(owner, owner)}**: {routes}", ""])
 
     if own:
-        lines.extend(["Also on this surface:", ""])
-        lines.extend(_also_line(inventory.endpoints[op]) for op in own)
+        lines.extend(["Also here:", ""])
+        for operation in own:
+            lines.extend(_also_line(inventory.endpoints[operation]))
         lines.append("")
     return lines
 
@@ -542,14 +600,18 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
         "scan the whole table; do not offer them prominently.",
         "- **filled** is the share of rows where a field has a value. A field at "
         "56% needs a designed empty state; one at 100% does not. `-` means the "
-        "field is computed or nested, so there is no measured rate.",
-        "- `?` on a type means the field can be null.",
+        "field is computed or nested, so there is no measured rate. `?` on a type "
+        "means it can be null.",
         "- Timings are observed, not modelled. At n=7 the p95 is effectively the "
-        "slowest run seen. Endpoints listed under *Also on this surface* are "
+        "slowest run seen. Endpoints listed under *Also here* are "
         f"all at or under p95 {_fmt_ms(_supporting_ceiling(inventory, surface_map))}"
         " except where **Costly** says otherwise.",
         "- Listings return a cursor, never a total. There is no page count.",
         "- Every write is last-write-wins: no ETag, no version field, no conflict " "detection.",
+        "- On a create, an omitted optional field takes its declared default. "
+        "On a `PATCH`, omitted fields are left unchanged — and an explicit "
+        "`null` is discarded by the same rule, so **a nullable field cannot be "
+        "cleared through a `PATCH` at all**. Endpoints that differ say so.",
         "- Every write can return `401` (token rejected), `404` (no such row), "
         "`409` (constraint or illegal relationship), `422` (validation) and "
         "`423` (database read-only). Endpoint entries spell out only the "
@@ -562,7 +624,7 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
             [
                 "## Changed since the brief",
                 "",
-                "Section 6 and 7 of the brief list these as missing. They exist now.",
+                "The brief lists these as missing. They exist now.",
                 "",
             ]
         )
@@ -574,10 +636,10 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
     for surface in surface_map.surfaces:
         lines.extend(_surface_section(surface, inventory, surface_map, rendered_models))
 
-    lines.extend(
-        ["## Do not call", "", "Worker and machine routes. Nothing is designed against these.", ""]
-    )
+    lines.extend(["## Do not call", "", "Worker and machine routes.", ""])
     for note in surface_map.do_not_call:
+        if not note.reason:
+            continue
         endpoint = inventory.endpoints[note.operation]
         lines.append(f"- `{endpoint.route}` — {note.reason}")
     lines.append("")
@@ -599,9 +661,8 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
         [
             "## Costly",
             "",
-            "Reachable from a surface and expensive. Nothing here should be "
-            "driven from a keystroke, and nothing uncapped should be rendered "
-            "without virtualising it.",
+            "Reachable from a surface and expensive. Nothing here belongs on a "
+            "keystroke; nothing uncapped should render unvirtualised.",
             "",
         ]
     )
