@@ -9,128 +9,130 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 ## Run
 
 - **Source:** media-api @ app.openapi()
-- **App version:** 5.0.4.dev1+g4a7ea39e6
+- **App version:** 6.1.0
 - **Phases run:** 1 (static surface), 2 (code annotation), 3 (data shape), 4 (timed probes), 5 (dead surface), 6 (write semantics)
 - **Phases skipped:** none
-- **Endpoints:** 106
+- **Endpoints:** 108
 - **Database:** read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)
 - **Server:** PostgreSQL 17.9 (Debian 17.9-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
-- **Baseline database round trip:** 25ms median for `SELECT 1`. This is the unit cost of a query issued once per row, and it is a property of where the harness ran relative to the database rather than of the API. An API co-located with its database would see a far smaller number for the same defect — so read a per-row cost below as evidence of *how many* queries an endpoint issues, and treat the absolute milliseconds as specific to this measurement setup.
+- **Baseline database round trip:** 26ms median for `SELECT 1`. This is the unit cost of a query issued once per row, and it is a property of where the harness ran relative to the database rather than of the API. An API co-located with its database would see a far smaller number for the same defect — so read a per-row cost below as evidence of *how many* queries an endpoint issues, and treat the absolute milliseconds as specific to this measurement setup.
 - Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.
-- Probed `http://127.0.0.1:8137` with 70 probe(s).
-- Phase 6 probed `http://127.0.0.1:8077` against a disposable database (fingerprint `644092952611`), verified bound to it by sentinel before any write. 11 of 12 write scenarios executed; 1 idempotent, 5 guarded, 0 duplicating.
+- Probed `http://127.0.0.1:8137` with 74 probe(s).
+- Phase 6 probed `http://127.0.0.1:8077` against a disposable database (fingerprint `644092952611`), verified bound to it by sentinel before any write. 12 of 13 write scenarios executed; 2 idempotent, 6 guarded, 0 duplicating.
 - No scratch media root was configured, so filesystem-touching write probes were skipped rather than run against a real one.
 
 ## Summary
 
 | Endpoint | Auth | Paging | Measured p95 | Verdict | One-line judgement |
 |---|---|---|---|---|---|
-| `GET /api/artwork` | bearer | keyset | 110ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/artwork` | bearer | keyset | 114ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `DELETE /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/artwork/{artwork_id}` | bearer | **none** | 100ms | safe | p95 100ms, index-covered |
+| `GET /api/artwork/{artwork_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
 | `PATCH /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/artwork_kinds` | bearer | **none** | 99ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 99ms, so it is fine to render directly |
-| `GET /api/assets/` | bearer | keyset | 314ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/artwork_kinds` | bearer | **none** | 105ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly |
+| `GET /api/assets/` | bearer | keyset | 284ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/assets/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 105ms | caution | the lookup is not index-covered and measures p95 105ms, which will grow with the table |
+| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 97ms | caution | the lookup is not index-covered and measures p95 97ms, which will grow with the table |
 | `PATCH /api/assets/seen` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}` | bearer | **none** | 134ms | safe | p95 134ms, index-covered |
+| `GET /api/assets/{asset_id}` | bearer | **none** | 129ms | safe | p95 129ms, index-covered |
 | `PATCH /api/assets/{asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | 127ms | safe | p95 127ms, index-covered |
-| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | 117ms | safe | p95 117ms, index-covered |
+| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | 165ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 165ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 106ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 98ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 169ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 166ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/metadata` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | 173ms | safe | p95 173ms, index-covered |
+| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | 373ms | caution | p95 373ms — fine for a detail view, too slow to fire on every keystroke |
 | `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `DELETE /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/streams` | bearer | **none** | 162ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/streams` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 154ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 154ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PUT /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 175ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 175ms, so it is fine to render directly |
-| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | 168ms | safe | the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 156ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | 152ms | safe | the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 152ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/transform_requests` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/external-ids/resolve` | bearer | **none** | 104ms | safe | p95 104ms, index-covered |
+| `GET /api/external-ids/resolve` | bearer | **none** | 85ms | safe | p95 85ms, index-covered |
 | `GET /api/fetch/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404) |
-| `GET /api/health` | **none** | **none** | 126ms | safe | p95 126ms, index-covered |
-| `GET /api/id_schemes` | bearer | **none** | 97ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly |
+| `GET /api/health` | **none** | **none** | 108ms | safe | p95 108ms, index-covered |
+| `GET /api/id_schemes` | bearer | **none** | 91ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 91ms, so it is fine to render directly |
 | `POST /api/id_schemes` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
-| `GET /api/id_schemes/{scheme_id}` | bearer | **none** | 98ms | safe | p95 98ms, index-covered |
+| `GET /api/id_schemes/{scheme_id}` | bearer | **none** | 106ms | safe | p95 106ms, index-covered |
 | `PATCH /api/id_schemes/{scheme_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `DELETE /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
-| `GET /api/inbox` | bearer | **none** | 9ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 9ms, so it is fine to render directly |
+| `GET /api/inbox` | bearer | **none** | 3ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly |
 | `POST /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
 | `POST /api/jobs` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `PATCH /api/jobs/{job_key}/completed` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `PUT /api/jobs/{job_key}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/log` | **none** | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
-| `GET /api/ping` | **none** | **none** | 2ms | safe | p95 2ms, index-covered |
+| `GET /api/ping` | **none** | **none** | 1ms | safe | p95 1ms, index-covered |
 | `POST /api/run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/runner_state` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/runner_state/{runner_key}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/runner_state/{runner_key}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `POST /api/scanner_run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/search/transcripts` | bearer | offset | UNKNOWN | UNKNOWN | offset paging over Elasticsearch has a hard result-window ceiling, but where it falls on this index was not measured; see Gaps |
-| `GET /api/streams` | bearer | keyset | 123ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/streams` | bearer | keyset | 125ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `GET /api/streams/{stream_id}` | bearer | **none** | 96ms | safe | p95 96ms, index-covered |
 | `PATCH /api/streams/{stream_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/tags` | bearer | keyset | 106ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/tags` | bearer | keyset | 113ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
-| `GET /api/tags/{tag_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
+| `GET /api/tags/{tag_id}` | bearer | **none** | 86ms | safe | p95 86ms, index-covered |
 | `PATCH /api/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `PUT /api/tags/{tag_id}` | bearer | — | UNKNOWN | not safe | Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest;… |
-| `GET /api/tags/{tag_id}/tags` | bearer | keyset | 144ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/tags/{tag_id}/tags` | bearer | keyset | 120ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/tags/{tag_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/title_types` | bearer | **none** | 97ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly |
+| `GET /api/title_types` | bearer | **none** | 112ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 112ms, so it is fine to render directly |
 | `POST /api/title_types` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/title_types/{title_type_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
+| `GET /api/title_types/{title_type_id}` | bearer | **none** | 92ms | safe | p95 92ms, index-covered |
 | `PATCH /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/` | bearer | keyset | 151ms | safe | cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 151ms |
+| `GET /api/titles/` | bearer | keyset | 161ms | safe | cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 161ms |
 | `POST /api/titles/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 104ms | caution | the lookup is not index-covered and measures p95 104ms, which will grow with the table |
-| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 201ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly |
+| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 108ms | caution | the lookup is not index-covered and measures p95 108ms, which will grow with the table |
+| `POST /api/titles/{destination_title_id}/contents/batch/move` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
+| `POST /api/titles/{destination_title_id}/contents/{title_contents_id}/move` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
+| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 184ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly |
 | `POST /api/titles/{parent_title_id}/contents` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
+| `POST /api/titles/{parent_title_id}/contents/batch` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
+| `POST /api/titles/{parent_title_id}/contents/batch/detach` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `POST /api/titles/{parent_title_id}/contents/positioned` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/{title_id}` | bearer | **none** | 236ms | caution | p95 236ms — fine for a detail view, too slow to fire on every keystroke |
+| `GET /api/titles/{title_id}` | bearer | **none** | 215ms | caution | p95 215ms — fine for a detail view, too slow to fire on every keystroke |
 | `PATCH /api/titles/{title_id}` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
-| `PUT /api/titles/{title_id}` | bearer | — | UNKNOWN | not safe | Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest |
-| `GET /api/titles/{title_id}/artwork` | bearer | **none** | 151ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 151ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/artwork` | bearer | **none** | 157ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/{title_id}/ids` | bearer | **none** | 102ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/ids` | bearer | **none** | 106ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `DELETE /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/{title_id}/parents` | bearer | **none** | 164ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly |
-| `GET /api/titles/{title_id}/references` | bearer | **none** | 133ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 133ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/parents` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/references` | bearer | **none** | 134ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/references` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{title_id}/references/{reference_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/{title_id}/tags` | bearer | **none** | 125ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 125ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/tags` | bearer | **none** | 121ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 121ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
 | `PUT /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/titles/{title_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/transform_requests` | bearer | keyset | 198ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/transform_requests` | bearer | keyset | 189ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/transform_requests/claim` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
-| `GET /api/transform_requests/{request_id}` | bearer | **none** | 106ms | safe | p95 106ms, index-covered |
+| `GET /api/transform_requests/{request_id}` | bearer | **none** | 97ms | safe | p95 97ms, index-covered |
 | `PATCH /api/transform_requests/{request_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `PATCH /api/transform_requests/{request_id}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/transform_requests/{request_id}/link` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | 107ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 107ms, so it is fine to render directly |
+| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | 119ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 119ms, so it is fine to render directly |
 | `PATCH /api/transform_requests/{request_id}/retry` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/version` | **none** | **none** | 9ms | safe | p95 9ms, index-covered |
+| `GET /api/version` | **none** | **none** | 8ms | safe | p95 8ms, index-covered |
 
 ## Coverage
 
@@ -138,9 +140,9 @@ Measured over the rows a surface actually renders, not over whole tables. The li
 
 | Population | Attribute | Covered | Of | Share |
 |---|---|---|---|---|
-| Titles with library_root=true | resolve a display image (the API's own resolution) | 955 | 1,136 | **84%** |
-| Titles with library_root=true | have a release_year | 878 | 1,136 | **77%** |
-| Titles with library_root=true | have at least one tag | 850 | 1,136 | **75%** |
+| Titles with library_root=true | resolve a display image (the API's own resolution) | 957 | 1,137 | **84%** |
+| Titles with library_root=true | have a release_year | 879 | 1,137 | **77%** |
+| Titles with library_root=true | have at least one tag | 851 | 1,137 | **75%** |
 
 - **resolve a display image (the API's own resolution)** — the browse grid's central design constraint: every root that does not resolve one needs the typographic treatment, so this is the proportion of the grid that is *not* a poster wall. Measured with the API's own resolution query, so it matches what `resolves_display_image=true` returns rather than approximating it.
 - **have a release_year** — drives the 'titles with no year' view, and any sort or facet by year.
@@ -148,7 +150,7 @@ Measured over the rows a surface actually renders, not over whole tables. The li
 
 ## Endpoints
 
-All 106 endpoints have a section below, including each of the 61 that write. Writes used to be collapsed into one table on the grounds that a single-row write has nothing endpoint-specific to get wrong. That was true of their query shape and false of their contract: what a form gets wrong is whether a partial submit erases fields, whether a retry duplicates, and whether a failure is legible — and those differ per route. Each now carries a [Write contract](#post-apititles) block saying so.
+All 108 endpoints have a section below, including each of the 63 that write. Writes used to be collapsed into one table on the grounds that a single-row write has nothing endpoint-specific to get wrong. That was true of their query shape and false of their contract: what a form gets wrong is whether a partial submit erases fields, whether a retry duplicates, and whether a failure is legible — and those differ per route. Each now carries a [Write contract](#post-apititles) block saying so.
 
 ### GET /api/artwork
 
@@ -177,7 +179,7 @@ All 106 endpoints have a section below, including each of the 61 that write. Wri
 | `entity_id` | query | int \| None | **no** | no index on artwork.entity_id; requires a sequential scan |
 | `entity_type` | query | EntityTypeEnum \| None | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
 | `is_primary` | query | bool \| None | **no** | no index on artwork.is_primary; requires a sequential scan |
-| `kind` | query | str \| None (maxLength=32) | **no** | resolves to `artwork.artwork_kind_id`, declared rather than derived. The service resolves the public `kind` code to kind ids before building the query, so the repository filters on `artwork_kind_id` and the name `kind` never reaches it. Seeing this statically would need dataflow across the service boundary through a rename. The filter is applied: `artwork-page-1` and the nested artwork probes exercise the same repository. Nothing else is pinned on this route -- `entity_type` and `entity_id` are optional here -- so unlike the nested reads there is no leading column to make `ix_artwork_entity_kind_primary` apply, and the filter is genuinely uncovered. no index on artwork.artwork_kind_id; requires a sequential scan |
+| `kind` | query | str \| None (maxLength=32) | yes (`ix_artwork_kind_id`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. The service resolves the public `kind` code to kind ids before building the query, so the repository filters on `artwork_kind_id` and the name `kind` never reaches it. Seeing this statically would need dataflow across the service boundary through a rename. The filter is applied: `artwork-page-1` and the nested artwork probes exercise the same repository. Nothing else is pinned on this route -- `entity_type` and `entity_id` are optional here -- so unlike the nested reads there is no leading column to make `ix_artwork_entity_kind_primary` apply. Covered since #182 by `ix_artwork_kind_id`, which exists for this route specifically. Its second column is `id` rather than nothing: the route is keyset-paginated, and against a bare `(artwork_kind_id)` index the planner prefers walking `artwork_pkey` in id order and filtering, at 1,214 rows, at 100,014 rows, and with `enable_seqscan = off`. The pair matches the cursor tuple so the index supplies the ordering too -- 6.947ms against 0.019ms on `?kind=poster` at 100k rows. served by ix_artwork_kind_id |
 | `limit` | query | int (maximum=500, minimum=1) | n/a | — |
 | `sort` | query | str | n/a | — |
 | `sort=created_at` | sort | — | **no** | no index on artwork.created_at; every page must sort the whole filtered set, so the keyset cursor keeps the ordering correct but does not make it cheap |
@@ -198,14 +200,14 @@ Own probe responses carried 50 item(s); the largest was 17.0KB (`artwork-deep-pa
 
 #### Measured
 
-- `artwork-deep-page` (`/api/artwork?after=>i:1000&limit=50`): p50 102ms · p95 110ms · 17.0KB · 50 items · n=7 — page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork
+- `artwork-deep-page` (`/api/artwork?after=>i:1000&limit=50`): p50 89ms · p95 109ms · 17.0KB · 50 items · n=7 — page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork
   - deep page reached by following 20 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
-- `artwork-page-1` (`/api/artwork?limit=50`): p50 100ms · p95 105ms · 16.8KB · 50 items · n=7 — default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it
+- `artwork-page-1` (`/api/artwork?limit=50`): p50 99ms · p95 114ms · 16.8KB · 50 items · n=7 — default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,206 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`entity_id`, `is_primary`, `kind`); each forces a sequential scan, though `artwork` holds only 1,206 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,218 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`entity_id`, `is_primary`); each forces a sequential scan, though `artwork` holds only 1,218 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -288,7 +290,7 @@ None identified by this run.
 
 ### GET /api/artwork/{artwork_id}
 
-> **SAFE** — p95 100ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -320,7 +322,7 @@ Reads [`artwork`](#table-artwork) — see the [Tables](#tables) appendix for eac
 
 #### Measured
 
-- `artwork-one` (`/api/artwork/1`): p50 96ms · p95 100ms · 343B · n=7 — index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable
+- `artwork-one` (`/api/artwork/1`): p50 86ms · p95 99ms · 343B · n=7 — index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable
 
 #### Risk
 
@@ -353,7 +355,7 @@ None identified by this run.
 | `<body>` | body | ArtworkPatchPublic | n/a | — |
 | `artwork_id` | path | int | n/a | — |
 | `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
-| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_kind_id`) | served by ix_artwork_kind_id |
 | `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
 | `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
 | `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
@@ -419,7 +421,7 @@ None identified by this run.
 
 ### GET /api/artwork_kinds
 
-> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 99ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -447,7 +449,7 @@ Own probe responses carried 8 item(s); the largest was 1.1KB (`artwork-kinds`).
 
 #### Measured
 
-- `artwork-kinds` (`/api/artwork_kinds`): p50 90ms · p95 99ms · 1.1KB · 8 items · n=7 — bounded by the seeded kinds, which is small and fixed at six
+- `artwork-kinds` (`/api/artwork_kinds`): p50 87ms · p95 105ms · 1.1KB · 8 items · n=7 — bounded by the seeded kinds, which is small and fixed at six
 
 #### Risk
 
@@ -484,6 +486,7 @@ Own probe responses carried 8 item(s); the largest was 1.1KB (`artwork-kinds`).
 | `duration_min` | query | float \| None (minimum=0) | **no** | no index on assets.duration; requires a sequential scan |
 | `filename_ext` | query | str \| None | yes (`ix_assets_filename_ext`) | `lower(substring(filename, '\.([^.]+)$'))` served by ix_assets_filename_ext; declared rather than derived. The predicate is written against `filename_extension()` so that it matches `ix_assets_filename_ext`, and `app/models/asset.py` documents why the model and PostgreSQL spellings of that expression never match as text -- the same reason the tracer cannot match them either. The pairing is held by `test_filename_ext_filter_uses_the_index`, not by this file. |
 | `has_artwork` | query | bool \| None | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
+| `has_intrinsic_parent` | query | bool \| None | yes (`ix_title_contents_asset_membership`) | served by ix_title_contents_asset_membership |
 | `include` | query | str \| None | n/a | — |
 | `limit` | query | int (maximum=500, minimum=1) | n/a | — |
 | `path_part` | query | str \| None | yes (`ix_assets_path_trgm`) | substring match on assets.path; a btree cannot use a leading wildcard, but ix_assets_path_trgm is a GIN trigram index and serves this for patterns of **three characters or more**. A shorter pattern contains no whole trigram, so the planner falls back to a sequential scan -- verified by EXPLAIN against the deployed schema, where a two-character pattern seq-scans and a three-character one does not. A search box that waits for three characters is on the right side of that line |
@@ -501,7 +504,7 @@ Own probe responses carried 8 item(s); the largest was 1.1KB (`artwork-kinds`).
 
 #### Queries
 
-- `select_page` on `assets`, `asset_tags` in `SQLAlchemyMediaRepository.list_paged` (app/repositories/media_repository.py:157)
+- `select_page` on `assets`, `asset_tags` in `SQLAlchemyMediaRepository.list_paged` (app/repositories/media_repository.py:189)
 
 #### Data shape
 
@@ -516,22 +519,24 @@ Own probe responses carried 10 to 500 items; the largest was 206.4KB (`assets-ma
 
 #### Measured
 
-- `assets-page-1` (`/api/assets/?limit=50`): p50 141ms · p95 160ms · 19.7KB · 50 items · n=7 — default first page a browse screen would issue
-- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 175ms · p95 188ms · 19.7KB · 50 items · n=7 — same page with every optional relation eager-loaded
-- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 128ms · p95 141ms · 4.0KB · 10 items · n=7 — N+1 scaling, 10 rows
-- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 165ms · p95 178ms · 81.7KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
-- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 250ms · p95 260ms · 206.4KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
-- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 221ms · p95 228ms · 206.4KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
-- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 223ms · p95 314ms · 205.0KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
-- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 139ms · p95 163ms · 19.7KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case
-- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 139ms · p95 172ms · 18.6KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
+- `assets-page-1` (`/api/assets/?limit=50`): p50 141ms · p95 150ms · 19.7KB · 50 items · n=7 — default first page a browse screen would issue
+- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 179ms · p95 189ms · 19.7KB · 50 items · n=7 — same page with every optional relation eager-loaded
+- `assets-unplaced-page-1` (`/api/assets/?has_intrinsic_parent=False&limit=50`): p50 140ms · p95 143ms · 19.7KB · 50 items · n=7 — the drag source -- assets with no intrinsic home, which is the queue the whole placement workflow starts from. Curated listings deliberately do not count as placed, so an asset sitting only in a collection appears here. Pairs with `assets-placed-page-1`; the two should partition `assets`.
+- `assets-placed-page-1` (`/api/assets/?has_intrinsic_parent=True&limit=50`): p50 144ms · p95 156ms · 19.4KB · 50 items · n=7 — the other half of the pair. Both directions are served by `ix_title_contents_asset_membership`, whose leading column is `asset_id` -- nothing indexed that column before #177, and `uq_parent_asset_once` cannot serve it because it leads with `parent_title_id`.
+- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 121ms · p95 129ms · 4.0KB · 10 items · n=7 — N+1 scaling, 10 rows
+- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 160ms · p95 173ms · 81.7KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
+- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 230ms · p95 284ms · 206.4KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
+- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 223ms · p95 235ms · 206.4KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
+- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 216ms · p95 234ms · 205.0KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
+- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 139ms · p95 156ms · 19.7KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case
+- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 133ms · p95 140ms · 18.6KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
   - deep page reached by following 40 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
 
 #### Risk
 
-- unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,344 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,344 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
-- measured p95 of 314ms on `assets-indexed-sort-no-n1` is too slow to drive from a keystroke
+- unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,350 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,350 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- measured p95 of 284ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`
 
 ---
@@ -618,7 +623,7 @@ None identified by this run.
 
 ### GET /api/assets/by-scheme/{scheme_id}/{external_id}
 
-> **CAUTION** — the lookup is not index-covered and measures p95 105ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
+> **CAUTION** — the lookup is not index-covered and measures p95 97ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -652,7 +657,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `asset-by-scheme` (`/api/assets/by-scheme/2/capinv-probe-no-such-external-id`): p50 93ms · p95 105ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
+- `asset-by-scheme` (`/api/assets/by-scheme/2/capinv-probe-no-such-external-id`): p50 86ms · p95 97ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -684,7 +689,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 #### Queries
 
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `execute` on `assets` in `SQLAlchemyMediaRepository.mark_assets_seen` (app/repositories/media_repository.py:189)
+- `execute` on `assets` in `SQLAlchemyMediaRepository.mark_assets_seen` (app/repositories/media_repository.py:221)
 
 #### Data shape
 
@@ -730,7 +735,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}
 
-> **SAFE** — p95 134ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 129ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -768,7 +773,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `asset-detail` (`/api/assets/1065`): p50 126ms · p95 134ms · 373B · n=7
+- `asset-detail` (`/api/assets/1065`): p50 119ms · p95 129ms · 373B · n=7
 
 #### Risk
 
@@ -810,9 +815,9 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 - `execute` on `assets` in `SQLAlchemyMediaRepository.get` (app/repositories/media_repository.py:42)
 - `execute` on `assets` in `SQLAlchemyMediaRepository.path_exists` (app/repositories/media_repository.py:59)
-- `execute` on `assets` in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:169)
+- `execute` on `assets` in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:201)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on unresolved table in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:180)
+- `refresh` on unresolved table in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:212)
 
 #### Data shape
 
@@ -873,7 +878,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/accessories
 
-> **SAFE** — p95 127ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 117ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -909,7 +914,7 @@ Own probe responses carried 0 item(s); the largest was 28B (`asset-accessories`)
 
 #### Measured
 
-- `asset-accessories` (`/api/assets/1065/accessories`): p50 123ms · p95 127ms · 28B · 0 items · n=7
+- `asset-accessories` (`/api/assets/1065/accessories`): p50 113ms · p95 117ms · 28B · 0 items · n=7
 
 #### Risk
 
@@ -919,7 +924,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/artwork
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -940,7 +945,7 @@ None identified by this run.
 | Param | In | Type | Indexed | Cost note |
 |---|---|---|---|---|
 | `asset_id` | path | int | n/a | — |
-| `kind` | query | str \| None | yes (`ix_artwork_entity_kind_primary`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. Same translation, and the same `list_for_entity` call as the title route, so `entity_type` and `entity_id` are pinned here too. Declared per endpoint rather than once for the parameter name, so that a future unrelated `kind` on some other route is not silently answered by this entry. served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `kind` | query | str \| None | yes (`ix_artwork_kind_id`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. Same translation, and the same `list_for_entity` call as the title route, so `entity_type` and `entity_id` are pinned here too. Declared per endpoint rather than once for the parameter name, so that a future unrelated `kind` on some other route is not silently answered by this entry. served by ix_artwork_kind_id |
 
 #### Queries
 
@@ -957,7 +962,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-artwork`).
 
 #### Measured
 
-- `asset-artwork` (`/api/assets/1065/artwork`): p50 154ms · p95 171ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
+- `asset-artwork` (`/api/assets/1065/artwork`): p50 139ms · p95 144ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
 
 #### Risk
 
@@ -990,7 +995,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-artwork`).
 | `<body>` | body | Body_upload_asset_artwork | n/a | — |
 | `asset_id` | path | int | n/a | — |
 | `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
-| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_kind_id`) | served by ix_artwork_kind_id |
 | `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
 | `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
 | `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
@@ -1062,7 +1067,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/derived_assets
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 165ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1099,7 +1104,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-derived-assets
 
 #### Measured
 
-- `asset-derived-assets` (`/api/assets/1065/derived_assets`): p50 152ms · p95 165ms · 2B · 0 items · n=7
+- `asset-derived-assets` (`/api/assets/1065/derived_assets`): p50 132ms · p95 144ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -1135,9 +1140,9 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-derived-assets
 
 #### Queries
 
-- `execute` on `assets` in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:169)
+- `execute` on `assets` in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:201)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on unresolved table in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:180)
+- `refresh` on unresolved table in `SQLAlchemyMediaRepository.update` (app/repositories/media_repository.py:212)
 - `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
 
 #### Data shape
@@ -1183,7 +1188,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/ids
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1217,7 +1222,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`)
 
 #### Measured
 
-- `asset-external-ids` (`/api/assets/1065/ids`): p50 90ms · p95 106ms · 2B · 0 items · n=7
+- `asset-external-ids` (`/api/assets/1065/ids`): p50 85ms · p95 98ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -1460,7 +1465,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/metadata
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 169ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1496,7 +1501,7 @@ Own probe responses carried 1 item(s); the largest was 2.9KB (`asset-metadata`).
 
 #### Measured
 
-- `asset-metadata` (`/api/assets/1065/metadata`): p50 156ms · p95 169ms · 2.9KB · 1 items · n=7
+- `asset-metadata` (`/api/assets/1065/metadata`): p50 138ms · p95 166ms · 2.9KB · 1 items · n=7
 
 #### Risk
 
@@ -1662,7 +1667,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/metadata/{metadata_id}
 
-> **SAFE** — p95 173ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **CAUTION** — p95 373ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
 
 | | |
 |---|---|
@@ -1696,11 +1701,11 @@ Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Ta
 
 #### Measured
 
-- `asset-metadata-one` (`/api/assets/1065/metadata/5617`): p50 153ms · p95 173ms · 2.9KB · n=7 — metadata_id is read from this asset's own metadata list
+- `asset-metadata-one` (`/api/assets/1065/metadata/5617`): p50 145ms · p95 373ms · 2.9KB · n=7 — metadata_id is read from this asset's own metadata list
 
 #### Risk
 
-None identified by this run.
+- measured p95 of 373ms on `asset-metadata-one` is too slow to drive from a keystroke
 
 ---
 
@@ -1862,7 +1867,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/streams
 
-> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 162ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1899,7 +1904,7 @@ Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 #### Measured
 
-- `asset-streams` (`/api/assets/1065/streams`): p50 144ms · p95 162ms · 699B · 3 items · n=7
+- `asset-streams` (`/api/assets/1065/streams`): p50 148ms · p95 171ms · 699B · 3 items · n=7
 
 #### Risk
 
@@ -1994,7 +1999,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 154ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2030,7 +2035,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-tags`).
 
 #### Measured
 
-- `asset-tags` (`/api/assets/1065/tags`): p50 148ms · p95 154ms · 2B · 0 items · n=7
+- `asset-tags` (`/api/assets/1065/tags`): p50 138ms · p95 144ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -2194,7 +2199,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Risk
 
-- no pagination, but the largest collection measured is only 46 rows (at most all 46 rows of `tags`), so the absent cap is currently latent
+- no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent
 
 ---
 
@@ -2278,7 +2283,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/titles
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 175ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2299,11 +2304,11 @@ None identified by this run.
 | Param | In | Type | Indexed | Cost note |
 |---|---|---|---|---|
 | `asset_id` | path | int | n/a | — |
-| `title_contents.asset_id` | lookup | — | **no** | no index on title_contents.asset_id; requires a sequential scan |
+| `title_contents.asset_id` | lookup | — | yes (`ix_title_contents_asset_membership`) | served by ix_title_contents_asset_membership |
 
 #### Queries
 
-- `execute` on `titles`, `title_contents` in `SQLAlchemyTitleContentRepository.get_titles_with_asset` (app/repositories/title_content_repository.py:236)
+- `execute` on `titles`, `title_contents` in `SQLAlchemyTitleContentRepository.get_titles_with_asset` (app/repositories/title_content_repository.py:256)
 - `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53)
 
 #### Data shape
@@ -2314,18 +2319,17 @@ Own probe responses carried 0 item(s); the largest was 2B (`asset-titles`).
 
 #### Measured
 
-- `asset-titles` (`/api/assets/1065/titles`): p50 157ms · p95 175ms · 2B · 0 items · n=7
+- `asset-titles` (`/api/assets/1065/titles`): p50 137ms · p95 156ms · 2B · 0 items · n=7
 
 #### Risk
 
-- unindexed lookup on `title_contents.asset_id`; the read is a sequential scan
 - no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
 ### GET /api/assets/{asset_id}/transform_requests
 
-> **SAFE** — the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 168ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 152ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2362,7 +2366,7 @@ Own probe responses carried 4 item(s); the largest was 1.7KB (`asset-transform-r
 
 #### Measured
 
-- `asset-transform-requests` (`/api/assets/1065/transform_requests`): p50 147ms · p95 168ms · 1.7KB · 4 items · n=7
+- `asset-transform-requests` (`/api/assets/1065/transform_requests`): p50 137ms · p95 152ms · 1.7KB · 4 items · n=7
 
 #### Risk
 
@@ -2457,7 +2461,7 @@ None identified by this run.
 
 ### GET /api/external-ids/resolve
 
-> **SAFE** — p95 104ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 85ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2492,7 +2496,7 @@ Reads [`external_identifiers`](#table-external_identifiers) · [`id_schemes`](#t
 
 #### Measured
 
-- `external-id-resolve` (`/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin`): p50 91ms · p95 104ms · 81B · n=7 — the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id
+- `external-id-resolve` (`/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin`): p50 81ms · p95 85ms · 81B · n=7 — the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id
 
 #### Risk
 
@@ -2555,7 +2559,7 @@ Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 ### GET /api/health
 
-> **SAFE** — p95 126ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 108ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2576,7 +2580,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `health` (`/api/health`): p50 113ms · p95 126ms · 226B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
+- `health` (`/api/health`): p50 104ms · p95 108ms · 210B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
 
 #### Risk
 
@@ -2586,7 +2590,7 @@ This endpoint reads no database tables.
 
 ### GET /api/id_schemes
 
-> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 91ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2613,7 +2617,7 @@ Own probe responses carried 3 item(s); the largest was 182B (`id-schemes-all`).
 
 #### Measured
 
-- `id-schemes-all` (`/api/id_schemes`): p50 85ms · p95 97ms · 182B · 3 items · n=7
+- `id-schemes-all` (`/api/id_schemes`): p50 88ms · p95 91ms · 182B · 3 items · n=7
 
 #### Risk
 
@@ -2697,7 +2701,7 @@ None identified by this run.
 
 ### GET /api/id_schemes/{scheme_id}
 
-> **SAFE** — p95 98ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2729,7 +2733,7 @@ Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix f
 
 #### Measured
 
-- `id-scheme-one` (`/api/id_schemes/2`): p50 93ms · p95 98ms · 62B · n=7
+- `id-scheme-one` (`/api/id_schemes/2`): p50 89ms · p95 106ms · 62B · n=7
 
 #### Risk
 
@@ -2892,7 +2896,7 @@ None identified by this run.
 
 ### GET /api/inbox
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 9ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2923,7 +2927,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`inbox-full`).
 
 #### Measured
 
-- `inbox-full` (`/api/inbox`): p50 2ms · p95 9ms · 2B · 0 items · n=7 — the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling
+- `inbox-full` (`/api/inbox`): p50 2ms · p95 3ms · 2B · 0 items · n=7 — the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling
 - `inbox-top-level` (`/api/inbox?depth=1`): p50 2ms · p95 2ms · 2B · 0 items · n=7 — one level only, the cheapest useful request a client can make
 
 #### Risk
@@ -3278,7 +3282,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 ### GET /api/ping
 
-> **SAFE** — p95 2ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 1ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -3295,7 +3299,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `ping` (`/api/ping`): p50 2ms · p95 2ms · 15B · n=7
+- `ping` (`/api/ping`): p50 1ms · p95 1ms · 15B · n=7
 
 #### Risk
 
@@ -3761,13 +3765,13 @@ Own probe responses carried 3 to 500 items; the largest was 120.1KB (`streams-ma
 
 #### Measured
 
-- `streams-page-1` (`/api/streams?limit=50`): p50 99ms · p95 107ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
-- `streams-max-page` (`/api/streams?limit=500`): p50 119ms · p95 123ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
-- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 90ms · p95 105ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
+- `streams-page-1` (`/api/streams?limit=50`): p50 88ms · p95 96ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
+- `streams-max-page` (`/api/streams?limit=500`): p50 115ms · p95 125ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
+- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 90ms · p95 94ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
 
 #### Risk
 
-- unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,212 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,230 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 
 ---
 
@@ -3805,7 +3809,7 @@ Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for eac
 
 #### Measured
 
-- `stream-one` (`/api/streams/2117`): p50 90ms · p95 96ms · 231B · n=7
+- `stream-one` (`/api/streams/2117`): p50 93ms · p95 96ms · 231B · n=7
 
 #### Risk
 
@@ -3939,16 +3943,16 @@ None identified by this run.
 
 Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
-Own probe responses carried 42 item(s); the largest was 7.7KB (`tags-page-1`).
+Own probe responses carried 47 item(s); the largest was 8.7KB (`tags-page-1`).
 
 #### Measured
 
-- `tags-page-1` (`/api/tags?limit=50`): p50 99ms · p95 106ms · 7.7KB · 42 items · n=7
+- `tags-page-1` (`/api/tags?limit=50`): p50 101ms · p95 113ms · 8.7KB · 47 items · n=7
 
 #### Risk
 
-- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 46 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 46 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -4028,7 +4032,7 @@ None identified by this run.
 
 ### GET /api/tags/{tag_id}
 
-> **SAFE** — p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 86ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -4060,7 +4064,7 @@ Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `tag-detail` (`/api/tags/1`): p50 87ms · p95 99ms · 212B · n=7
+- `tag-detail` (`/api/tags/1`): p50 81ms · p95 86ms · 212B · n=7
 
 #### Risk
 
@@ -4145,83 +4149,6 @@ None identified by this run.
 
 ---
 
-### PUT /api/tags/{tag_id}
-
-> **NOT SAFE** — Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest; no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
-
-| | |
-|---|---|
-| **Purpose** | Update Tag By Put |
-| **Auth** | bearer, no scope or role enforced at the route |
-| **Handler** | `app.routers.tags.update_tag_by_put` |
-| **Pagination** | none — single object; not a collection |
-| **Response 200** | `TagRead` |
-| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
-| **Limits** | none declared |
-
-#### Fields
-
-`id: int`, `name: str`, `description?: str | None`, `color?: str`, `parent_id?: int | None`, `created_at: str(date-time)`, `updated_at: str(date-time)`
-
-#### Parameters
-
-| Param | In | Type | Indexed | Cost note |
-|---|---|---|---|---|
-| `<body>` | body | TagPatchPublic | n/a | — |
-| `tag_id` | path | int | n/a | — |
-| `tags.id` | lookup | — | yes (`tags_pkey`) | served by tags_pkey |
-
-#### Queries
-
-- `execute` on `tags` in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:142)
-- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on unresolved table in `SQLAlchemyTagRepository.update` (app/repositories/tag_repository.py:153)
-
-#### Data shape
-
-Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
-
-#### Write contract
-
-| Field | Type | Required | Omitted means | Explicit null means | Constraints |
-|---|---|---|---|---|---|
-| `color` | `string` | no | set to null | set to null | `maxLength=7`, `pattern=^#[0-9a-fA-F]{6}$` |
-| `description` | `string` | no | set to null | set to null | `maxLength=255` |
-| `name` | `string` | no | set to null | set to null | `maxLength=50` |
-
-Every field of the model is written, whether the caller sent it or not: an omitted field is applied as `null`. A partial form submitted here **erases the fields it did not include**. Send a complete object, read from the server immediately before the write.
-
-| | |
-|---|---|
-| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
-| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
-| **Atomic** | yes — Single transaction: the row is written or it is not. |
-| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
-| **Auth** | bearer, no scope or role enforced at the route |
-| **Audience** | front end |
-
-**Errors**
-
-| Status | Condition | Body | Usable message |
-|---|---|---|---|
-| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
-| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
-| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
-| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
-| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
-
-> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
-
-#### Measured
-
-UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
-
-#### Risk
-
-None identified by this run.
-
----
-
 ### GET /api/tags/{tag_id}/tags
 
 > **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
@@ -4268,12 +4195,12 @@ Own probe responses carried 0 item(s); the largest was 45B (`child-tags`).
 
 #### Measured
 
-- `child-tags` (`/api/tags/1/tags?limit=50`): p50 120ms · p95 144ms · 45B · 0 items · n=7 — keyset like the parent listing; first screen of one tag's children
+- `child-tags` (`/api/tags/1/tags?limit=50`): p50 112ms · p95 120ms · 45B · 0 items · n=7 — keyset like the parent listing; first screen of one tag's children
 
 #### Risk
 
-- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 46 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 46 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -4356,7 +4283,7 @@ None identified by this run.
 
 ### GET /api/title_types
 
-> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 97ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 112ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -4383,7 +4310,7 @@ Own probe responses carried 8 item(s); the largest was 497B (`title-types-all`).
 
 #### Measured
 
-- `title-types-all` (`/api/title_types`): p50 90ms · p95 97ms · 497B · 8 items · n=7 — bounded by the number of title types, which is small and fixed
+- `title-types-all` (`/api/title_types`): p50 90ms · p95 112ms · 497B · 8 items · n=7 — bounded by the number of title types, which is small and fixed
 
 #### Risk
 
@@ -4547,7 +4474,7 @@ None identified by this run.
 
 ### GET /api/title_types/{title_type_id}
 
-> **SAFE** — p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 92ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -4579,7 +4506,7 @@ Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix
 
 #### Measured
 
-- `title-type-one` (`/api/title_types/4`): p50 93ms · p95 99ms · 66B · n=7
+- `title-type-one` (`/api/title_types/4`): p50 86ms · p95 92ms · 66B · n=7
 
 #### Risk
 
@@ -4665,7 +4592,7 @@ None identified by this run.
 
 ### GET /api/titles/
 
-> **SAFE** — cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 151ms. Suitable as the backing query for a virtualised full-library scroll.
+> **SAFE** — cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 161ms. Suitable as the backing query for a virtualised full-library scroll.
 
 | | |
 |---|---|
@@ -4688,13 +4615,14 @@ None identified by this run.
 | `after` | query | str \| None | n/a | — |
 | `before` | query | str \| None | n/a | — |
 | `has_artwork` | query | bool \| None | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
+| `has_intrinsic_parent` | query | bool \| None | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
 | `include` | query | str \| None | n/a | — |
 | `library_root` | query | bool \| None | yes (`ix_titles_library_root_id`) | served by ix_titles_library_root_id |
 | `limit` | query | int (maximum=500, minimum=1) | n/a | — |
-| `membership` | query | MembershipKind \| None | **no** | no index on title_contents.membership; requires a sequential scan |
+| `membership` | query | MembershipKind \| None | yes (`ix_title_contents_membership_child`) | served by ix_title_contents_membership_child |
 | `name` | query | str \| None | yes (`ix_titles_name_trgm`) | substring match on titles.name; a btree cannot use a leading wildcard, but ix_titles_name_trgm is a GIN trigram index and serves this for patterns of **three characters or more**. A shorter pattern contains no whole trigram, so the planner falls back to a sequential scan -- verified by EXPLAIN against the deployed schema, where a two-character pattern seq-scans and a three-character one does not. A search box that waits for three characters is on the right side of that line |
 | `parent_id` | query | int \| None | yes (`uq_parent_position`) | served by uq_parent_position |
-| `resolves_display_image` | query | bool \| None | **no** | resolves to `artwork.artwork_kind_id`, declared rather than derived. Not a column on `titles` at all. The service resolves the display chain to kind ids and the repository semi-joins against `titles_resolving_artwork`, whose seed is `artwork.artwork_kind_id IN (...)` -- so what the filter costs is decided there. `params.resolves_display_image` only selects whether the semi-join is built, which is why no `where()` is keyed on it. no index on artwork.artwork_kind_id; requires a sequential scan |
+| `resolves_display_image` | query | bool \| None | yes (`ix_artwork_kind_id`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. Not a column on `titles` at all. The service resolves the display chain to kind ids and the repository semi-joins against `titles_resolving_artwork`, whose seed is `artwork.artwork_kind_id IN (...)` -- so what the filter costs is decided there. `params.resolves_display_image` only selects whether the semi-join is built, which is why no `where()` is keyed on it. served by ix_artwork_kind_id |
 | `sort` | query | str | n/a | — |
 | `tag_ids` | query | str \| None | yes (`ix_title_tags_title_id`) | served by ix_title_tags_title_id |
 | `title_type` | query | str \| None | yes (`ix_titles_title_type_id`) | served by ix_titles_title_type_id |
@@ -4704,11 +4632,11 @@ None identified by this run.
 
 #### Queries
 
-- `select_page` on `titles`, `title_types`, `title_tags` in `SQLAlchemyTitleRepository.list_paged` (app/repositories/title_repository.py:214)
+- `select_page` on `titles`, `title_types`, `title_tags` in `SQLAlchemyTitleRepository.list_paged` (app/repositories/title_repository.py:246)
 - `execute` on `artwork_kinds` in `SQLAlchemyArtworkKindRepository.list_all` (app/repositories/artwork_repository.py:170) **[N+1]** — comprehension
 - `execute` on `artwork` in `SQLAlchemyArtworkRepository.resolve_for_titles` (app/repositories/artwork_repository.py:542)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.counts_for_titles` (app/repositories/title_content_repository.py:489) **[N+1]** — comprehension
-- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.totals_for_titles` (app/repositories/title_content_repository.py:579) **[N+1]** — comprehension
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.counts_for_titles` (app/repositories/title_content_repository.py:692) **[N+1]** — comprehension
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.totals_for_titles` (app/repositories/title_content_repository.py:782) **[N+1]** — comprehension
 
 #### Data shape
 
@@ -4723,19 +4651,20 @@ Own probe responses carried 0 to 200 items; the largest was 139.0KB (`titles-pos
 
 #### Measured
 
-- `titles-page-1` (`/api/titles/?limit=50`): p50 106ms · p95 120ms · 41.3KB · 50 items · n=7
-- `titles-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=True`): p50 139ms · p95 151ms · 37.0KB · 50 items · n=7 — the hit path -- 50 rows that each resolve a display image, every one of them borrowed from a contained asset. Pairs with `titles-not-resolving-page-1`, and the gap between them is what the walk costs when it fails.
-- `titles-not-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=False`): p50 138ms · p95 142ms · 41.3KB · 50 items · n=7 — the miss path -- rows where the walk ascends to its depth cap and finds nothing. 181 of 1,136 library roots are in this state, and every one of them is a hole in the grid that needs the typographic treatment.
-- `titles-owning-artwork` (`/api/titles/?has_artwork=True&limit=50`): p50 93ms · p95 98ms · 45B · 0 items · n=7 — not a timing measurement -- a recorded fact. This returns an empty page on the whole library: no Title holds artwork of its own, so every image the grid shows is borrowed from an asset through the resolution chain. A design that assumes a title can own its poster has nothing behind it.
-- `titles-poster-scaling-200-rows` (`/api/titles/?include=poster&limit=200`): p50 120ms · p95 135ms · 139.0KB · 200 items · n=7 — poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost
-- `titles-newest-page` (`/api/titles/?limit=50&sort=id:desc`): p50 103ms · p95 112ms · 28.6KB · 50 items · n=7 — the newest page, which a "recently added" view would issue. Compare against `titles-page-1` for the effect of sort order, and against the `has_artwork` pair above for the cost of resolution itself.
-- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 112ms · p95 118ms · 43.1KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
-- `titles-deep-page` (`/api/titles/?limit=50`): UNAVAILABLE — the collection ran out after 32 pages of 50, so there is no page 41 to measure on this instance
+- `titles-page-1` (`/api/titles/?limit=50`): p50 111ms · p95 144ms · 41.3KB · 50 items · n=7
+- `titles-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=True`): p50 145ms · p95 152ms · 37.0KB · 50 items · n=7 — the hit path -- 50 rows that each resolve a display image, every one of them borrowed from a contained asset. Pairs with `titles-not-resolving-page-1`, and the gap between them is what the walk costs when it fails.
+- `titles-not-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=False`): p50 145ms · p95 161ms · 41.3KB · 50 items · n=7 — the miss path -- rows where the walk ascends to its depth cap and finds nothing. 181 of 1,136 library roots are in this state, and every one of them is a hole in the grid that needs the typographic treatment.
+- `titles-owning-artwork` (`/api/titles/?has_artwork=True&limit=50`): p50 96ms · p95 111ms · 45B · 0 items · n=7 — not a timing measurement -- a recorded fact. This returns an empty page on the whole library: no Title holds artwork of its own, so every image the grid shows is borrowed from an asset through the resolution chain. A design that assumes a title can own its poster has nothing behind it.
+- `titles-unparented-page-1` (`/api/titles/?has_intrinsic_parent=False&library_root=False&limit=50`): p50 99ms · p95 121ms · 16.2KB · 50 items · n=7 — titles with no home that are not deliberate entry points either. Rootness is stored rather than derived from having a parent (#91), so this is the conjunction of two filters and not one -- a library root with no parent is not misplaced. Served by `uq_one_intrinsic_parent`, whose partial predicate is exactly this condition.
+- `titles-parented-page-1` (`/api/titles/?has_intrinsic_parent=True&limit=50`): p50 102ms · p95 109ms · 19.3KB · 50 items · n=7 — the pair's other half, and a cross-check: this returns the same set as `membership=intrinsic`, which is the half the containment filter could already express. A divergence between them is a bug in one of the two.
+- `titles-poster-scaling-200-rows` (`/api/titles/?include=poster&limit=200`): p50 132ms · p95 144ms · 139.0KB · 200 items · n=7 — poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost
+- `titles-newest-page` (`/api/titles/?limit=50&sort=id:desc`): p50 104ms · p95 114ms · 31.6KB · 50 items · n=7 — the newest page, which a "recently added" view would issue. Compare against `titles-page-1` for the effect of sort order, and against the `has_artwork` pair above for the cost of resolution itself.
+- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 104ms · p95 124ms · 43.1KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
+- `titles-deep-page` (`/api/titles/?limit=50`): UNAVAILABLE — the collection ran out after 33 pages of 50, so there is no page 41 to measure on this instance
 
 #### Risk
 
-- static analysis flags queries inside a loop — **contradicted by measurement** and downgraded: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension). `titles-page-1` returns 50 rows at p50 106ms and `titles-poster-scaling-200-rows` returns 200 at p50 120ms — 15ms for 150 extra rows, against the ~3.7s a genuine query-per-row would cost at the measured 25ms round trip. The queries inside these comprehensions are issued once for the page, not once per row.
-- filters that cannot use an index (`membership`, `resolves_display_image`); each forces a sequential scan, though `title_contents` holds only 1,908 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- static analysis flags queries inside a loop — **contradicted by measurement** and downgraded: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension). `titles-page-1` returns 50 rows at p50 111ms and `titles-poster-scaling-200-rows` returns 200 at p50 132ms — 21ms for 150 extra rows, against the ~3.8s a genuine query-per-row would cost at the measured 26ms round trip. The queries inside these comprehensions are issued once for the page, not once per row.
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
 
 ---
@@ -4820,7 +4749,7 @@ None identified by this run.
 
 ### GET /api/titles/by-scheme/{scheme_id}/{external_id}
 
-> **CAUTION** — the lookup is not index-covered and measures p95 104ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
+> **CAUTION** — the lookup is not index-covered and measures p95 108ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -4854,7 +4783,7 @@ Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-- `title-by-scheme` (`/api/titles/by-scheme/2/capinv-probe-no-such-external-id`): p50 94ms · p95 104ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
+- `title-by-scheme` (`/api/titles/by-scheme/2/capinv-probe-no-such-external-id`): p50 82ms · p95 108ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -4862,9 +4791,182 @@ Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 ---
 
+### POST /api/titles/{destination_title_id}/contents/batch/move
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Move Title Contents Batch |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.move_title_contents_batch` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleContentBatchResult`, rows are `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is moved. `detail` lists every offending item, each with its index in `loc`, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentBatchIds | n/a | — |
+| `destination_title_id` | path | int | n/a | — |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.id` | lookup | — | yes (`title_contents_pkey`) | served by title_contents_pkey |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+
+#### Queries
+
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTitleContentRepository.move_many` (app/repositories/title_content_repository.py:645) **[N+1]** — for orm in moving
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.move_many` (app/repositories/title_content_repository.py:617) **[N+1]** — comprehension
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135) **[N+1]** — for (index, edge_id) in enumerate(wanted)
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122) **[N+1]** — for (index, edge) in found
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302) **[N+1]** — for (index, edge) in found
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `title_contents_ids` | `array[integer]` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is moved. `detail` lists every offending item, each with its index in `loc` | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTitleContentRepository.can_reach (for (index, edge) in found); SQLAlchemyTitleContentRepository.get (for (index, edge_id) in enumerate(wanted)); SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id (for (index, edge) in found); SQLAlchemyTitleContentRepository.move_many (comprehension); SQLAlchemyTitleContentRepository.move_many (for orm in moving)
+
+---
+
+### POST /api/titles/{destination_title_id}/contents/{title_contents_id}/move
+
+> **SAFE** — Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible.
+
+| | |
+|---|---|
+| **Purpose** | Move Title Content |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.move_title_content` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict — the move would close a containment cycle (`containment_cycle`), the child already has an intrinsic parent (`intrinsic_parent_conflict`), or the destination position is taken (`position_conflict`). The discriminator is in `detail[0].type`, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `destination_title_id` | path | int | n/a | — |
+| `title_contents_id` | path | int | n/a | — |
+| `after_id` | query | int \| None | n/a | Place after this id |
+| `before_id` | query | int \| None | n/a | Place before this id |
+| `position` | query | str \| None | n/a | Special position: 'start' or 'end' |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.id` | lookup | — | yes (`title_contents_pkey`) | served by title_contents_pkey |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+
+#### Queries
+
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:428)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `refresh` on unresolved table in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:467)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+No request body.
+
+No request body: the route carries its arguments in the path.
+
+| | |
+|---|---|
+| **Unknown fields** | n/a -- no request body |
+| **Repeat** | idempotent — probed -- the second identical request returns 200 and changes nothing; safe to retry blindly |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict — the move would close a containment cycle (`containment_cycle`), the child already has an intrinsic parent (`intrinsic_parent_conflict`), or the destination position is taken (`position_conflict`). The discriminator is in `detail[0].type` | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+None identified by this run.
+
+---
+
 ### GET /api/titles/{parent_title_id}/contents
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 201ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -4901,14 +5003,13 @@ Own probe responses carried 1 item(s); the largest was 542B (`title-contents`).
 
 #### Measured
 
-- `title-contents` (`/api/titles/1/contents`): p50 178ms · p95 201ms · 542B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
+- `title-contents` (`/api/titles/1/contents`): p50 172ms · p95 184ms · 542B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
 
 #### Risk
 
 - one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`
 - one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`
 - no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
-- measured p95 of 201ms on `title-contents` is too slow to drive from a keystroke
 
 ---
 
@@ -4941,15 +5042,17 @@ Own probe responses carried 1 item(s); the largest was 542B (`title-contents`).
 | `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
 
 #### Queries
 
 - `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
-- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:439)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302)
+- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:513)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:442)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:516)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
 - `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
 
 #### Data shape
@@ -5001,6 +5104,172 @@ None identified by this run.
 
 ---
 
+### POST /api/titles/{parent_title_id}/contents/batch
+
+> **CAUTION** — Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures (409) come back with nothing a user could be shown, so the form needs its own message for them.
+
+| | |
+|---|---|
+| **Purpose** | Attach Title Contents Batch |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.attach_title_contents_batch` |
+| **Pagination** | none — single object; not a collection |
+| **Response 201** | `TitleContentBatchResult`, rows are `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is written. `detail` lists **every** offending item, each with its index in `loc`, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentBatchInsert | n/a | — |
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents.child_title_id` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership |
+| `title_contents.child_title_id` | lookup | — | UNKNOWN | unrecognised operator 'isnot' |
+| `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+
+#### Queries
+
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_many_positioned` (app/repositories/title_content_repository.py:555) **[N+1]** — for (offset, insert) in enumerate(inserts)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_many_positioned` (app/repositories/title_content_repository.py:564) **[N+1]** — for orm in created
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122) **[N+1]** — for (index, insert) in enumerate(inserts)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302) **[N+1]** — for (index, insert) in enumerate(inserts)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47) **[N+1]** — for (index, insert) in enumerate(inserts)
+- `get` on `assets` in `SQLAlchemyMediaRepository.exists` (app/repositories/media_repository.py:53) **[N+1]** — for (index, insert) in enumerate(inserts)
+
+#### Data shape
+
+Reads [`assets`](#table-assets) · [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `items` | `array[TitleContentInsert]` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | guarded — probed -- the second identical request is refused with 409; a retry after a dropped connection must treat that conflict as success, not as a new error to show the user |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is written. `detail` lists **every** offending item, each with its index in `loc` | `{"detail": ...}` | yes |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated."}` | **no** |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyMediaRepository.exists (for (index, insert) in enumerate(inserts)); SQLAlchemyTitleContentRepository.can_reach (for (index, insert) in enumerate(inserts)); SQLAlchemyTitleContentRepository.create_many_positioned (for (offset, insert) in enumerate(inserts)); SQLAlchemyTitleContentRepository.create_many_positioned (for orm in created); SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id (for (index, insert) in enumerate(inserts)); SQLAlchemyTitleRepository.exists (for (index, insert) in enumerate(inserts))
+
+---
+
+### POST /api/titles/{parent_title_id}/contents/batch/detach
+
+> **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
+
+| | |
+|---|---|
+| **Purpose** | Detach Title Contents Batch |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Handler** | `app.routers.titles.contents.detach_title_contents_batch` |
+| **Pagination** | none — single object; not a collection |
+| **Response 200** | `TitleContentBatchResult`, rows are `TitleContentRead` |
+| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
+| **Limits** | none declared |
+
+#### Fields
+
+`id: int`, `kind: ContentKind`, `child_title_id?: int | None`, `asset_id?: int | None`, `label?: str | None`, `membership?: MembershipKind`, `parent_title_id: int`, `position: int`
+
+#### Parameters
+
+| Param | In | Type | Indexed | Cost note |
+|---|---|---|---|---|
+| `<body>` | body | TitleContentBatchIds | n/a | — |
+| `parent_title_id` | path | int | n/a | — |
+| `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
+
+#### Queries
+
+- `flush` on unresolved table in `SQLAlchemyBaseRepository._safe_flush` (app/repositories/base_repository.py:55)
+- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.delete_many` (app/repositories/title_content_repository.py:585) **[N+1]** — for orm in doomed
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135) **[N+1]** — for (index, edge_id) in enumerate(wanted)
+
+#### Data shape
+
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+#### Write contract
+
+| Field | Type | Required | Omitted means | Explicit null means | Constraints |
+|---|---|---|---|---|---|
+| `title_contents_ids` | `array[integer]` | yes | rejected | — | — |
+
+Create: an omitted optional field takes its declared default.
+
+| | |
+|---|---|
+| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
+| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
+| **Atomic** | yes — Single transaction: the row is written or it is not. |
+| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
+| **Auth** | bearer, no scope or role enforced at the route |
+| **Audience** | front end |
+
+**Errors**
+
+| Status | Condition | Body | Usable message |
+|---|---|---|---|
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
+
+> Derived from the code alone — no write probe exercised this endpoint, so repetition and the response to a constraint violation read UNKNOWN.
+
+#### Measured
+
+UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
+
+#### Risk
+
+- queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTitleContentRepository.delete_many (for orm in doomed); SQLAlchemyTitleContentRepository.get (for (index, edge_id) in enumerate(wanted))
+
+---
+
 ### POST /api/titles/{parent_title_id}/contents/positioned
 
 > **CAUTION** — Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is.
@@ -5033,15 +5302,17 @@ None identified by this run.
 | `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
 
 #### Queries
 
 - `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
-- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:439)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302)
+- `add` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:513)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:442)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.create_positioned` (app/repositories/title_content_repository.py:516)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
 - `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
 
 #### Data shape
@@ -5111,16 +5382,20 @@ None identified by this run.
 |---|---|---|---|---|
 | `parent_title_id` | path | int | n/a | — |
 | `title_contents_id` | path | int | n/a | — |
+| `title_contents.id` | lookup | — | yes (`title_contents_pkey`) | served by title_contents_pkey |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
 
 #### Queries
 
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
 - `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
-- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:205)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:209)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:210)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.delete_title_content` (app/repositories/title_content_repository.py:229)
 - `flush` on unresolved table in `SQLAlchemyBaseRepository._safe_flush` (app/repositories/base_repository.py:55)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
 
 #### Data shape
 
@@ -5203,21 +5478,24 @@ None identified by this run.
 | `title_contents.membership` | lookup | — | yes (`ix_title_contents_child_membership`) | served by ix_title_contents_child_membership; the same query pins child_title_id, so the composite index applies from its leading column |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
 
 #### Queries
 
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
+- `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
 - `execute` on unresolved table in `SQLAlchemyTitleContentRepository.can_reach` (app/repositories/title_content_repository.py:122)
 - `get` on `title_contents` in `SQLAlchemyTitleContentRepository.update` (app/repositories/title_content_repository.py:162)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.update` (app/repositories/title_content_repository.py:190)
+- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.update` (app/repositories/title_content_repository.py:193)
 - `flush` on unresolved table in `SQLAlchemyBaseRepository._safe_flush` (app/repositories/base_repository.py:55)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
-- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:282)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.intrinsic_parent_edge_id` (app/repositories/title_content_repository.py:302)
 
 #### Data shape
 
-Reads [`title_contents`](#table-title_contents) — see the [Tables](#tables) appendix for each.
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5288,15 +5566,19 @@ None identified by this run.
 | `after_id` | query | int \| None | n/a | Place after this id |
 | `before_id` | query | int \| None | n/a | Place before this id |
 | `position` | query | str \| None | n/a | Special position: 'start' or 'end' |
+| `title_contents.id` | lookup | — | yes (`title_contents_pkey`) | served by title_contents_pkey |
 | `title_contents.parent_title_id` | lookup | — | yes (`uq_parent_position`) | served by uq_parent_position |
+| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
 
 #### Queries
 
+- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.get` (app/repositories/title_content_repository.py:135)
 - `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
-- `get` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:367)
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:310)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:428)
+- `execute` on `titles` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:352)
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository._locked_lists` (app/repositories/title_content_repository.py:360)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on `title_contents` in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:393)
+- `refresh` on unresolved table in `SQLAlchemyTitleContentRepository.reorder` (app/repositories/title_content_repository.py:467)
 
 #### Data shape
 
@@ -5341,7 +5623,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}
 
-> **CAUTION** — p95 236ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
+> **CAUTION** — p95 215ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
 
 | | |
 |---|---|
@@ -5368,8 +5650,8 @@ None identified by this run.
 - `get` on `titles` in `SQLAlchemyTitleRepository.get` (app/repositories/title_repository.py:36)
 - `execute` on `artwork` in `SQLAlchemyArtworkRepository.resolve_for_titles` (app/repositories/artwork_repository.py:542)
 - `execute` on `artwork_kinds` in `SQLAlchemyArtworkKindRepository.list_all` (app/repositories/artwork_repository.py:170) **[N+1]** — comprehension
-- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.counts_for_titles` (app/repositories/title_content_repository.py:489) **[N+1]** — comprehension
-- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.totals_for_titles` (app/repositories/title_content_repository.py:579) **[N+1]** — comprehension
+- `execute` on `title_contents` in `SQLAlchemyTitleContentRepository.counts_for_titles` (app/repositories/title_content_repository.py:692) **[N+1]** — comprehension
+- `execute` on unresolved table in `SQLAlchemyTitleContentRepository.totals_for_titles` (app/repositories/title_content_repository.py:782) **[N+1]** — comprehension
 
 #### Data shape
 
@@ -5382,13 +5664,13 @@ Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · 
 
 #### Measured
 
-- `title-detail` (`/api/titles/1`): p50 225ms · p95 236ms · 751B · n=7
-- `title-detail-with-poster` (`/api/titles/1?include=poster`): p50 220ms · p95 227ms · 751B · n=7 — pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own
+- `title-detail` (`/api/titles/1`): p50 202ms · p95 215ms · 751B · n=7
+- `title-detail-with-poster` (`/api/titles/1?include=poster`): p50 193ms · p95 211ms · 751B · n=7 — pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)
-- measured p95 of 236ms on `title-detail` is too slow to drive from a keystroke
+- measured p95 of 215ms on `title-detail` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
 
 ---
@@ -5422,9 +5704,9 @@ Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · 
 
 #### Queries
 
-- `execute` on `titles` in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:226)
+- `execute` on `titles` in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:258)
 - `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on unresolved table in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:237)
+- `refresh` on unresolved table in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:269)
 - `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.get_by_code` (app/repositories/title_type_repository.py:33)
 
 #### Data shape
@@ -5472,88 +5754,9 @@ None identified by this run.
 
 ---
 
-### PUT /api/titles/{title_id}
-
-> **NOT SAFE** — Not safe to drive from a partial form — a partial PUT body is written as nulls, so a form that submits only the fields it changed erases the rest.
-
-| | |
-|---|---|
-| **Purpose** | Update Title |
-| **Auth** | bearer, no scope or role enforced at the route |
-| **Handler** | `app.routers.titles.core.update_title` |
-| **Pagination** | none — single object; not a collection |
-| **Response 200** | `TitleRead` |
-| **Declares** | `404` Not Found - the requested resource does not exist, `409` Conflict - unique constraint violated or relationship not permitted, `422` Unprocessable Entity - validation error or database integrity constraint violated, `423` Locked - database is currently in read-only mode |
-| **Limits** | none declared |
-
-#### Fields
-
-`id: int`, `name: str`, `title_type: str`, `release_year?: int | None`, `synopsis?: str | None`, `library_root?: bool`
-
-#### Parameters
-
-| Param | In | Type | Indexed | Cost note |
-|---|---|---|---|---|
-| `<body>` | body | TitlePatchPublic | n/a | — |
-| `title_id` | path | int | n/a | — |
-| `titles.id` | lookup | — | yes (`titles_pkey`) | served by titles_pkey |
-| `title_types.code` | lookup | — | yes (`ix_title_types_code`) | served by ix_title_types_code |
-
-#### Queries
-
-- `execute` on `titles` in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:226)
-- `commit` on unresolved table in `SQLAlchemyBaseRepository._safe_commit` (app/repositories/base_repository.py:37)
-- `refresh` on unresolved table in `SQLAlchemyTitleRepository.update` (app/repositories/title_repository.py:237)
-- `execute` on `title_types` in `SQLAlchemyTitleTypeRepository.get_by_code` (app/repositories/title_type_repository.py:33)
-
-#### Data shape
-
-Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
-
-#### Write contract
-
-| Field | Type | Required | Omitted means | Explicit null means | Constraints |
-|---|---|---|---|---|---|
-| `library_root` | `boolean` | no | set to null | set to null | — |
-| `name` | `string` | no | set to null | set to null | — |
-| `release_year` | `integer` | no | set to null | set to null | — |
-| `synopsis` | `string` | no | set to null | set to null | — |
-| `title_type` | `string` | no | set to null | set to null | `maxLength=32` |
-
-`synopsis` did not survive a body that omitted it (was 'capinv probe original synopsis', now None): a partial form erases it. (Confirmed by probe `title-put-omission`.)
-
-| | |
-|---|---|
-| **Unknown fields** | rejected with 422 naming the field (`extra="forbid"`) |
-| **Repeat** | UNKNOWN — not probed -- repetition is a property of the database's constraints, not of the verb, and reading it off the method would be a guess |
-| **Atomic** | yes — Single transaction: the row is written or it is not. |
-| **Concurrency** | last-write-wins -- no ETag, no `If-Match`, no version column and no `updated_at` precondition |
-| **Auth** | bearer, no scope or role enforced at the route |
-| **Audience** | front end |
-
-**Errors**
-
-| Status | Condition | Body | Usable message |
-|---|---|---|---|
-| `401` | bearer token missing or rejected | `{"detail": ...}` | yes |
-| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes |
-| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes |
-| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes |
-| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes |
-
-#### Measured
-
-UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuing the mutation, and the harness refuses any non-GET unless it is named in `allowlist`, which ships empty. Cost here is established from the query shape above rather than by timing.
-
-#### Risk
-
-None identified by this run.
-
----
-
 ### GET /api/titles/{title_id}/artwork
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 151ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -5574,7 +5777,7 @@ None identified by this run.
 | Param | In | Type | Indexed | Cost note |
 |---|---|---|---|---|
 | `title_id` | path | int | n/a | — |
-| `kind` | query | str \| None | yes (`ix_artwork_entity_kind_primary`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. Same translation as the collection route: the code is resolved to an id in the service. `title-artwork-by-kind` in probes.yaml exists precisely to time this filter, and its note has recorded that it is applied since the probe was added. `constrained` is not incidental here: `list_for_entity` always pins `entity_type` and `entity_id` before narrowing by kind, which is what lets `ix_artwork_entity_kind_primary` apply from its leading column. Judged without them this reads as a sequential scan, which is the opposite of true. served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `kind` | query | str \| None | yes (`ix_artwork_kind_id`) | resolves to `artwork.artwork_kind_id`, declared rather than derived. Same translation as the collection route: the code is resolved to an id in the service. `title-artwork-by-kind` in probes.yaml exists precisely to time this filter, and its note has recorded that it is applied since the probe was added. `constrained` is not incidental here: `list_for_entity` always pins `entity_type` and `entity_id` before narrowing by kind, which is what lets `ix_artwork_entity_kind_primary` apply from its leading column. Judged without them this reads as a sequential scan, which is the opposite of true. served by ix_artwork_kind_id |
 
 #### Queries
 
@@ -5591,8 +5794,8 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-artwork`).
 
 #### Measured
 
-- `title-artwork` (`/api/titles/1/artwork`): p50 117ms · p95 135ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
-- `title-artwork-by-kind` (`/api/titles/1/artwork?kind=poster`): p50 144ms · p95 151ms · 2B · 0 items · n=7 — the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it
+- `title-artwork` (`/api/titles/1/artwork`): p50 118ms · p95 130ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
+- `title-artwork-by-kind` (`/api/titles/1/artwork?kind=poster`): p50 145ms · p95 157ms · 2B · 0 items · n=7 — the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it
 
 #### Risk
 
@@ -5625,7 +5828,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-artwork`).
 | `<body>` | body | Body_upload_title_artwork | n/a | — |
 | `title_id` | path | int | n/a | — |
 | `artwork_kinds.code` | lookup | — | yes (`ix_artwork_kinds_code`) | served by ix_artwork_kinds_code |
-| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_entity_kind_primary`) | served by ix_artwork_entity_kind_primary; the same query pins entity_type, entity_id, so the composite index applies from its leading column |
+| `artwork.artwork_kind_id` | lookup | — | yes (`ix_artwork_kind_id`) | served by ix_artwork_kind_id |
 | `artwork.entity_id` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path; the same query pins entity_type, so the composite index applies from its leading column |
 | `artwork.entity_type` | lookup | — | yes (`uq_artwork_entity_storage_path`) | served by uq_artwork_entity_storage_path |
 | `artwork.id` | lookup | — | UNKNOWN | unrecognised operator '!=' |
@@ -5697,7 +5900,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/ids
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 102ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -5731,7 +5934,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-ids`).
 
 #### Measured
 
-- `title-ids` (`/api/titles/1/ids`): p50 89ms · p95 102ms · 2B · 0 items · n=7 — uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier
+- `title-ids` (`/api/titles/1/ids`): p50 91ms · p95 106ms · 2B · 0 items · n=7 — uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier
 
 #### Risk
 
@@ -5973,7 +6176,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/parents
 
-> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 164ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -5998,7 +6201,7 @@ None identified by this run.
 
 #### Queries
 
-- `execute` on `titles`, `title_contents` in `SQLAlchemyTitleContentRepository.get_parents_of_title` (app/repositories/title_content_repository.py:264)
+- `execute` on `titles`, `title_contents` in `SQLAlchemyTitleContentRepository.get_parents_of_title` (app/repositories/title_content_repository.py:284)
 - `get` on `titles` in `SQLAlchemyTitleRepository.exists` (app/repositories/title_repository.py:47)
 
 #### Data shape
@@ -6009,7 +6212,7 @@ Own probe responses carried 1 item(s); the largest was 275B (`title-parents`).
 
 #### Measured
 
-- `title-parents` (`/api/titles/1/parents`): p50 150ms · p95 164ms · 275B · 1 items · n=7 — uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing
+- `title-parents` (`/api/titles/1/parents`): p50 147ms · p95 171ms · 275B · 1 items · n=7 — uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing
 
 #### Risk
 
@@ -6019,7 +6222,7 @@ Own probe responses carried 1 item(s); the largest was 275B (`title-parents`).
 
 ### GET /api/titles/{title_id}/references
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 133ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6055,7 +6258,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-references`).
 
 #### Measured
 
-- `title-references` (`/api/titles/1/references`): p50 127ms · p95 133ms · 2B · 0 items · n=7
+- `title-references` (`/api/titles/1/references`): p50 117ms · p95 134ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -6218,7 +6421,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/tags
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 125ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 121ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6254,7 +6457,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`title-tags`).
 
 #### Measured
 
-- `title-tags` (`/api/titles/1/tags`): p50 123ms · p95 125ms · 2B · 0 items · n=7
+- `title-tags` (`/api/titles/1/tags`): p50 110ms · p95 121ms · 2B · 0 items · n=7
 
 #### Risk
 
@@ -6416,7 +6619,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Risk
 
-- no pagination, but the largest collection measured is only 46 rows (at most all 46 rows of `tags`), so the absent cap is currently latent
+- no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent
 
 ---
 
@@ -6540,16 +6743,16 @@ None identified by this run.
 
 Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
-Own probe responses carried 50 item(s); the largest was 45.4KB (`transform-requests-page-1`).
+Own probe responses carried 50 item(s); the largest was 45.6KB (`transform-requests-page-1`).
 
 #### Measured
 
-- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 185ms · p95 198ms · 45.4KB · 50 items · n=7
+- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 178ms · p95 189ms · 45.6KB · 50 items · n=7
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,294 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
-- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,294 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,312 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,312 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -6632,7 +6835,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 ### GET /api/transform_requests/{request_id}
 
-> **SAFE** — p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -6664,7 +6867,7 @@ Reads [`media_transform_requests`](#table-media_transform_requests) — see the 
 
 #### Measured
 
-- `transform-request-detail` (`/api/transform_requests/21337`): p50 98ms · p95 106ms · 568B · n=7
+- `transform-request-detail` (`/api/transform_requests/21355`): p50 87ms · p95 97ms · 568B · n=7
 
 #### Risk
 
@@ -6912,7 +7115,7 @@ None identified by this run.
 
 ### GET /api/transform_requests/{request_id}/logs
 
-> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 107ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 119ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6946,7 +7149,7 @@ Own probe responses carried 0 item(s); the largest was 2B (`transform-request-lo
 
 #### Measured
 
-- `transform-request-logs` (`/api/transform_requests/21337/logs`): p50 96ms · p95 107ms · 2B · 0 items · n=7 — an external round-trip to the orchestration backend, not a database read. Capped at the provider's log limit (100 by default), so the worst case is bounded by that rather than by the collection size. An item count of 0 means the backend returned no lines -- the endpoint did its work, but the timing is then the cost of reaching an orchestration backend that had nothing to give, not of rendering a full log.
+- `transform-request-logs` (`/api/transform_requests/21355/logs`): p50 102ms · p95 119ms · 2B · 0 items · n=7 — an external round-trip to the orchestration backend, not a database read. Capped at the provider's log limit (100 by default), so the worst case is bounded by that rather than by the collection size. An item count of 0 means the backend returned no lines -- the endpoint did its work, but the timing is then the cost of reaching an orchestration backend that had nothing to give, not of rendering a full log.
 
 #### Risk
 
@@ -7028,7 +7231,7 @@ None identified by this run.
 
 ### GET /api/version
 
-> **SAFE** — p95 9ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
+> **SAFE** — p95 8ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -7045,7 +7248,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-- `version` (`/api/version`): p50 4ms · p95 9ms · 77B · n=7
+- `version` (`/api/version`): p50 4ms · p95 8ms · 61B · n=7
 
 #### Risk
 
@@ -7059,29 +7262,29 @@ Row counts, fill rates, cardinality and collection-size distributions are proper
 
 ### Table: artwork
 
-**1,206 rows.**
+**1,218 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `source_external_id` | 0% | 0 | 0 | — |
 | `source_scheme_id` | 0% | 0 | — | — |
-| `source_url` | 0% | 1 | 1 | yes |
-| `artwork_kind_id` | 100% | 1,206 | — | — |
-| `created_at` | 100% | 1,206 | — | — |
-| `entity_id` | 100% | 1,206 | — | — |
-| `entity_type` | 100% | 1,206 | 1 | yes |
-| `height` | 100% | 1,206 | — | — |
-| `id` | 100% | 1,206 | — | — |
-| `is_primary` | 100% | 1,206 | 1 | yes |
-| `mime` | 100% | 1,206 | 2 | yes |
-| `storage_path` | 100% | 1,206 | 1,157 | — |
-| `width` | 100% | 1,206 | — | — |
+| `source_url` | 1% | 7 | 5 | yes |
+| `artwork_kind_id` | 100% | 1,218 | — | — |
+| `created_at` | 100% | 1,218 | — | — |
+| `entity_id` | 100% | 1,218 | — | — |
+| `entity_type` | 100% | 1,218 | 1 | yes |
+| `height` | 100% | 1,218 | — | — |
+| `id` | 100% | 1,218 | — | — |
+| `is_primary` | 100% | 1,218 | 1 | yes |
+| `mime` | 100% | 1,218 | 2 | yes |
+| `storage_path` | 100% | 1,218 | 1,167 | — |
+| `width` | 100% | 1,218 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `artwork_kinds` | `artwork_kind_id` | 1 | 1 | 1071 | 1,071 | 4 of 8 |
+| `artwork_kinds` | `artwork_kind_id` | 1 | 7 | 1077 | 1,077 | 4 of 8 |
 
 ### Table: artwork_kinds
 
@@ -7100,64 +7303,64 @@ Children per parent:
 
 ### Table: asset_tags
 
-**2,862 rows.**
+**2,880 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `asset_id` | 100% | 2,862 | — | — |
-| `created_at` | 100% | 2,862 | — | — |
-| `tag_id` | 100% | 2,862 | — | — |
+| `asset_id` | 100% | 2,880 | — | — |
+| `created_at` | 100% | 2,880 | — | — |
+| `tag_id` | 100% | 2,880 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 2 | 3 | 4 | 1,382 of 13,344 |
-| `tags` | `tag_id` | 1 | 30 | 504 | 739 | 35 of 46 |
+| `assets` | `asset_id` | 1 | 2 | 3 | 4 | 1,388 of 13,350 |
+| `tags` | `tag_id` | 1 | 30 | 510 | 739 | 35 of 51 |
 
 ### Table: assets
 
-**13,344 rows.**
+**13,350 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `master_asset_id` | 0% | 10 | — | — |
 | `edition` | 1% | 146 | 10 | yes |
-| `container_format` | 99% | 13,196 | 4 | yes |
-| `mtime` | 99% | 13,214 | — | — |
-| `last_seen` | 100% | 13,294 | — | — |
-| `bitrate` | 100% | 13,344 | — | — |
-| `created_at` | 100% | 13,344 | — | — |
-| `duration` | 100% | 13,344 | — | — |
-| `filename` | 100% | 13,344 | ≥5,000 | — |
-| `id` | 100% | 13,344 | — | — |
-| `path` | 100% | 13,344 | ≥5,000 | — |
-| `size` | 100% | 13,344 | — | — |
+| `container_format` | 99% | 13,202 | 4 | yes |
+| `mtime` | 99% | 13,220 | — | — |
+| `last_seen` | 100% | 13,300 | — | — |
+| `bitrate` | 100% | 13,350 | — | — |
+| `created_at` | 100% | 13,350 | — | — |
+| `duration` | 100% | 13,350 | — | — |
+| `filename` | 100% | 13,350 | ≥5,000 | — |
+| `id` | 100% | 13,350 | — | — |
+| `path` | 100% | 13,350 | ≥5,000 | — |
+| `size` | 100% | 13,350 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `master_asset_id` | 1 | 1 | 4 | 4 | 6 of 13,344 |
+| `assets` | `master_asset_id` | 1 | 1 | 4 | 4 | 6 of 13,350 |
 
 ### Table: external_identifiers
 
-**1,515 rows.**
+**1,523 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 1,515 | — | — |
-| `entity_id` | 100% | 1,515 | — | — |
-| `entity_type` | 100% | 1,515 | 2 | yes |
-| `external_id` | 100% | 1,515 | 1,515 | — |
-| `id` | 100% | 1,515 | — | — |
-| `scheme_id` | 100% | 1,515 | — | — |
+| `created_at` | 100% | 1,523 | — | — |
+| `entity_id` | 100% | 1,523 | — | — |
+| `entity_type` | 100% | 1,523 | 2 | yes |
+| `external_id` | 100% | 1,523 | 1,523 | — |
+| `id` | 100% | 1,523 | — | — |
+| `scheme_id` | 100% | 1,523 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `id_schemes` | `scheme_id` | 133 | 671 | 711 | 711 | 3 of 3 |
+| `id_schemes` | `scheme_id` | 133 | 671 | 719 | 719 | 3 of 3 |
 
 ### Table: id_schemes
 
@@ -7172,82 +7375,82 @@ Children per parent:
 
 ### Table: jobs
 
-**3,128 rows.**
+**3,158 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `heartbeat_at` | 55% | 1,712 | — | — |
-| `completed_at` | 100% | 3,125 | — | — |
-| `created_at` | 100% | 3,128 | — | — |
-| `job_key` | 100% | 3,128 | 3,128 | — |
+| `heartbeat_at` | 55% | 1,742 | — | — |
+| `completed_at` | 100% | 3,155 | — | — |
+| `created_at` | 100% | 3,158 | — | — |
+| `job_key` | 100% | 3,158 | 3,158 | — |
 
 ### Table: media_transform_requests
 
-**18,294 rows.**
+**18,312 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `parent_transform_request_id` | 16% | 2,965 | — | — |
-| `first_heartbeat` | 20% | 3,653 | — | — |
-| `last_heartbeat` | 20% | 3,653 | — | — |
-| `on_failure` | 25% | 4,486 | — | — |
-| `on_success` | 25% | 4,486 | — | — |
+| `parent_transform_request_id` | 16% | 2,977 | — | — |
+| `first_heartbeat` | 20% | 3,671 | — | — |
+| `last_heartbeat` | 20% | 3,671 | — | — |
+| `on_failure` | 25% | 4,504 | — | — |
+| `on_success` | 25% | 4,504 | — | — |
 | `worker_notes` | 77% | 14,166 | ≥5,000 | — |
-| `external_job_id` | 90% | 16,521 | 2,720 | — |
-| `duration` | 97% | 17,710 | — | — |
-| `parameters` | 99% | 18,195 | — | — |
-| `worker` | 100% | 18,242 | 1,071 | — |
-| `actioned` | 100% | 18,294 | 1 | yes |
-| `asset_id` | 100% | 18,294 | — | — |
-| `created_at` | 100% | 18,294 | — | — |
-| `id` | 100% | 18,294 | — | — |
-| `outcome` | 100% | 18,294 | 3 | yes |
-| `processed_at` | 100% | 18,294 | — | — |
-| `transform_type` | 100% | 18,294 | 11 | yes |
+| `external_job_id` | 90% | 16,539 | 2,734 | — |
+| `duration` | 97% | 17,728 | — | — |
+| `parameters` | 99% | 18,213 | — | — |
+| `worker` | 100% | 18,260 | 1,085 | — |
+| `actioned` | 100% | 18,312 | 1 | yes |
+| `asset_id` | 100% | 18,312 | — | — |
+| `created_at` | 100% | 18,312 | — | — |
+| `id` | 100% | 18,312 | — | — |
+| `outcome` | 100% | 18,312 | 3 | yes |
+| `processed_at` | 100% | 18,312 | — | — |
+| `transform_type` | 100% | 18,312 | 11 | yes |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 4 | 17 | 13,329 of 13,344 |
-| `media_transform_requests` | `parent_transform_request_id` | 1 | 2 | 3 | 4 | 1,494 of 18,294 |
+| `assets` | `asset_id` | 1 | 1 | 4 | 17 | 13,335 of 13,350 |
+| `media_transform_requests` | `parent_transform_request_id` | 1 | 2 | 3 | 4 | 1,500 of 18,312 |
 
 ### Table: metadata
 
-**14,578 rows.**
+**14,602 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `asset_id` | 100% | 14,578 | — | — |
-| `created_at` | 100% | 14,578 | — | — |
-| `data` | 100% | 14,578 | — | — |
-| `id` | 100% | 14,578 | — | — |
-| `metadata_type` | 100% | 14,578 | 7 | yes |
-| `updated_at` | 100% | 14,578 | — | — |
+| `asset_id` | 100% | 14,602 | — | — |
+| `created_at` | 100% | 14,602 | — | — |
+| `data` | 100% | 14,602 | — | — |
+| `id` | 100% | 14,602 | — | — |
+| `metadata_type` | 100% | 14,602 | 7 | yes |
+| `updated_at` | 100% | 14,602 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 2 | 4 | 13,232 of 13,344 |
+| `assets` | `asset_id` | 1 | 1 | 2 | 4 | 13,238 of 13,350 |
 
 ### Table: run_summaries
 
-**1,134 rows.**
+**1,152 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 1,134 | — | — |
-| `extras` | 100% | 1,134 | — | — |
-| `failed_count` | 100% | 1,134 | — | — |
-| `id` | 100% | 1,134 | — | — |
-| `processed_count` | 100% | 1,134 | — | — |
-| `running_time` | 100% | 1,134 | — | — |
-| `started_at` | 100% | 1,134 | — | — |
-| `success_count` | 100% | 1,134 | — | — |
-| `transform_type` | 100% | 1,134 | 6 | yes |
-| `worker_name` | 100% | 1,134 | 1,134 | — |
-| `worker_type` | 100% | 1,134 | 6 | yes |
+| `created_at` | 100% | 1,152 | — | — |
+| `extras` | 100% | 1,152 | — | — |
+| `failed_count` | 100% | 1,152 | — | — |
+| `id` | 100% | 1,152 | — | — |
+| `processed_count` | 100% | 1,152 | — | — |
+| `running_time` | 100% | 1,152 | — | — |
+| `started_at` | 100% | 1,152 | — | — |
+| `success_count` | 100% | 1,152 | — | — |
+| `transform_type` | 100% | 1,152 | 6 | yes |
+| `worker_name` | 100% | 1,152 | 1,152 | — |
+| `worker_type` | 100% | 1,152 | 6 | yes |
 
 ### Table: runner_state
 
@@ -7261,7 +7464,7 @@ Children per parent:
 
 ### Table: scanner_run_summaries
 
-**171 rows.**
+**201 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
@@ -7272,88 +7475,88 @@ Children per parent:
 | `scan_path` | 0% | 0 | 0 | — |
 | `total_count` | 0% | 0 | — | — |
 | `unsupported_file_count` | 0% | 0 | — | — |
-| `excluded_count` | 13% | 23 | — | — |
-| `error_count` | 66% | 113 | — | — |
-| `created_at` | 100% | 171 | — | — |
-| `dry_run` | 100% | 171 | 2 | yes |
-| `extras` | 100% | 171 | — | — |
-| `id` | 100% | 171 | — | — |
-| `previously_seen_count` | 100% | 171 | — | — |
-| `processed_count` | 100% | 171 | — | — |
-| `running_time` | 100% | 171 | — | — |
-| `started_at` | 100% | 171 | — | — |
-| `worker_name` | 100% | 171 | 29 | yes |
-| `worker_type` | 100% | 171 | 8 | yes |
+| `excluded_count` | 12% | 25 | — | — |
+| `error_count` | 65% | 130 | — | — |
+| `created_at` | 100% | 201 | — | — |
+| `dry_run` | 100% | 201 | 2 | yes |
+| `extras` | 100% | 201 | — | — |
+| `id` | 100% | 201 | — | — |
+| `previously_seen_count` | 100% | 201 | — | — |
+| `processed_count` | 100% | 201 | — | — |
+| `running_time` | 100% | 201 | — | — |
+| `started_at` | 100% | 201 | — | — |
+| `worker_name` | 100% | 201 | 29 | yes |
+| `worker_type` | 100% | 201 | 8 | yes |
 
 ### Table: streams
 
-**65,212 rows.**
+**65,230 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
 | `title` | 22% | 14,185 | 12 | yes |
-| `frame_rate` | 29% | 18,674 | — | — |
-| `height` | 29% | 18,841 | — | — |
-| `width` | 29% | 18,841 | — | — |
-| `channels` | 32% | 21,167 | — | — |
-| `sample_rate` | 32% | 21,167 | — | — |
-| `language` | 92% | 59,745 | 60 | yes |
-| `codec_name` | 100% | 65,207 | 21 | yes |
-| `asset_id` | 100% | 65,212 | — | — |
-| `codec_type` | 100% | 65,212 | 4 | yes |
-| `id` | 100% | 65,212 | — | — |
-| `is_default` | 100% | 65,212 | 1 | yes |
-| `is_forced` | 100% | 65,212 | 1 | yes |
-| `stream_index` | 100% | 65,212 | — | — |
+| `frame_rate` | 29% | 18,686 | — | — |
+| `height` | 29% | 18,853 | — | — |
+| `width` | 29% | 18,853 | — | — |
+| `channels` | 32% | 21,173 | — | — |
+| `sample_rate` | 32% | 21,173 | — | — |
+| `language` | 92% | 59,763 | 60 | yes |
+| `codec_name` | 100% | 65,225 | 21 | yes |
+| `asset_id` | 100% | 65,230 | — | — |
+| `codec_type` | 100% | 65,230 | 4 | yes |
+| `id` | 100% | 65,230 | — | — |
+| `is_default` | 100% | 65,230 | 1 | yes |
+| `is_forced` | 100% | 65,230 | 1 | yes |
+| `stream_index` | 100% | 65,230 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 3 | 20 | 79 | 12,998 of 13,344 |
+| `assets` | `asset_id` | 1 | 3 | 20 | 79 | 13,004 of 13,350 |
 
 ### Table: tags
 
-**46 rows.**
+**51 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `parent_id` | 9% | 4 | — | — |
-| `color` | 100% | 46 | 4 | yes |
-| `created_at` | 100% | 46 | — | — |
-| `description` | 100% | 46 | 6 | yes |
-| `id` | 100% | 46 | — | — |
-| `name` | 100% | 46 | 46 | yes |
-| `updated_at` | 100% | 46 | — | — |
+| `parent_id` | 8% | 4 | — | — |
+| `color` | 100% | 51 | 4 | yes |
+| `created_at` | 100% | 51 | — | — |
+| `description` | 100% | 51 | 6 | yes |
+| `id` | 100% | 51 | — | — |
+| `name` | 100% | 51 | 51 | yes |
+| `updated_at` | 100% | 51 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `tags` | `parent_id` | 4 | 4 | 4 | 4 | 1 of 46 |
+| `tags` | `parent_id` | 4 | 4 | 4 | 4 | 1 of 51 |
 
 ### Table: title_contents
 
-**1,908 rows.**
+**1,921 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `child_title_id` | 27% | 509 | — | — |
-| `asset_id` | 73% | 1,399 | — | — |
-| `label` | 99% | 1,889 | 271 | — |
-| `id` | 100% | 1,908 | — | — |
-| `kind` | 100% | 1,908 | 2 | yes |
-| `membership` | 100% | 1,908 | 2 | yes |
-| `parent_title_id` | 100% | 1,908 | — | — |
-| `position` | 100% | 1,908 | — | — |
+| `child_title_id` | 27% | 516 | — | — |
+| `asset_id` | 73% | 1,405 | — | — |
+| `label` | 99% | 1,902 | 276 | — |
+| `id` | 100% | 1,921 | — | — |
+| `kind` | 100% | 1,921 | 2 | yes |
+| `membership` | 100% | 1,921 | 2 | yes |
+| `parent_title_id` | 100% | 1,921 | — | — |
+| `position` | 100% | 1,921 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `assets` | `asset_id` | 1 | 1 | 1 | 1 | 1,399 of 13,344 |
-| `titles` | `child_title_id` | 1 | 1 | 1 | 1 | 509 of 1,598 |
-| `titles` | `parent_title_id` | 1 | 1 | 2 | 35 | 1,585 of 1,598 |
+| `assets` | `asset_id` | 1 | 1 | 1 | 1 | 1,405 of 13,350 |
+| `titles` | `child_title_id` | 1 | 1 | 1 | 1 | 516 of 1,606 |
+| `titles` | `parent_title_id` | 1 | 1 | 2 | 35 | 1,593 of 1,606 |
 
 ### Table: title_references
 
@@ -7369,20 +7572,20 @@ Children per parent:
 
 ### Table: title_tags
 
-**871 rows.**
+**900 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `created_at` | 100% | 871 | — | — |
-| `tag_id` | 100% | 871 | — | — |
-| `title_id` | 100% | 871 | — | — |
+| `created_at` | 100% | 900 | — | — |
+| `tag_id` | 100% | 900 | — | — |
+| `title_id` | 100% | 900 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `tags` | `tag_id` | 1 | 3 | 722 | 722 | 9 of 46 |
-| `titles` | `title_id` | 1 | 1 | 1 | 4 | 859 of 1,598 |
+| `tags` | `tag_id` | 1 | 3 | 722 | 722 | 15 of 51 |
+| `titles` | `title_id` | 1 | 1 | 1 | 7 | 867 of 1,606 |
 
 ### Table: title_types
 
@@ -7397,52 +7600,55 @@ Children per parent:
 
 ### Table: titles
 
-**1,598 rows.**
+**1,606 rows.**
 
 | Column | Filled | Non-null | Distinct | Facet |
 |---|---|---|---|---|
-| `release_year` | 56% | 888 | — | — |
-| `synopsis` | 96% | 1,527 | 1,445 | — |
-| `id` | 100% | 1,598 | — | — |
-| `library_root` | 100% | 1,598 | 2 | yes |
-| `name` | 100% | 1,598 | 1,294 | — |
-| `title_type_id` | 100% | 1,598 | — | — |
+| `release_year` | 56% | 896 | — | — |
+| `synopsis` | 96% | 1,535 | 1,452 | — |
+| `id` | 100% | 1,606 | — | — |
+| `library_root` | 100% | 1,606 | 2 | yes |
+| `name` | 100% | 1,606 | 1,300 | — |
+| `title_type_id` | 100% | 1,606 | — | — |
 
 Children per parent:
 
 | Parent | Via | Min | Median | p95 | Max | Parents with any |
 |---|---|---|---|---|---|---|
-| `title_types` | `title_type_id` | 11 | 107 | 741 | 741 | 6 of 8 |
+| `title_types` | `title_type_id` | 11 | 109 | 741 | 741 | 6 of 8 |
 
 ## Error taxonomy
 
-Every non-2xx response the 61 write endpoints can produce, grouped by status and condition rather than by endpoint. A front end needs one handler for this table, not one per route.
+Every non-2xx response the 63 write endpoints can produce, grouped by status and condition rather than by endpoint. A front end needs one handler for this table, not one per route.
 
-**3 of these 21 conditions come back with nothing a user could be shown.** They are distinguishable by status, but the body names neither the field nor the cause, so an interface can only print something generic. That is a back-end issue: the front end cannot work around it.
+**3 of these 24 conditions come back with nothing a user could be shown.** They are distinguishable by status, but the body names neither the field nor the cause, so an interface can only print something generic. That is a back-end issue: the front end cannot work around it.
 
 | Status | Condition | Body | Usable message | Endpoints |
 |---|---|---|---|---|
 | `400` | Bad Request - the file is empty, or is not a readable image | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
 | `400` | Heartbeat rejected | `{"detail": ...}` | yes | `PATCH /api/transform_requests/{request_id}/heartbeat` |
-| `401` | bearer token missing or rejected | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+56 more)* |
+| `401` | bearer token missing or rejected | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+58 more)* |
 | `404` | Asset does not exist | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/tags/{tag_id}` |
 | `404` | Asset not found | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/ids` |
 | `404` | External ID not found or doesn't belong to this asset | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/ids/{record_id}`, `PATCH /api/assets/{asset_id}/ids/{record_id}` |
 | `404` | External ID not found or doesn't belong to this title | `{"detail": ...}` | yes | `DELETE /api/titles/{title_id}/ids/{record_id}`, `PATCH /api/titles/{title_id}/ids/{record_id}` |
-| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams`, `DELETE /api/title_types/{title_type_id}` *(+33 more)* |
+| `404` | Not Found - the requested resource does not exist | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams`, `DELETE /api/title_types/{title_type_id}` *(+35 more)* |
 | `404` | Title does not exist | `{"detail": ...}` | yes | `DELETE /api/titles/{title_id}/tags/{tag_id}` |
 | `404` | Title not found | `{"detail": ...}` | yes | `POST /api/titles/{title_id}/ids` |
 | `409` | Conflict - the title type is still used by one or more titles | `{"detail": ...}` | yes | `DELETE /api/title_types/{title_type_id}` |
-| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+53 more)* |
-| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated. This external ID may already exist."}` | **no** | `POST /api/id_schemes`, `POST /api/tags`, `POST /api/titles/{parent_title_id}/contents`, `POST /api/titles/{title_id}/ids` |
+| `409` | Conflict - unique constraint violated or relationship not permitted | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+52 more)* |
+| `409` | Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is moved. `detail` lists every offending item, each with its index in `loc` | `{"detail": ...}` | yes | `POST /api/titles/{destination_title_id}/contents/batch/move` |
+| `409` | Conflict — one or more items would close a containment cycle (`containment_cycle`) or give a title a second intrinsic parent (`intrinsic_parent_conflict`). Nothing is written. `detail` lists **every** offending item, each with its index in `loc` | `{"detail": ...}` | yes | `POST /api/titles/{parent_title_id}/contents/batch` |
+| `409` | Conflict — the move would close a containment cycle (`containment_cycle`), the child already has an intrinsic parent (`intrinsic_parent_conflict`), or the destination position is taken (`position_conflict`). The discriminator is in `detail[0].type` | `{"detail": ...}` | yes | `POST /api/titles/{destination_title_id}/contents/{title_contents_id}/move` |
+| `409` | the same request is sent a second time | `{"detail": "Unique constraint violated. This external ID may already exist."}` | **no** | `POST /api/id_schemes`, `POST /api/tags`, `POST /api/titles/{parent_title_id}/contents`, `POST /api/titles/{parent_title_id}/contents/batch` *(+1 more)* |
 | `409` | violates `no_self_containment_chk` | `{"detail": "A title cannot contain itself."}` | yes | `POST /api/titles/{parent_title_id}/contents` |
 | `413` | Payload Too Large - the file exceeds the size or pixel cap | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
 | `415` | Unsupported Media Type - the file is not a supported image | `{"detail": ...}` | yes | `POST /api/assets/{asset_id}/artwork`, `POST /api/titles/{title_id}/artwork` |
-| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+54 more)* |
+| `422` | Unprocessable Entity - validation error or database integrity constraint violated | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+56 more)* |
 | `422` | Validation Error | `{"detail": ...}` | yes | `DELETE /api/assets/{asset_id}/tags/{tag_id}`, `DELETE /api/titles/{title_id}/tags/{tag_id}` |
 | `422` | violates `id_schemes.code varchar(16)` | `{"detail": [{"loc": [], "msg": "Invalid enum value.", "type": "domain_error"}]}` | **no** | `POST /api/id_schemes` |
 | `422` | violates `one_target_chk` | `{"detail": [{"loc": [], "msg": "CHECK constraint violated.", "type": "domain_error"}]}` | **no** | `POST /api/titles/{parent_title_id}/contents` |
-| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+54 more)* |
+| `423` | Locked - database is currently in read-only mode | `{"detail": ...}` | yes | `DELETE /api/artwork/{artwork_id}`, `DELETE /api/assets/{asset_id}/ids/{record_id}`, `DELETE /api/assets/{asset_id}/metadata/{metadata_id}`, `DELETE /api/assets/{asset_id}/streams` *(+56 more)* |
 
 ## Constraint map
 
@@ -7495,12 +7701,13 @@ Nothing has been deleted. This is a list of questions, not actions.
 
 ## Gaps
 
-3 value(s) could not be established. Each is listed with the specific thing that would settle it.
+4 value(s) could not be established. Each is listed with the specific thing that would settle it.
 
 | Scope | Not known | What would settle it |
 |---|---|---|
+| `POST /api/titles/{parent_title_id}/contents/batch` | write probe `contents-batch-attach-twice` could not remove everything it created | inspect the write target and remove the leftovers (DELETE assets.id=2 -> update or delete on table "assets" violates foreign key constraint "title_contents_asset_id_fkey" on table "title_contents" DETAIL:  Key (id)=(2) is still referenced from table "title_contents".; DELETE titles.id=9 -> current transaction is aborted, commands ignored until end of transaction block); the next run's results are otherwise measured against a dirty database |
 | `Phase 5` | whether an endpoint has any real caller | re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories |
-| `Phase 6` | what a repeated request does to 54 of 61 write endpoints | declare a `repeat` scenario for them under `write_probes` in probes.yaml. Their contracts are otherwise derived from the code; only repetition is unmeasured, and it cannot be read off the verb — of the routes probed here, one is idempotent and four are guarded, none of which the method predicted |
+| `Phase 6` | what a repeated request does to 55 of 63 write endpoints | declare a `repeat` scenario for them under `write_probes` in probes.yaml. Their contracts are otherwise derived from the code; only repetition is unmeasured, and it cannot be read off the verb — of the routes probed here, one is idempotent and four are guarded, none of which the method predicted |
 | `Phase 6` | what the API returns when 24 of 26 constraints are violated | declare a `violation` scenario naming the constraint. Until then the Constraint map lists them with their definition and no observed response, because assuming one would invent it: `check_processed_at_matches_actioned`, `ck_artwork_source_pair`, `ck_artwork_valid_height`, `ck_artwork_valid_width`, `ck_asset_not_own_master`, `ck_asset_valid_bitrate` and others |
 
 ## Index inventory
@@ -7511,6 +7718,7 @@ Indexes declared by the SQLAlchemy models, which is the schema the running appli
 |---|---|---|---|---|
 | `artwork` | `artwork_pkey` | `id` | yes | primary key |
 | `artwork` | `ix_artwork_entity_kind_primary` | `entity_type`, `entity_id`, `artwork_kind_id`, `is_primary` | no | models |
+| `artwork` | `ix_artwork_kind_id` | `artwork_kind_id`, `id` | no | models |
 | `artwork` | `uq_artwork_entity_storage_path` | `entity_type`, `entity_id`, `storage_path` | yes | models |
 | `artwork` | `uq_artwork_one_primary_per_kind` | `entity_type`, `entity_id`, `artwork_kind_id` WHERE artwork.is_primary IS true | yes | models |
 | `artwork_kinds` | `artwork_kinds_pkey` | `id` | yes | primary key |
@@ -7547,7 +7755,9 @@ Indexes declared by the SQLAlchemy models, which is the schema the running appli
 | `tags` | `ix_tags_name_lower` | `lower(tags.name)` | no | models |
 | `tags` | `ix_tags_parent_id` | `parent_id` | no | models |
 | `tags` | `tags_pkey` | `id` | yes | primary key |
+| `title_contents` | `ix_title_contents_asset_membership` | `asset_id`, `membership` | no | models |
 | `title_contents` | `ix_title_contents_child_membership` | `child_title_id`, `membership` | no | models |
+| `title_contents` | `ix_title_contents_membership_child` | `membership`, `child_title_id` | no | models |
 | `title_contents` | `title_contents_pkey` | `id` | yes | primary key |
 | `title_contents` | `uq_one_intrinsic_parent` | `child_title_id` WHERE title_contents.child_title_id IS NOT NULL AND title_contents.membership = :param_1 | yes | models |
 | `title_contents` | `uq_parent_asset_once` | `parent_title_id`, `asset_id` WHERE title_contents.asset_id IS NOT NULL | yes | models |
@@ -7566,6 +7776,7 @@ Indexes declared by the SQLAlchemy models, which is the schema the running appli
 | `titles` | `ix_titles_title_type_id` | `title_type_id` | no | models |
 | `titles` | `titles_pkey` | `id` | yes | primary key |
 | `artwork` | `ix_artwork_entity_kind_primary` | `entity_type`, `entity_id`, `artwork_kind_id`, `is_primary` | no | migration 5249e7cf3eff |
+| `artwork` | `ix_artwork_kind_id` | `artwork_kind_id`, `id` | no | migration b7d2e4a91f38 |
 | `artwork` | `uq_artwork_entity_storage_path` | `entity_type`, `entity_id`, `storage_path` | yes | migration 5249e7cf3eff |
 | `artwork` | `uq_artwork_one_primary_per_kind` | `entity_type`, `entity_id`, `artwork_kind_id` | yes | migration 5249e7cf3eff |
 | `artwork_kinds` | `ix_artwork_kinds_code` | `code` | yes | migration 5249e7cf3eff |
@@ -7585,6 +7796,8 @@ Indexes declared by the SQLAlchemy models, which is the schema the running appli
 | `tags` | `ix_tags_parent_id` | `parent_id` | no | migration 31d43b7e01c0 |
 | `title_contents` | `<computed>` | `child_title_id` | yes | migration 7c4a1e9d2b83 |
 | `title_contents` | `<computed>` | `child_title_id`, `membership` | no | migration 9a3c5d17be24 |
+| `title_contents` | `<computed>` | `asset_id`, `membership` | no | migration f3a91c07d5e2 |
+| `title_contents` | `ix_title_contents_membership_child` | `membership`, `child_title_id` | no | migration b7d2e4a91f38 |
 | `title_contents` | `uq_parent_asset_once` | `parent_title_id`, `asset_id` | yes | migration 31d43b7e01c0 |
 | `title_contents` | `uq_parent_child_title_once` | `parent_title_id`, `child_title_id` | yes | migration 31d43b7e01c0 |
 | `title_references` | `ix_title_references_title_id` | `title_id` | no | migration 598c6446db99 |
