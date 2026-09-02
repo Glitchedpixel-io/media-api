@@ -205,4 +205,34 @@ class TitleContentORM(Base):
             "asset_id",
             "membership",
         ),
+        # Membership asked *without* a child to pin it -- `GET /api/titles/?membership=`
+        # on its own, where the semi-join has to find every edge of a kind rather than
+        # check one child's edges (#182).
+        #
+        # Leading with `membership` is the whole point, and is what makes this not a
+        # duplicate of `ix_title_contents_child_membership` above despite holding the
+        # same two columns: that one leads with `child_title_id` and answers "what kind
+        # of edge does this child have", this one answers "which children have an edge
+        # of this kind". Neither can serve the other's question, and #59 and #171 are
+        # the reminder to say so explicitly rather than leave the pair looking redundant.
+        #
+        # `child_title_id` is carried as the second column so the scan is index-only:
+        # the semi-join wants exactly that column and nothing else. Measured at the
+        # production shape (1,917 edges, 119 of them curated), on
+        # `?membership=curated`:
+        #
+        #   sequential scan                        cost 38.96
+        #   index scan, membership alone           cost 10.36
+        #   index-only scan, (membership, child)   cost  6.36
+        #
+        # The intrinsic half is untouched by this and stays on
+        # `uq_one_intrinsic_parent`, which is smaller and already exact -- 94% of edges
+        # are intrinsic, so an index leading on `membership` has nothing to narrow
+        # there. This index earns its place on the rare value, which is the one a
+        # curated-collections screen filters by.
+        Index(
+            "ix_title_contents_membership_child",
+            "membership",
+            "child_title_id",
+        ),
     )
