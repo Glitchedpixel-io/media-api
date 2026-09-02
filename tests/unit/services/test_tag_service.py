@@ -258,7 +258,7 @@ class TestUpdateTag:
 
     @pytest.mark.unit
     def test_update_tag_success_with_exclude_none(self) -> None:
-        """update_tag updates tag with exclude_none=True."""
+        """update_tag leaves omitted fields alone -- the only behaviour since #181."""
         tag_repo = create_autospec(TagRepository, instance=True, spec_set=True)
         media_repo = create_autospec(MediaRepository, instance=True, spec_set=True)
         title_repo = create_autospec(TitleRepository, instance=True, spec_set=True)
@@ -268,7 +268,7 @@ class TestUpdateTag:
 
         patch = TagPatchPublic(name="Updated Name")
 
-        result = svc.update_tag(3, patch, exclude_none=True)
+        result = svc.update_tag(3, patch)
 
         assert result is updated_tag
         assert result.name == "updated name"
@@ -291,7 +291,7 @@ class TestUpdateTag:
         patch = TagPatchPublic(name="X")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_tag(999, patch, exclude_none=True)
+            svc.update_tag(999, patch)
 
         assert exc_info.value.status_code == 404
         assert "Tag not found" in exc_info.value.detail
@@ -308,7 +308,7 @@ class TestUpdateTag:
         patch = TagPatchPublic(name="duplicate")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_tag(3, patch, exclude_none=False)
+            svc.update_tag(3, patch)
 
         assert exc_info.value.status_code == 409
         assert "Unique constraint violated" in exc_info.value.detail
@@ -325,7 +325,7 @@ class TestUpdateTag:
         patch = TagPatchPublic(name="X")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_tag(3, patch, exclude_none=True)
+            svc.update_tag(3, patch)
 
         assert exc_info.value.status_code == 423
         assert "read-only mode" in exc_info.value.detail
@@ -352,7 +352,7 @@ class TestUpdateTag:
         patch = TagPatchPublic(name="X")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_tag(3, patch, exclude_none=True)
+            svc.update_tag(3, patch)
 
         assert exc_info.value.status_code == 422
 

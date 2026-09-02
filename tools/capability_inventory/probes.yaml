@@ -1065,44 +1065,6 @@ write_probes:
         discarded by the same rule so the field cannot be cleared. This checks
         that against the running system rather than trusting the call-site trace.
 
-    - name: title-put-omission
-      endpoint: PUT /api/titles/{title_id}
-      kind: omission
-      field: synopsis
-      base_body:
-        name: capinv probe put semantics
-        title_type: movie
-        library_root: true
-      setup:
-        - method: POST
-          path: /api/titles/
-          body:
-            name: capinv probe put semantics
-            title_type: movie
-            synopsis: capinv probe original synopsis
-          capture:
-            title: id
-          sql_cleanup:
-            table: titles
-            id_var: title
-      read:
-        method: GET
-        path: /api/titles/{title}
-      act:
-        method: PUT
-        path: /api/titles/{title}
-      note: >-
-        the same body model as the PATCH above with the opposite null semantics.
-        `base_body` carries every field backed by a NOT NULL column -- `name`,
-        `title_type` and `library_root` -- because PUT writes every field of the
-        model whether the caller sent it or not, so omitting any of them is a 422
-        from the database before the probe can demonstrate anything. That refusal
-        is itself worth knowing and was the first thing this scenario found; with
-        the non-nullable fields supplied it goes on to ask the real question,
-        which is whether omitting a *nullable* field erases it.
-
-    # -- filesystem: declared, and deliberately not run ----------------------
-
     - name: title-artwork-upload-twice
       endpoint: POST /api/titles/{title_id}/artwork
       kind: repeat

@@ -32,9 +32,23 @@ class TagAttrs(UTCBaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name_not_empty(cls, v: str) -> str:
-        """Validate that name is not empty or just whitespace"""
-        if not v or v.strip() == "":
+    def validate_name_not_empty(cls, v: str | None) -> str | None:
+        """Validate that name is not empty or just whitespace.
+
+        Accepts ``None`` and returns it, which the annotation on this class does not
+        allow but its partial subclasses do. ``make_partial_model`` widens every field
+        to ``| None`` and **inherits the validators unchanged**, so a validator written
+        for the strict model runs against a null on the partial one. This one did, and
+        `TagUpdateInternal(name=None)` raised a ValidationError out of the service as a
+        500 rather than a 4xx -- reachable through the PUT route removed in #181.
+
+        Rejecting a null here would be wrong as well as unreachable: on a partial model
+        an absent name means "not being changed", which is the PATCH contract. Emptiness
+        is still refused, which is the check that has to hold.
+        """
+        if v is None:
+            return None
+        if not v.strip():
             raise ValueError("Tag name cannot be empty")
         return v.lower()
 

@@ -128,7 +128,7 @@ class TestUpdateResolution:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_title(5, TitlePatchPublic(title_type="not_a_type"), exclude_none=True)
+            svc.update_title(5, TitlePatchPublic(title_type="not_a_type"))
 
         assert exc_info.value.status_code == 422
         assert not repo.update.called
@@ -144,7 +144,7 @@ class TestUpdateResolution:
         repo.update.return_value = TitleReadFactory(id=5)
         svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo(), _content_repo())
 
-        svc.update_title(5, TitlePatchPublic(name="Renamed"), exclude_none=True)
+        svc.update_title(5, TitlePatchPublic(name="Renamed"))
 
         call_arg = repo.update.call_args[0][1]
         assert isinstance(call_arg, TitleUpdateInternal)
@@ -162,23 +162,7 @@ class TestUpdateResolution:
             _content_repo(),
         )
 
-        svc.update_title(5, TitlePatchPublic(title_type="season"), exclude_none=True)
+        svc.update_title(5, TitlePatchPublic(title_type="season"))
 
         call_arg = repo.update.call_args[0][1]
         assert call_arg.model_dump(exclude_unset=True) == {"title_type_id": 7}
-
-    def test_put_that_omits_title_type_still_clears_it(self) -> None:
-        """PUT keeps replace semantics: an omitted type is written as NULL.
-
-        The repository then hits the NOT NULL column and the caller gets the
-        same 422 it always did. Silently preserving the old type here would turn
-        a replace into a partial update.
-        """
-        repo = _title_repo()
-        repo.update.return_value = TitleReadFactory(id=5)
-        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo(), _content_repo())
-
-        svc.update_title(5, TitlePatchPublic(name="Replaced"), exclude_none=False)
-
-        call_arg = repo.update.call_args[0][1]
-        assert call_arg.model_dump(exclude_unset=True)["title_type_id"] is None

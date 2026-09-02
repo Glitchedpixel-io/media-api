@@ -1911,32 +1911,62 @@ def test_a_write_scenario_may_only_clean_up_listed_tables() -> None:
 # -- the contract derivation ------------------------------------------------
 
 
-def test_patch_and_put_sharing_one_body_model_have_opposite_null_semantics() -> None:
-    """The finding the whole phase exists to surface.
+def test_no_write_route_writes_omitted_fields_as_null() -> None:
+    """The defect this phase was built to find, kept out rather than described.
 
-    ``PATCH`` and ``PUT /api/titles/{title_id}`` both take ``TitlePatchPublic``.
-    The PATCH leaves an omitted field alone; the PUT writes it as null. Nothing
-    in the OpenAPI document distinguishes them -- only the positional argument
-    the router hands the service does, which is why the tracer has to read
-    positional arguments and not only keywords.
+    ``TitlePatchPublic`` was once the request model for both ``PATCH`` and
+    ``PUT /api/titles/{title_id}``, and the two had opposite null semantics: the
+    PATCH left an omitted field alone, the PUT wrote it as null. Nothing in the
+    OpenAPI document distinguished them -- only the positional argument the router
+    handed the service, which is why the tracer reads positional arguments and not
+    only keywords.
+
+    #181 removed both PUT routes rather than rebuilding them on required-field
+    models, so no route behaves that way today. This asserts the *absence*, because
+    the difference was one boolean wide: a new route calling a service with
+    ``exclude_none=False`` over an all-optional model would reintroduce it silently,
+    and the derivation is the only thing that can see it.
+
+    A genuine replacement contract is not what this forbids. A PUT whose body model
+    makes its replaceable fields required refuses a partial body at validation, and
+    reports "refused outright" here rather than "set to null".
     """
     api = static_surface.load_app()
     routes, spec = static_surface.collect(api)
     root = Path.cwd()
     graph = annotate.CodeGraph(root / "app", root)
 
+    offenders: list[str] = []
+    for route in routes:
+        if route.method not in {"POST", "PUT", "PATCH"}:
+            continue
+        contract = write_contracts.derive(route, None, spec, graph)
+        for field in contract.fields:
+            if field.omitted_means == "set to null":
+                offenders.append(f"{route.key} -> {field.name}")
+
+    assert not offenders, (
+        "these routes write omitted fields as null, which erases whatever the caller "
+        f"did not restate: {offenders}. See #181 -- bind the route to a model whose "
+        "replaceable fields are required, or drop it."
+    )
+
+
+def test_patch_leaves_omitted_fields_alone() -> None:
+    """The other half: the surviving route has the semantics a partial form needs."""
+    api = static_surface.load_app()
+    routes, spec = static_surface.collect(api)
+    root = Path.cwd()
+    graph = annotate.CodeGraph(root / "app", root)
+
     by_key = {r.key: r for r in routes}
+    assert "PUT /api/titles/{title_id}" not in by_key, "removed in #181"
+    assert "PUT /api/tags/{tag_id}" not in by_key, "removed in #181"
+
     patch = write_contracts.derive(by_key["PATCH /api/titles/{title_id}"], None, spec, graph)
-    put = write_contracts.derive(by_key["PUT /api/titles/{title_id}"], None, spec, graph)
-
-    assert by_key["PATCH /api/titles/{title_id}"].request_body == "TitlePatchPublic"
-    assert by_key["PUT /api/titles/{title_id}"].request_body == "TitlePatchPublic"
-
-    synopsis_patch = next(f for f in patch.fields if f.name == "synopsis")
-    synopsis_put = next(f for f in put.fields if f.name == "synopsis")
-    assert synopsis_patch.omitted_means == "unchanged"
-    assert synopsis_put.omitted_means == "set to null"
-    assert "cannot be cleared" in (synopsis_patch.null_means or "")
+    synopsis = next(f for f in patch.fields if f.name == "synopsis")
+    assert synopsis.omitted_means == "unchanged"
+    assert "cannot be cleared" in (synopsis.null_means or "")
 
 
 def test_every_write_route_resolves_its_omission_semantics() -> None:

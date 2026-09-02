@@ -146,41 +146,48 @@ class TestTagsAPI:
         assert db_tag.updated_at is not None
         assert db_tag.parent_id is None
 
-    def test_update_tag_with_put(
+    def test_put_is_gone_and_patch_cannot_clear_a_field(
         self, client: TestClient, tag_repository: TagRepository, db_session: Session
     ) -> None:
-        """Tests a PATCH update to a tag which should ignore unset fields."""
-        # Arrange - create test data using factory
-        tag = TagReadFactory(name="old", description="should change", color="#ab12ef")
+        """`PUT /api/tags/{id}` was removed in #181.
+
+        This test used to assert that a PUT carrying `description: None` cleared the
+        description. It did -- along with every other nullable field the caller had not
+        restated, which is why the route is gone.
+
+        What replaces it is worth stating rather than deleting: **PATCH cannot clear an
+        optional field.** An explicit null is discarded by the same rule that leaves an
+        omitted field alone, so `description` survives. That is a real gap in the API,
+        and it is the honest consequence of removing the only route that could clear
+        one; a `TagReplacePublic` with required replaceable fields is the way back if it
+        is ever wanted.
+        """
+        tag = TagReadFactory(name="old", description="should survive", color="#ab12ef")
         t = tag_repository.create(
             TagCreateInternal(**tag.model_dump(exclude={"id", "created_at", "updated_at"}))  # type: ignore
         )
 
-        # Act
-        response = client.put(
+        gone = client.put(
             f"/api/tags/{t.id}",
             json={"name": "new", "description": None, "color": "#ab12ef"},
         )
+        assert gone.status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
-        # Assert
+        response = client.patch(f"/api/tags/{t.id}", json={"name": "new", "description": None})
+
         assert response.status_code == HTTPStatus.OK
         r = response.json()
         assert r["name"] == "new"
-        assert r["description"] is None
-        assert r["color"] == "#ab12ef"
+        assert r["description"] == "should survive"
 
-        # Verify database persistence
         db_session.commit()
         from app.models import TagORM
 
         db_tag = db_session.query(TagORM).filter_by(id=t.id).first()
         assert db_tag is not None
         assert db_tag.name == "new"
-        assert db_tag.description is None
+        assert db_tag.description == "should survive"
         assert db_tag.color == t.color
-        assert db_tag.created_at is not None
-        assert db_tag.updated_at is not None
-        assert db_tag.parent_id is None
 
     # ----------------------- Tagging assets
 

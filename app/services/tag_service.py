@@ -153,9 +153,27 @@ class TagService:
         self,
         tag_id: int,
         update: TagPatchPublic,  # type: ignore
-        exclude_none: bool,
     ) -> TagRead:
+        """Apply a partial update to a tag.
+
+        Omitted fields are left unchanged, and an explicit null is discarded by the
+        same rule rather than clearing the field.
+
+        ``exclude_none`` used to be a parameter, passed ``False`` by a PUT route so
+        that omitted fields were written as nulls (#181). Both are gone. Besides the
+        contract, that path could not even be relied on to fail cleanly: an empty body
+        dumped ``name=None`` into ``TagUpdateInternal``, whose inherited
+        ``validate_name_not_empty`` validator assumed a string, and the resulting
+        ValidationError escaped as a 500.
+
+        Args:
+            tag_id: ID of the tag to update.
+            update: The submitted partial update.
+
+        Returns:
+            TagRead: The updated tag.
+        """
         return self.repo.update(
             tag_id,
-            TagUpdateInternal(**update.model_dump(exclude_none=exclude_none)),  # type: ignore
+            TagUpdateInternal(**update.model_dump(exclude_none=True)),  # type: ignore
         )
