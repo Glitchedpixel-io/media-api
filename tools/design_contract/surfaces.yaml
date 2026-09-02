@@ -136,6 +136,7 @@ surfaces:
       - create_title_content_positioned
       - update_title_content
       - delete_title_content
+      # The inbox is the work queue for this surface, confirmed 2026-09-02.
       - list_inbox
       - import_from_inbox
       - delete_from_inbox
@@ -239,6 +240,18 @@ do_not_call:
       design, so there is no fleet view to build.
   - operation: ingest_client_traces
     reason: Telemetry sink. Not a data route.
+  - operation: stream_asset
+    reason: >-
+      Byte serving, and being removed. No playback in this version -- not even
+      for thumbnails.
+  # The inventory records this one's audience as the front end. That is wrong,
+  # and the reason below deliberately does not repeat it to a designer.
+  - operation: mark_assets_seen
+    reason: Scanner bookkeeping, never triggered by a person.
+  - operation: create_asset
+    reason: >-
+      Assets come from scanning, never by hand. The inbox is the only path;
+      there is no create form.
   - operation: get_health
     reason: Infrastructure probe, with `GET /api/ping` and `GET /api/version`.
   - operation: ping
@@ -251,21 +264,9 @@ do_not_call:
 unassigned:
   - operation: search_transcripts
     reason: >-
-      Searches transcript text, which is a different capability from the name
-      search the brief describes. Unmeasured in the inventory (verdict
-      "unknown"). Needs a product decision before it gets a surface.
-  - operation: stream_asset
-    reason: >-
-      Byte serving. Deliberately deferred (issue #85), so no surface should
-      depend on it for thumbnails or preview.
-  - operation: mark_assets_seen
-    reason: >-
-      Bulk "still on disk" stamp. Reads as scanner bookkeeping, but its declared
-      audience is the front end. Unclear whether a person ever triggers it.
-  - operation: create_asset
-    reason: >-
-      Assets originate from scanning the filesystem. Creating one by hand may be
-      an import-only path; if so it belongs to Organise's inbox, not a form.
+      Transcript text search, a different capability from the name search the
+      brief describes. Its Elasticsearch cluster is unavailable (#78), so it
+      cannot be measured or designed against yet. Revisit when ES is back.
   - operation: list_id_schemes
     reason: Configuration of identifier namespaces, not a browse or edit surface.
   - operation: get_id_scheme
@@ -304,10 +305,11 @@ unassigned:
 # list can never drift back into claiming a gap that has since been closed.
 not_available:
   - capability: Unified search across Titles and Assets
-    issue: "#97 (design paused), #78 (search cluster)"
+    issue: "#97, #78"
     absent_op: unified_search
     detail: >-
-      The only search route is transcript search. Title lookup is a substring
+      The only search route is transcript search, whose cluster is down.
+      Title lookup is a substring
       match on `name` that needs three characters before its trigram index
       engages, so the search box must not fire before then. Build against the
       name filter; do not design a single ranked cross-entity result list.

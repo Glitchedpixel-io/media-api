@@ -636,7 +636,9 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
     for surface in surface_map.surfaces:
         lines.extend(_surface_section(surface, inventory, surface_map, rendered_models))
 
-    lines.extend(["## Do not call", "", "Worker and machine routes.", ""])
+    lines.extend(
+        ["## Do not call", "", "Worker and machine routes, and routes no person may drive.", ""]
+    )
     for note in surface_map.do_not_call:
         if not note.reason:
             continue
@@ -648,7 +650,7 @@ def render(inventory: Inventory, surface_map: SurfaceMap) -> str:
         [
             "## Not available",
             "",
-            "Constraints on the design, not a roadmap. Do not draw these.",
+            "Constraints on the design, not a roadmap.",
             "",
         ]
     )
