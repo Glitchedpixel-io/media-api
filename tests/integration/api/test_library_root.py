@@ -5,9 +5,12 @@ rather than derived: parent absence is the closest structural proxy and is still
 because a curated collection has no parent and is not a library root.
 
 So what matters here is that it is a plain settable field with a conservative default,
-and that it survives the two write paths independently -- PATCH and PUT differ in how
-they treat an omitted field, and a boolean is exactly the type where `exclude_none`
-handling tends to go wrong.
+and that a PATCH treats it correctly: false is not None, and a boolean is exactly the
+type where `exclude_none` handling tends to go wrong.
+
+There used to be a PUT path tested alongside PATCH, on the grounds that the two differed
+in how they treat an omitted field. That difference was the defect, not the feature --
+the PUT wrote every field the caller had not restated as null -- and #181 removed it.
 
 The backfill rule itself is a migration concern and is not exercised here: this suite
 builds its schema from the models via `create_all`, so no migration runs. It was
@@ -72,13 +75,22 @@ class TestLibraryRootOnWrite:
         assert response.json()["name"] == "Renamed"
         assert response.json()["library_root"] is True
 
-    def test_can_be_set_by_put(self, client: TestClient):
+    def test_cannot_be_set_by_put_because_there_is_no_put(self, client: TestClient):
+        """`PUT /api/titles/{id}` was removed in #181; PATCH sets this instead.
+
+        Kept as a test rather than deleted, because `library_root` is the grid's
+        every-load filter and how it is written is worth pinning. The route it used to
+        be written through wrote every other field as null at the same time.
+        """
         title_id = client.post("/api/titles/", json=_payload()).json()["id"]
 
         response = client.put(f"/api/titles/{title_id}", json=_payload(library_root=True))
 
-        assert response.status_code == HTTPStatus.OK
-        assert response.json()["library_root"] is True
+        assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
+
+        patched = client.patch(f"/api/titles/{title_id}", json={"library_root": True})
+        assert patched.status_code == HTTPStatus.OK
+        assert patched.json()["library_root"] is True
 
 
 @pytest.mark.integration

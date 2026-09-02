@@ -242,7 +242,9 @@ class TestUpdateTitle:
         call_args = title_service_mock.update_title.call_args[0]
         assert call_args[0] == 10  # title_id
         assert isinstance(call_args[1], TitlePatchPublic)  # update object
-        assert call_args[2] is True  # exclude_none for PATCH
+        # No third argument. `exclude_none` was one, passed False by the PUT route so
+        # that omitted fields were written as nulls; both went in #181.
+        assert len(call_args) == 2
 
     @pytest.mark.unit
     @pytest.mark.api
@@ -281,40 +283,44 @@ class TestUpdateTitle:
         assert response.status_code == HTTPStatus.NOT_FOUND
 
 
-class TestReplaceTitle:
-    """Tests for PUT /api/titles/{title_id}."""
+class TestTheTitlePutRouteIsGone:
+    """`PUT /api/titles/{title_id}` was removed in #181.
+
+    It was bound to `TitlePatchPublic`, in which every field is optional, so it could
+    not express the complete representation a PUT is supposed to carry -- and the
+    handler wrote every field whether or not the caller sent it. Measured: a body
+    omitting a NOT NULL column produced a 422 from Postgres rather than from
+    validation, and a body complete enough to succeed erased `release_year` and
+    `synopsis` without mentioning them.
+
+    405 rather than 404 because the path still serves GET, PATCH and DELETE.
+    """
 
     @pytest.mark.unit
     @pytest.mark.api
-    def test_replace_title_success(self, client: TestClient, title_service_mock) -> None:
-        """PUT /api/titles/{id} replaces title (exclude_none=False)."""
-        updated_title = TitleReadFactory(id=10)
-        title_service_mock.update_title.return_value = updated_title
+    def test_put_is_not_routed(self, client: TestClient) -> None:
+        response = client.put("/api/titles/10", json={"name": "New Name"})
 
-        response = client.put("/api/titles/10", json={"name": "New Name", "release_year": None})
-
-        assert response.status_code == HTTPStatus.OK
-        response_data = response.json()
-        assert response_data["id"] == 10
-
-        # Verify service called with exclude_none=False
-        title_service_mock.update_title.assert_called_once()
-        call_args = title_service_mock.update_title.call_args[0]
-        assert call_args[0] == 10
-        assert call_args[2] is False  # exclude_none for PUT
+        assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
     @pytest.mark.unit
     @pytest.mark.api
-    def test_replace_title_clears_optional_fields(
+    def test_patch_discards_an_explicit_null_rather_than_clearing(
         self, client: TestClient, title_service_mock
     ) -> None:
-        """PUT /api/titles/{id} can clear optional fields with None."""
-        updated_title = TitleReadFactory(synopsis=None)
-        title_service_mock.update_title.return_value = updated_title
+        """What replaced it, stated plainly.
 
-        response = client.put("/api/titles/5", json={"name": "Title", "synopsis": None})
+        PATCH cannot clear an optional field: an explicit null is discarded by the same
+        rule that leaves an omitted field alone. That is a real limitation and it is the
+        one the API now has -- worth pinning, because the removed PUT was the only way to
+        clear one, and it did so by erasing everything else too.
+        """
+        title_service_mock.update_title.return_value = TitleReadFactory(id=5)
+
+        response = client.patch("/api/titles/5", json={"name": "Title", "synopsis": None})
 
         assert response.status_code == HTTPStatus.OK
-        # Verify the update object has None for synopsis
-        call_update = title_service_mock.update_title.call_args[0][1]
-        assert call_update.synopsis is None
+        submitted = title_service_mock.update_title.call_args[0][1]
+        assert submitted.name == "Title"
+        assert submitted.synopsis is None
+        assert "synopsis" not in submitted.model_dump(exclude_none=True)

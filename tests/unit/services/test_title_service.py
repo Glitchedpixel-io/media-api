@@ -402,7 +402,11 @@ class TestUpdateTitle:
 
     @pytest.mark.unit
     def test_update_title_success_with_exclude_none(self) -> None:
-        """update_title updates title with exclude_none=True (PATCH behavior)."""
+        """update_title leaves omitted fields alone.
+
+        There is only one behaviour now. The `exclude_none` parameter, and the PUT route
+        that passed it False so omitted fields were written as nulls, went in #181.
+        """
         repo = create_autospec(TitleRepository, instance=True, spec_set=True)
         updated_title = TitleReadFactory(id=9, name="Renamed Title")
         repo.update.return_value = updated_title
@@ -410,35 +414,17 @@ class TestUpdateTitle:
 
         patch = TitlePatchPublic(name="Renamed Title")
 
-        result = svc.update_title(9, patch, exclude_none=True)
+        result = svc.update_title(9, patch)
 
         assert result is updated_title
         assert result.id == 9
         assert result.name == "Renamed Title"
 
-        # Verify internal DTO and exclude_none behavior
+        # Verify internal DTO
         repo.update.assert_called_once()
         call_args = repo.update.call_args[0]
         assert call_args[0] == 9
         assert isinstance(call_args[1], TitleUpdateInternal)
-
-    @pytest.mark.unit
-    def test_update_title_success_without_exclude_none(self) -> None:
-        """update_title updates title with exclude_none=False (PUT behavior)."""
-        repo = create_autospec(TitleRepository, instance=True, spec_set=True)
-        updated_title = TitleReadFactory(id=9, name="X")
-        repo.update.return_value = updated_title
-        svc = TitleService(repo, _type_repo(), _artwork_repo(), _kind_repo(), _content_repo())
-
-        patch = TitlePatchPublic(name="X")
-
-        result = svc.update_title(9, patch, exclude_none=False)
-
-        assert result is updated_title
-        repo.update.assert_called_once()
-        call_args = repo.update.call_args[0]
-        assert call_args[0] == 9
-        assert hasattr(call_args[1], "name")
 
     @pytest.mark.unit
     def test_update_title_partial_update(self) -> None:
@@ -450,7 +436,7 @@ class TestUpdateTitle:
         # Only update name, leave other fields unchanged
         patch = TitlePatchPublic(name="Updated Name")
 
-        svc.update_title(5, patch, exclude_none=True)
+        svc.update_title(5, patch)
 
         repo.update.assert_called_once()
         call_arg = repo.update.call_args[0][1]
@@ -466,7 +452,7 @@ class TestUpdateTitle:
 
         patch = TitlePatchPublic(title_type="season")
 
-        result = svc.update_title(5, patch, exclude_none=True)
+        result = svc.update_title(5, patch)
 
         assert result.title_type == "season"
 
@@ -480,7 +466,7 @@ class TestUpdateTitle:
         patch = TitlePatchPublic(name="X")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_title(5, patch, exclude_none=True)
+            svc.update_title(5, patch)
 
         assert exc_info.value.status_code == 404
         assert "Title not found" in exc_info.value.detail
@@ -495,7 +481,7 @@ class TestUpdateTitle:
         patch = TitlePatchPublic(name="X")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_title(5, patch, exclude_none=False)
+            svc.update_title(5, patch)
 
         assert exc_info.value.status_code == 409
         assert "Unique constraint violated" in exc_info.value.detail
@@ -510,7 +496,7 @@ class TestUpdateTitle:
         patch = TitlePatchPublic(name="Y")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_title(5, patch, exclude_none=True)
+            svc.update_title(5, patch)
 
         assert exc_info.value.status_code == 423
         assert "read-only mode" in exc_info.value.detail
@@ -535,6 +521,6 @@ class TestUpdateTitle:
         patch = TitlePatchPublic(name="Y")
 
         with pytest.raises(HTTPException) as exc_info:
-            svc.update_title(5, patch, exclude_none=True)
+            svc.update_title(5, patch)
 
         assert exc_info.value.status_code == 422

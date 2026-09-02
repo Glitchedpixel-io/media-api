@@ -80,25 +80,15 @@ def partial_title_update(
     update: TitlePatchPublic,  # type: ignore
     service: TitleService = Depends(get_title_service),
 ) -> TitleRead:
-    return service.update_title(title_id, update, True)
+    return service.update_title(title_id, update)
 
 
-@router.put(
-    "/{title_id}",
-    response_model=TitleRead,
-    operation_id="replace_title",
-    responses={
-        **COMMON_READ_RESPONSES,
-        **COMMON_WRITE_RESPONSES,
-        200: {"description": "Title replaced successfully"},
-    },
-)
-def update_title(
-    title_id: int,
-    update: TitlePatchPublic,  # type: ignore
-    service: TitleService = Depends(get_title_service),
-) -> TitleRead:
-    return service.update_title(title_id, update, False)
+# There is deliberately no `PUT /{title_id}` -- see the note on the tags router for the
+# measurements. The short version: it was bound to `TitlePatchPublic`, in which every
+# field is optional, so it could not express the complete representation a PUT is
+# supposed to carry. Omitting a NOT NULL field produced a 422 from Postgres rather than
+# from validation, and a body complete enough to succeed erased `release_year` and
+# `synopsis` without mentioning them. Removed in #181; PATCH covers every field.
 
 
 @router.get(

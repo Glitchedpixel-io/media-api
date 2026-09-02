@@ -10,10 +10,16 @@ that needs a real request against a real schema, and lives in
 The centrepiece is :func:`_omission_semantics`, and it is the reason this phase
 exists. A management UI's most destructive bug is a partial form that silently
 clears the fields it did not send, and nothing in the OpenAPI document says which
-way a route behaves: ``TitlePatchPublic`` is the request model for both
-``PATCH`` and ``PUT /api/titles/{title_id}``, and the two have opposite null
-semantics. The difference is one keyword argument at the router's call into the
-service, so that is what is traced.
+way a route behaves.
+
+The case that proved it: ``TitlePatchPublic`` was the request model for both
+``PATCH`` and ``PUT /api/titles/{title_id}``, and the two had opposite null
+semantics -- the difference being one positional argument at the router's call
+into the service, which is why the tracer reads positional arguments and not only
+keywords. This phase is what surfaced that, and #181 removed both PUT routes as a
+result, so the API no longer contains an example of it. The tracing stays: the
+defect was one boolean wide, and nothing but this phase would notice it coming
+back.
 """
 
 from __future__ import annotations

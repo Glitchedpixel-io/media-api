@@ -264,7 +264,6 @@ class TitleService:
         self,
         title_id: int,
         update: TitlePatchPublic,  # type: ignore
-        exclude_none: bool,
     ) -> TitleRead:
         """Update a title, translating a submitted type code into its foreign key.
 
@@ -274,18 +273,21 @@ class TitleService:
         so that forgetting to do so fails loudly instead of silently leaving the
         title's type unchanged.
 
-        Translation is keyed on presence, not truthiness, so that both callers
-        keep their existing semantics: PATCH (``exclude_none=True``) omits the
-        field and leaves the type alone, while PUT (``exclude_none=False``)
-        always carries it, and a PUT that omits ``title_type`` still passes
-        ``None`` through to the non-nullable column and gets the same 422 it has
-        always returned.
+        Translation is keyed on presence, not truthiness, so an omitted
+        ``title_type`` leaves the type alone rather than resolving ``None``.
+
+        There used to be an ``exclude_none`` parameter here, and a PUT route that
+        passed it ``False`` so that omitted fields were written as nulls (#181).
+        Both are gone. The flag is what made a PATCH model serve as a replacement
+        body, and leaving it in place -- unused, with one caller always passing
+        ``True`` -- would leave the next route one boolean away from
+        reintroducing the same defect.
 
         Args:
             title_id: ID of the title to update.
-            update: The submitted partial update.
-            exclude_none: Whether ``None`` values should be treated as omitted
-                (PATCH semantics) rather than as explicit nulls (PUT).
+            update: The submitted partial update. Omitted fields are left
+                unchanged; an explicit null is discarded rather than written,
+                so this cannot clear an optional field.
 
         Returns:
             TitleRead: The updated title.
@@ -294,7 +296,7 @@ class TitleService:
             HTTPException: 404 if the title does not exist, or 422 if a
                 submitted title type code is unknown.
         """
-        data: dict[str, Any] = update.model_dump(exclude_none=exclude_none)  # type: ignore
+        data: dict[str, Any] = update.model_dump(exclude_none=True)  # type: ignore
         if "title_type" in data:
             code = data.pop("title_type")
             data["title_type_id"] = self._resolve_title_type_id(code) if code is not None else None

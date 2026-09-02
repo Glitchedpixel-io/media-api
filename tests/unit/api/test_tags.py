@@ -255,12 +255,14 @@ class TestUpdateTag:
         response_data = response.json()
         assert response_data["id"] == 5
 
-        # Verify service called with exclude_none=True for PATCH
+        # The service takes the id and the submitted model, and nothing else. There
+        # used to be a third positional argument -- `exclude_none` -- which the PUT
+        # route passed as False; both are gone (#181).
         tag_service_mock.update_tag.assert_called_once()
         call_args = tag_service_mock.update_tag.call_args[0]
         assert call_args[0] == 5  # tag_id
         assert isinstance(call_args[1], TagPatchPublic)
-        assert call_args[2] is True  # exclude_none
+        assert len(call_args) == 2
 
     @pytest.mark.unit
     @pytest.mark.api
@@ -297,38 +299,43 @@ class TestUpdateTag:
         assert response.status_code == HTTPStatus.NOT_FOUND
 
 
-class TestReplaceTag:
-    """Tests for PUT /api/tags/{tag_id}."""
+class TestTheTagPutRouteIsGone:
+    """`PUT /api/tags/{tag_id}` was removed in #181.
+
+    It was bound to `TagPatchPublic` -- the same optional-field model the PATCH uses --
+    and called the service with `exclude_none=False`, so omitted fields were written as
+    nulls. Measured, that route was unusable as well as unsafe: a body omitting any NOT
+    NULL column produced a 422 from Postgres, an empty body raised a ValidationError out
+    of the service as a 500, and the one body shape that succeeded silently erased
+    `description`.
+
+    405 rather than 404 because the path still exists for GET, PATCH and DELETE; it is
+    the method that is gone.
+    """
 
     @pytest.mark.unit
     @pytest.mark.api
-    def test_replace_tag_success(self, client: TestClient, tag_service_mock) -> None:
-        """PUT /api/tags/{id} replaces tag with exclude_none=False."""
-        replaced_tag = TagReadFactory(id=5)
-        tag_service_mock.update_tag.return_value = replaced_tag
-
+    def test_put_is_not_routed(self, client: TestClient) -> None:
         response = client.put(
             "/api/tags/5",
             json={"name": "ReplacedName", "description": "New desc", "color": "#FF0000"},
         )
 
-        assert response.status_code == HTTPStatus.OK
-
-        # Verify service called with exclude_none=False for PUT
-        tag_service_mock.update_tag.assert_called_once()
-        call_args = tag_service_mock.update_tag.call_args[0]
-        assert call_args[2] is False  # exclude_none
+        assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
     @pytest.mark.unit
     @pytest.mark.api
-    def test_replace_tag_not_found(self, client: TestClient, tag_service_mock) -> None:
-        """PUT /api/tags/{id} returns 404 when tag not found."""
-        from fastapi import HTTPException
+    def test_patch_still_reaches_every_field(self, client: TestClient, tag_service_mock) -> None:
+        """Removing PUT costs no capability: PATCH covers the whole model."""
+        tag_service_mock.update_tag.return_value = TagReadFactory(id=5)
 
-        tag_service_mock.update_tag.side_effect = HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Tag not found"
+        response = client.patch(
+            "/api/tags/5",
+            json={"name": "NewName", "description": "New desc", "color": "#FF0000"},
         )
 
-        response = client.put("/api/tags/999", json={"name": "NewName"})
-
-        assert response.status_code == HTTPStatus.NOT_FOUND
+        assert response.status_code == HTTPStatus.OK
+        submitted = tag_service_mock.update_tag.call_args[0][1]
+        assert submitted.name == "newname"
+        assert submitted.description == "New desc"
+        assert submitted.color == "#FF0000"

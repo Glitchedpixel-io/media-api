@@ -108,22 +108,21 @@ def update_tag(
     tag: TagPatchPublic,  # type: ignore
     service: TagService = Depends(get_tag_service),
 ) -> TagRead:
-    return service.update_tag(tag_id, tag, True)
+    return service.update_tag(tag_id, tag)
 
 
-@router.put(
-    "/{tag_id}",
-    response_model=TagRead,
-    operation_id="replace_tag",
-    responses={
-        **COMMON_READ_RESPONSES,
-        **COMMON_WRITE_RESPONSES,
-        200: {"description": "Tag replaced successfully"},
-    },
-)
-def update_tag_by_put(
-    tag_id: int,
-    tag: TagPatchPublic,  # type: ignore
-    service: TagService = Depends(get_tag_service),
-) -> TagRead:
-    return service.update_tag(tag_id, tag, False)
+# There is deliberately no `PUT /{tag_id}`.
+#
+# One existed until #181, bound to `TagPatchPublic` -- the same optional-field model
+# the PATCH above uses -- and calling the service with `exclude_none=False`. That is
+# not a replacement contract, it is a PATCH that writes nulls, and measurement showed
+# it was unusable as well as unsafe: any body omitting a NOT NULL column produced a
+# 422 from Postgres and rolled back, an empty body crashed with a 500, and the one
+# body shape that succeeded silently erased every nullable field the caller had not
+# restated.
+#
+# Removed rather than rebuilt on a required-field replace model, because nothing asked
+# for it: PATCH already reaches every field, and no caller in any repo invoked
+# `replace_tag`. Reinstating it means writing a model whose replaceable fields are
+# required, so that a partial body is refused by validation rather than by a
+# constraint -- not passing a different boolean to this service.
