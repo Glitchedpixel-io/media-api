@@ -1,5 +1,5 @@
 # app/title_content_service.py
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 
 from fastapi import HTTPException
@@ -17,6 +17,7 @@ from app.repositories.errors import (
 )
 from app.schemas import (
     MembershipKind,
+    TitleContentBatchResult,
     TitleContentInsert,
     TitleContentPatchPublic,
     TitleContentRead,
@@ -320,6 +321,272 @@ class TitleContentService:
             raise HTTPException(status_code=404, detail="Title Content not found")
         else:
             return updated
+
+    def _batch_failures(self, problems: list[tuple[int, str, str]]) -> list[dict]:
+        """Shape a batch's per-item problems into a detail body a UI can render.
+
+        Deliberately the same ``[{loc, msg, type}]`` list FastAPI's own validation
+        errors use, and that :func:`domain_error_detail` already produces -- with the
+        item's index in ``loc``. A client parses one error shape rather than two, and
+        the index is what lets a form highlight row 17 rather than saying "something in
+        this batch was wrong".
+
+        Args:
+            problems: ``(index, message, code)`` per failing item.
+
+        Returns:
+            list[dict]: One entry per problem, in item order.
+        """
+        return [
+            {"loc": ["items", index], "msg": message, "type": code}
+            for index, message, code in sorted(problems)
+        ]
+
+    def _guard_problems(
+        self,
+        parent_title_id: int,
+        index: int,
+        child_title_id: int | None,
+        membership: MembershipKind,
+        *,
+        excluding_edge_id: int | None = None,
+    ) -> list[tuple[int, str, str]]:
+        """Run the single-write guards for one item and collect rather than raise.
+
+        The guards are reused exactly as the single writes call them, so a batch cannot
+        drift from what one-at-a-time would have allowed. Only the failure handling
+        differs: a batch reports every bad item at once instead of stopping at the first.
+        """
+        problems: list[tuple[int, str, str]] = []
+        try:
+            self._reject_cycle(parent_title_id, child_title_id)
+        except HTTPException as e:
+            problems.append((index, str(e.detail), _CYCLE_CODE))
+        try:
+            self._reject_second_intrinsic_parent(
+                child_title_id, membership, excluding_edge_id=excluding_edge_id
+            )
+        except HTTPException as e:
+            problems.append((index, str(e.detail), _INTRINSIC_PARENT_CODE))
+        return problems
+
+    @translate_repository_errors(not_found_message="Title Content not found")
+    def attach_many(
+        self, parent_title_id: int, inserts: Sequence[TitleContentInsert]
+    ) -> TitleContentBatchResult:
+        """Append several entries to one parent, all-or-nothing (#179).
+
+        **Every item is validated before anything is written**, and a failure names all
+        of them rather than the first. That is the half of "bulk" that matters to an
+        interface: a caller placing a 156-file directory wants one response listing the
+        three files that are wrong, not three round trips discovering them one at a time.
+
+        All-or-nothing rather than per-item commits, following #52 -- by-name tagging
+        committed once per tag, so a failed batch left an arbitrary prefix written with
+        no way for the caller to tell which. Choosing per-item here would recreate that
+        defect on a second table.
+
+        **Cycles cannot arise from the combination, only from individual items**, which
+        is why there is no whole-batch reachability check. Every edge this creates leaves
+        ``parent_title_id``; a cycle needs a path back *into* it, and adding more edges
+        out of a node cannot create one. So the per-item guard is complete here. What
+        does need a whole-batch check is duplicate targets: two items naming one child,
+        or one asset, collide on ``uq_parent_child_title_once`` /
+        ``uq_parent_asset_once`` and each looks perfectly valid alone.
+
+        Args:
+            parent_title_id: The parent to append under.
+            inserts: The entries to create, in the order they should land.
+
+        Returns:
+            TitleContentBatchResult: The created rows, in the order given.
+
+        Raises:
+            HTTPException: 404 if the parent does not exist; 422 naming every item whose
+                target is missing or duplicated within the batch; 409 naming every item
+                that would close a cycle or give a title a second home.
+        """
+        if not self.title_repository.exists(parent_title_id):
+            raise HTTPException(status_code=404, detail="Title not found")
+
+        invalid: list[tuple[int, str, str]] = []
+        conflicts: list[tuple[int, str, str]] = []
+        seen: dict[tuple[str, int], int] = {}
+
+        for index, insert in enumerate(inserts):
+            target: tuple[str, int] | None = None
+            if insert.child_title_id is not None:
+                target = ("title", insert.child_title_id)
+            elif insert.asset_id is not None:
+                target = ("asset", insert.asset_id)
+
+            if target is not None:
+                first = seen.get(target)
+                if first is not None:
+                    invalid.append(
+                        (
+                            index,
+                            f"{target[0].capitalize()} {target[1]} is already item {first} "
+                            "of this batch; it can appear once under a parent.",
+                            "duplicate_in_batch",
+                        )
+                    )
+                    continue
+                seen[target] = index
+
+                exists = (
+                    self.title_repository.exists(target[1])
+                    if target[0] == "title"
+                    else self.media_repository.exists(target[1])
+                )
+                if not exists:
+                    invalid.append(
+                        (
+                            index,
+                            f"{target[0].capitalize()} {target[1]} does not exist.",
+                            "target_missing",
+                        )
+                    )
+                    continue
+
+            conflicts.extend(
+                self._guard_problems(
+                    parent_title_id, index, insert.child_title_id, insert.membership
+                )
+            )
+
+        if invalid:
+            raise HTTPException(status_code=422, detail=self._batch_failures(invalid))
+        if conflicts:
+            raise HTTPException(status_code=409, detail=self._batch_failures(conflicts))
+
+        created = self.title_content_repository.create_many_positioned(parent_title_id, inserts)
+        return TitleContentBatchResult(count=len(created), items=created)
+
+    @translate_repository_errors(not_found_message="Title Content not found")
+    def detach_many(
+        self, parent_title_id: int, title_content_ids: Sequence[int]
+    ) -> TitleContentBatchResult:
+        """Remove several entries from one parent, all-or-nothing (#179).
+
+        Every id must be a row under this parent, checked the way a single delete checks
+        it (#185). Repeats are collapsed rather than refused: asking twice for a row to
+        be gone is not a conflicting instruction.
+
+        Args:
+            parent_title_id: The parent whose entries these are.
+            title_content_ids: The rows to remove.
+
+        Returns:
+            TitleContentBatchResult: How many rows were removed, and no items -- they are
+                gone, so there is nothing to return.
+
+        Raises:
+            HTTPException: 404 if the parent does not exist; 422 naming every id that is
+                not an entry under it.
+        """
+        wanted = list(dict.fromkeys(title_content_ids))
+        if not self.title_repository.exists(parent_title_id):
+            raise HTTPException(status_code=404, detail="Title not found")
+
+        problems: list[tuple[int, str, str]] = []
+        for index, edge_id in enumerate(wanted):
+            edge = self.title_content_repository.get(edge_id)
+            if edge is None or edge.parent_title_id != parent_title_id:
+                problems.append(
+                    (
+                        index,
+                        f"Title content {edge_id} is not an entry of title {parent_title_id}.",
+                        "not_under_parent",
+                    )
+                )
+        if problems:
+            raise HTTPException(status_code=422, detail=self._batch_failures(problems))
+
+        removed = self.title_content_repository.delete_many(parent_title_id, wanted)
+        return TitleContentBatchResult(count=removed, items=[])
+
+    @translate_repository_errors(not_found_message="Title Content not found")
+    def move_many(
+        self, destination_title_id: int, title_content_ids: Sequence[int]
+    ) -> TitleContentBatchResult:
+        """Move several entries under one destination, all-or-nothing (#179).
+
+        The bulk drag: multi-select in one list, drop into another. One transaction, one
+        set of parent locks, and the same guards a single move applies (#178).
+
+        **One destination is what keeps this tractable.** A batch that could send each
+        item somewhere different would need whole-batch reachability -- moving A under B
+        and B under A is a cycle neither item creates alone. Every item here lands under
+        the same parent, so as in :meth:`attach_many` every new edge *leaves* that
+        parent and the per-item guard is complete. That is a reason to keep this shape,
+        not an accident of it.
+
+        Args:
+            destination_title_id: The parent the entries should belong to afterwards.
+            title_content_ids: The rows to move.
+
+        Returns:
+            TitleContentBatchResult: The moved rows, in the order given.
+
+        Raises:
+            HTTPException: 404 if the destination does not exist; 422 naming every id
+                that does not exist or whose target another item already moves under the
+                destination; 409 naming every item that would close a cycle or give a
+                title a second home.
+        """
+        if not self.title_repository.exists(destination_title_id):
+            raise HTTPException(status_code=404, detail="Title not found")
+
+        wanted = list(dict.fromkeys(title_content_ids))
+        invalid: list[tuple[int, str, str]] = []
+        conflicts: list[tuple[int, str, str]] = []
+        found: list[tuple[int, TitleContentRead]] = []
+
+        for index, edge_id in enumerate(wanted):
+            edge = self.title_content_repository.get(edge_id)
+            if edge is None:
+                invalid.append((index, f"Title content {edge_id} does not exist.", "not_found"))
+                continue
+            found.append((index, edge))
+
+        seen: dict[tuple[str, int], int] = {}
+        for index, edge in found:
+            target = (
+                ("title", edge.child_title_id)
+                if edge.child_title_id is not None
+                else ("asset", edge.asset_id)
+            )
+            first = seen.get(target)  # type: ignore[arg-type]
+            if first is not None:
+                invalid.append(
+                    (
+                        index,
+                        f"This batch already moves {target[0]} {target[1]} under the "
+                        f"destination, as item {first}.",
+                        "duplicate_in_batch",
+                    )
+                )
+                continue
+            seen[target] = index  # type: ignore[index]
+
+            conflicts.extend(
+                self._guard_problems(
+                    destination_title_id,
+                    index,
+                    edge.child_title_id,
+                    edge.membership,
+                    excluding_edge_id=edge.id,
+                )
+            )
+
+        if invalid:
+            raise HTTPException(status_code=422, detail=self._batch_failures(invalid))
+        if conflicts:
+            raise HTTPException(status_code=409, detail=self._batch_failures(conflicts))
+
+        moved = self.title_content_repository.move_many(destination_title_id, wanted)
+        return TitleContentBatchResult(count=len(moved), items=moved)
 
     def move_content(
         self,

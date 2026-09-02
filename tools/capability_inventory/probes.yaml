@@ -910,6 +910,49 @@ write_probes:
         and a second row would mean the move is a copy. Neither is what #178
         asked for, and this is what says which one shipped.
 
+    - name: contents-batch-attach-twice
+      endpoint: POST /api/titles/{parent_title_id}/contents/batch
+      kind: repeat
+      setup:
+        - method: POST
+          path: /api/titles/
+          body:
+            name: capinv probe batch parent
+            title_type: collection
+          capture:
+            parent: id
+          sql_cleanup:
+            table: titles
+            id_var: parent
+        - method: POST
+          path: /api/assets/
+          body:
+            filename: capinv-probe-batch.mkv
+            path: /capinv-probe/batch.mkv
+            size: 1024
+            duration: 1.0
+            bitrate: 1000
+          capture:
+            asset: id
+          sql_cleanup:
+            table: assets
+            id_var: asset
+      act:
+        method: POST
+        path: /api/titles/{parent}/contents/batch
+        body:
+          items:
+            - kind: asset
+              asset_id: "{asset}"
+      act_sql_table: title_contents
+      note: >-
+        the bulk placement a UI retries after a dropped connection. The batch is
+        all-or-nothing, so the question this answers is whether a repeat is
+        *refused* rather than half-applied: `uq_parent_asset_once` should reject
+        the second attempt outright, leaving the first batch's rows exactly as
+        they were. A duplicating verdict here would mean bulk placement doubles
+        a directory on a retry, which is the worst outcome of the three.
+
     # -- 6c / 6d: constraint violations, and what the API makes of them ------
 
     - name: title-contains-itself

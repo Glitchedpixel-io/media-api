@@ -76,6 +76,80 @@ TitleContentUpdateInternal = make_partial_model(
 )
 
 
+#: Most entries one batch write may carry (#179).
+#:
+#: Chosen from the data, not rounded to a comfortable-looking number. The placement
+#: queue is 11,945 assets spread over 1,966 directories, and a directory is the unit of
+#: the gesture: median 14, p95 796, largest 796. A cap of 1,000 therefore places every
+#: directory currently on disk in a single request, which is the property worth having --
+#: a cap that splits the two largest folders makes the interface handle paging for the
+#: exact cases bulk exists to serve.
+#:
+#: Measured at the ceiling, against a database seeded to the production shape: a batch of
+#: 1,000 holds the parent title lock for **368ms** and takes 1.2s in total. The lock is
+#: the number that matters, because since #193 it blocks every other write to that
+#: parent, and validation -- which is the larger half, at 877ms of recursive cycle walks
+#: -- happens before the lock is taken, not under it.
+MAX_BATCH_ITEMS = 1_000
+
+
+class TitleContentBatchInsert(BaseModel):
+    """Several entries to append to one parent, applied as one transaction."""
+
+    model_config = {"extra": "forbid"}
+
+    items: list[TitleContentInsert] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_ITEMS,
+        title="Items",
+        description=(
+            "The entries to append, in the order they should land. Applied "
+            "all-or-nothing: if any item is invalid nothing is written, and the error "
+            "names every item that failed rather than the first"
+        ),
+    )
+
+
+class TitleContentBatchIds(BaseModel):
+    """Several existing entries to act on, applied as one transaction."""
+
+    model_config = {"extra": "forbid"}
+
+    title_contents_ids: list[int] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_ITEMS,
+        title="Title Content IDs",
+        description=(
+            "The containment rows to act on. Repeats are collapsed. Applied "
+            "all-or-nothing: if any id is not usable nothing is written, and the error "
+            "names every one that failed"
+        ),
+    )
+
+
+class TitleContentBatchResult(BaseModel):
+    """What a batch write did.
+
+    Deliberately not a per-item status list. The write is all-or-nothing, so on success
+    every item succeeded and a per-item report would be a column of identical ticks;
+    the interesting per-item detail belongs in the *error* body, where it says which
+    items stopped the batch. See the router docstrings for that shape.
+    """
+
+    model_config = {"from_attributes": True}
+
+    count: int = Field(..., title="Count", description="How many rows the batch affected")
+    items: list[TitleContentRead] = Field(
+        default_factory=list,
+        title="Items",
+        description=(
+            "The affected rows, in the order given. Empty for a detach, which removes " "them"
+        ),
+    )
+
+
 class TitleContentReadParent(TitleContentRead):
     parent_title: TitleRead = Field(
         ..., title="Parent Title", description="The Title that owns this piece of content"
