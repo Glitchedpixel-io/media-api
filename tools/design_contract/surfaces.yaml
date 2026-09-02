@@ -3,7 +3,7 @@
 # HAND-MAINTAINED. This file is a design decision, not something derivable from
 # the capability inventory. The generator reads it; the generator never writes it.
 #
-# Surfaces come from section 4 of ../media-manager/design/brief.md.
+# Surfaces come from section 4 of the design brief.
 #
 # Each surface has two lists:
 #   primary  - endpoints the surface is built on. Rendered in full: filters,

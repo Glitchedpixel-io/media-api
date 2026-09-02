@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -16,8 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 #: Default inventory location inside this repository.
 DEFAULT_INVENTORY = REPO_ROOT / "docs" / "capability-inventory.json"
 
-#: Default output, in the sibling design repository.
-DEFAULT_OUT = REPO_ROOT.parent / "media-manager" / "design" / "api-contract.md"
+#: Environment variable naming the destination. The contract is consumed by a
+#: separate repository, whose location is a property of a working copy rather
+#: than of this one, so there is no default path: pass ``--out`` or set this.
+OUT_ENV_VAR = "DESIGN_CONTRACT_OUT"
 
 #: The document lives permanently in a design tool's context.
 DEFAULT_MAX_BYTES = 20_480
@@ -48,8 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--out",
         type=Path,
-        default=DEFAULT_OUT,
-        help="file to write (default: %(default)s)",
+        default=None,
+        help=(f"file to write; required unless --check, and falls back to ${OUT_ENV_VAR}"),
     )
     parser.add_argument(
         "--max-bytes",
@@ -99,7 +102,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ok — {budget}, not written")
         return 0
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(document, encoding="utf-8")
-    print(f"wrote {args.out} — {budget}")
+    out = args.out or (Path(os.environ[OUT_ENV_VAR]) if os.environ.get(OUT_ENV_VAR) else None)
+    if out is None:
+        print(
+            f"no destination: pass --out, or set ${OUT_ENV_VAR}. The contract is "
+            "consumed by a separate repository, so there is no default path.",
+            file=sys.stderr,
+        )
+        return 1
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(document, encoding="utf-8")
+    print(f"wrote {out} — {budget}")
     return 0
