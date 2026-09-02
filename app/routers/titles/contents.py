@@ -213,6 +213,36 @@ def reorder_title_content(
     position: str | None = Query(None, description="Special position: 'start' or 'end'"),
     service: TitleContentService = Depends(get_title_content_service),
 ) -> TitleContentRead:
+    """Move an entry to a different place in its parent's list.
+
+    **One drag is one call, over any distance.** This is not a single-step nudge: the
+    entry is taken out of the list, an index is chosen against what remains, and the
+    list is renumbered around it, so `position=start` on the last item of a 20-item
+    collection lands it at index 0 in one request. Positions stay contiguous and
+    zero-based throughout; a caller never computes one.
+
+    Say where to land with exactly one of:
+
+    - `before_id` / `after_id` — immediately before or after that sibling
+    - `position=start` / `position=end` — either end of the list
+
+    Naming a row that is not in this parent's list, or the moved row as its own
+    neighbour, leaves the entry where it is rather than flinging it to the end.
+
+    Same-parent only. Moving an entry to a *different* parent is
+    `POST /{destination_title_id}/contents/{id}/move`, which is one call as well and
+    additionally rejects cycles — this route 404s if the entry is not under
+    `parent_title_id`.
+
+    **Reordering a whole list** has no single endpoint and does not need one (#180).
+    Walk the target order and send each entry to the end in turn: that is N calls, it
+    needs no knowledge of intermediate positions, and it converges. Measured against
+    production shapes, the sets this applies to are small -- curated collections are
+    what the design makes reorderable, and the largest holds 20 entries with a median
+    of 1. The trade is that each call commits, so a concurrent reader can observe the
+    intermediate orderings; that is the reason a set-level endpoint would exist, and
+    the reason it does not yet.
+    """
     return service.reorder_content(
         parent_title_id,
         title_content_id=title_contents_id,

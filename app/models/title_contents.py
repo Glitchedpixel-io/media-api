@@ -86,6 +86,21 @@ class TitleContentORM(Base):
         # Checking per-statement would reject the shuffle itself; checking at commit
         # asks the question that actually matters -- is the list well-formed now.
         #
+        # **Do not "tidy" this into a plain UniqueConstraint.** Measured in #180 by
+        # replacing it with `UNIQUE (parent_title_id, position)` and re-running the same
+        # requests: every reorder shape then fails with a 409 -- first-to-end,
+        # last-to-start and mid-to-mid alike. Not some edge case; reordering stops
+        # working entirely, because the mover's own row still occupies the position the
+        # first shifted row is being written into.
+        #
+        # Nothing in CI would catch that. `alembic check` compares models to database
+        # and does **not** report deferrability, so the swap above passed it with "No new
+        # upgrade operations detected" (verified in #180 against a freshly migrated
+        # database). The test suite builds its schema from this model rather than from
+        # the migrations, so a migration that dropped deferrability without touching this
+        # line would ship green and break reordering in production. `test_uq_parent_
+        # position_is_deferrable` pins the model side; the migration side is unguarded.
+        #
         # Deferred, not dropped. The guard has to hold against a writer that never goes
         # near the service layer, which this table demonstrably has (#125).
         UniqueConstraint(
