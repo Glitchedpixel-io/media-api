@@ -205,16 +205,33 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         Args:
             title_content_id: The entry to remove. Unknown ids are a no-op, as before.
         """
-        orm = self.db.get(TitleContentORM, title_content_id)
-        if orm is None:
+        # Which parent, without loading the row -- the same column-only read `reorder`
+        # uses, and for the same reason: the entity is taken from the locked lists.
+        parent_title_id = self.db.scalar(
+            select(TitleContentORM.parent_title_id).where(TitleContentORM.id == title_content_id)
+        )
+        if parent_title_id is None:
             return
-        parent_title_id = orm.parent_title_id
+
+        # Lock the parent **before** touching the row (#193). Deleting first took a lock
+        # on the contents row and the parent second, which is the opposite order to
+        # every other write here -- so a delete and a reorder on one parent could each
+        # hold what the other needed. Nothing in the API paired them, which is why it
+        # never showed up; normalising the order is cheaper than relying on that.
+        lists = self._locked_lists({parent_title_id})
+
+        orm = next((row for row in lists[parent_title_id] if row.id == title_content_id), None)
+        if orm is None:
+            # Deleted by a concurrent caller between the read above and the lock. Their
+            # transaction renumbered the list; there is nothing left to do.
+            return
+
         self.db.delete(orm)
         # Flushed explicitly rather than left to autoflush, which the session factory
         # disables: the renumber below reads the list back, and it has to read it
         # without the row that is on its way out.
         self._safe_flush()
-        self._renumber(self._locked_lists({parent_title_id})[parent_title_id])
+        self._renumber([row for row in lists[parent_title_id] if row.id != title_content_id])
         self._safe_commit()
 
     def get_titles_with_asset(self, asset_id: int) -> list[TitleContentReadParent]:
@@ -293,14 +310,16 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
     def _locked_lists(self, parent_title_ids: set[int]) -> dict[int, list[TitleContentORM]]:
         """Each named parent's rows in position order, locked for the transaction.
 
-        ``FOR UPDATE`` because every write below is read-modify-write over a whole
-        list: two concurrent moves under one parent would otherwise both renumber from
-        the same starting picture and the second would undo the first. The previous
-        key-based scheme took no lock at all and raced the same way, less visibly.
+        Every write below is read-modify-write over a whole list: two concurrent moves
+        under one parent would otherwise both renumber from the same starting picture
+        and the second would undo the first. The previous key-based scheme took no lock
+        at all and raced the same way, less visibly.
 
-        Both parents of a cross-parent move are locked by **one** statement, so the
-        rows are always taken in a single deterministic order and two opposing moves
-        cannot deadlock against each other.
+        The lock that makes that safe is on the **parent titles**, not on the contents
+        rows -- see the comment in the body for why locking the contents alone did not
+        work, and what it cost. Both parents of a cross-parent move are locked by one
+        statement in id order, so opposing moves take them the same way round and
+        cannot deadlock.
 
         Args:
             parent_title_ids: The parents whose lists are about to be rewritten.
@@ -309,6 +328,34 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
             dict[int, list[TitleContentORM]]: Parent id -> its rows, ascending by
                 position. A parent with no contents maps to an empty list.
         """
+        # Lock the **parent title rows** first, in id order, in one statement.
+        #
+        # This is the serialisation point, and locking the contents rows is not
+        # (#193). `FOR UPDATE` locks the rows it returned, and the row a concurrent
+        # append is about to insert is a phantom -- outside that set -- so two appends
+        # computed the same `len(rows)` and one lost at commit to the deferred
+        # `uq_parent_position`. Measured: 32 concurrent attaches to one parent landed
+        # 12 and rejected 20, and a parent already holding rows raced identically,
+        # because how many rows exist to lock is irrelevant when the contended value is
+        # a row that does not exist yet.
+        #
+        # A title row exists whether or not its list does, so it can be locked before
+        # the first child and still serialise the append. Taking it *before* any
+        # contents row is also what stops opposing cross-parent moves deadlocking:
+        # `reorder` used to lock its own edge first and then the lists, so two moves in
+        # opposite directions each held the row the other needed. That deadlock was
+        # real -- Postgres detected it -- despite the comment here that once claimed it
+        # could not happen.
+        #
+        # Ordered by id so that a two-parent move always takes them the same way round
+        # whichever direction the edge is travelling.
+        self.db.execute(
+            select(TitleORM.id)
+            .where(TitleORM.id.in_(sorted(parent_title_ids)))
+            .order_by(TitleORM.id)
+            .with_for_update()
+        ).all()
+
         lists: dict[int, list[TitleContentORM]] = {pid: [] for pid in parent_title_ids}
         rows = self.db.scalars(
             select(TitleContentORM)
@@ -367,12 +414,36 @@ class SQLAlchemyTitleContentRepository(SQLAlchemyBaseRepository, TitleContentRep
         Returns:
             TitleContentRead | None: The moved row, or None if no such row exists.
         """
-        orm = self.db.get(TitleContentORM, title_content_id, with_for_update=True)
-        if not orm:
+        # Learn which parent the row is under, without locking it and without loading
+        # it. Locking it here is what deadlocked opposing cross-parent moves (#193):
+        # each move held its own edge and then waited on the other's list, which
+        # contains the other's edge. Parent titles are the first thing locked now, and
+        # every contents row is taken after them, by `_locked_lists`.
+        #
+        # A column-only select, not `db.get`, deliberately. Loading the entity here
+        # would put it in the identity map with its pre-lock `parent_title_id`, and the
+        # fresh read inside `_locked_lists` would hand that same instance back rather
+        # than overwriting the attribute -- so the staleness check below would compare
+        # the row against itself and never fire.
+        source_parent_id = self.db.scalar(
+            select(TitleContentORM.parent_title_id).where(TitleContentORM.id == title_content_id)
+        )
+        if source_parent_id is None:
             return None
 
-        source_parent_id = orm.parent_title_id
         lists = self._locked_lists({source_parent_id, parent_title_id})
+
+        # Take the row from the locked lists, never from the read above. The window
+        # between that read and the lock is small but real: a concurrent move could have
+        # taken the row to a third parent, whose list is not one of the two now held.
+        # Returning None reports it as "no such row here", which is what it is from this
+        # caller's position -- the alternative is renumbering a list we never locked.
+        orm = next(
+            (row for row in lists[source_parent_id] if row.id == title_content_id),
+            None,
+        )
+        if orm is None:
+            return None
 
         remaining = [row for row in lists[parent_title_id] if row.id != title_content_id]
         index = target_index(
