@@ -318,7 +318,1919 @@
       "ui_message": ""
     }
   ],
-  "data_shape": null,
+  "data_shape": {
+    "baseline_rtt_ms": 25.62,
+    "captured_from": "read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)",
+    "collections": [
+      {
+        "child_table": "artwork",
+        "fk_column": "artwork_kind_id",
+        "max_children": 1077,
+        "median_children": 7.0,
+        "min_children": 1,
+        "p95_children": 1077.0,
+        "parent_table": "artwork_kinds",
+        "parents_total": 8,
+        "parents_with_children": 4
+      },
+      {
+        "child_table": "asset_tags",
+        "fk_column": "asset_id",
+        "max_children": 4,
+        "median_children": 2.0,
+        "min_children": 1,
+        "p95_children": 3.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 1388
+      },
+      {
+        "child_table": "assets",
+        "fk_column": "master_asset_id",
+        "max_children": 4,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 4.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 6
+      },
+      {
+        "child_table": "media_transform_requests",
+        "fk_column": "asset_id",
+        "max_children": 17,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 4.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 13335
+      },
+      {
+        "child_table": "metadata",
+        "fk_column": "asset_id",
+        "max_children": 4,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 2.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 13238
+      },
+      {
+        "child_table": "streams",
+        "fk_column": "asset_id",
+        "max_children": 79,
+        "median_children": 3.0,
+        "min_children": 1,
+        "p95_children": 20.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 13004
+      },
+      {
+        "child_table": "title_contents",
+        "fk_column": "asset_id",
+        "max_children": 1,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 1.0,
+        "parent_table": "assets",
+        "parents_total": 13350,
+        "parents_with_children": 1405
+      },
+      {
+        "child_table": "external_identifiers",
+        "fk_column": "scheme_id",
+        "max_children": 719,
+        "median_children": 671.0,
+        "min_children": 133,
+        "p95_children": 719.0,
+        "parent_table": "id_schemes",
+        "parents_total": 3,
+        "parents_with_children": 3
+      },
+      {
+        "child_table": "media_transform_requests",
+        "fk_column": "parent_transform_request_id",
+        "max_children": 4,
+        "median_children": 2.0,
+        "min_children": 1,
+        "p95_children": 3.0,
+        "parent_table": "media_transform_requests",
+        "parents_total": 18312,
+        "parents_with_children": 1500
+      },
+      {
+        "child_table": "asset_tags",
+        "fk_column": "tag_id",
+        "max_children": 739,
+        "median_children": 30.0,
+        "min_children": 1,
+        "p95_children": 510.0,
+        "parent_table": "tags",
+        "parents_total": 51,
+        "parents_with_children": 35
+      },
+      {
+        "child_table": "tags",
+        "fk_column": "parent_id",
+        "max_children": 4,
+        "median_children": 4.0,
+        "min_children": 4,
+        "p95_children": 4.0,
+        "parent_table": "tags",
+        "parents_total": 51,
+        "parents_with_children": 1
+      },
+      {
+        "child_table": "title_tags",
+        "fk_column": "tag_id",
+        "max_children": 722,
+        "median_children": 3.0,
+        "min_children": 1,
+        "p95_children": 722.0,
+        "parent_table": "tags",
+        "parents_total": 51,
+        "parents_with_children": 15
+      },
+      {
+        "child_table": "titles",
+        "fk_column": "title_type_id",
+        "max_children": 741,
+        "median_children": 109.0,
+        "min_children": 11,
+        "p95_children": 741.0,
+        "parent_table": "title_types",
+        "parents_total": 8,
+        "parents_with_children": 6
+      },
+      {
+        "child_table": "title_contents",
+        "fk_column": "child_title_id",
+        "max_children": 1,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 1.0,
+        "parent_table": "titles",
+        "parents_total": 1606,
+        "parents_with_children": 516
+      },
+      {
+        "child_table": "title_contents",
+        "fk_column": "parent_title_id",
+        "max_children": 35,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 2.0,
+        "parent_table": "titles",
+        "parents_total": 1606,
+        "parents_with_children": 1593
+      },
+      {
+        "child_table": "title_tags",
+        "fk_column": "title_id",
+        "max_children": 7,
+        "median_children": 1.0,
+        "min_children": 1,
+        "p95_children": 1.0,
+        "parent_table": "titles",
+        "parents_total": 1606,
+        "parents_with_children": 867
+      }
+    ],
+    "columns": [
+      {
+        "column": "artwork_kind_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "entity_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "entity_type",
+        "distinct": 1,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "height",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "is_primary",
+        "distinct": 1,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "mime",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "source_external_id",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "source_scheme_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "source_url",
+        "distinct": 5,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.0057,
+        "non_null": 7,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "storage_path",
+        "distinct": 1167,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "width",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1218,
+        "table": "artwork",
+        "top_values": [],
+        "total": 1218
+      },
+      {
+        "column": "code",
+        "distinct": 8,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "description",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "label",
+        "distinct": 8,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "max_width",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "min_width",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.625,
+        "non_null": 5,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "ratio_tolerance",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.5,
+        "non_null": 4,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "target_ratio",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.5,
+        "non_null": 4,
+        "table": "artwork_kinds",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 2880,
+        "table": "asset_tags",
+        "top_values": [],
+        "total": 2880
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 2880,
+        "table": "asset_tags",
+        "top_values": [],
+        "total": 2880
+      },
+      {
+        "column": "tag_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 2880,
+        "table": "asset_tags",
+        "top_values": [],
+        "total": 2880
+      },
+      {
+        "column": "bitrate",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "container_format",
+        "distinct": 4,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.9889,
+        "non_null": 13202,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "duration",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "edition",
+        "distinct": 10,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.0109,
+        "non_null": 146,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "filename",
+        "distinct": 5000,
+        "distinct_capped": true,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "last_seen",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9963,
+        "non_null": 13300,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "master_asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0007,
+        "non_null": 10,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "mtime",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9903,
+        "non_null": 13220,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "path",
+        "distinct": 5000,
+        "distinct_capped": true,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "size",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 13350,
+        "table": "assets",
+        "top_values": [],
+        "total": 13350
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "entity_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "entity_type",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "external_id",
+        "distinct": 1523,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "scheme_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1523,
+        "table": "external_identifiers",
+        "top_values": [],
+        "total": 1523
+      },
+      {
+        "column": "code",
+        "distinct": 3,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 3,
+        "table": "id_schemes",
+        "top_values": [],
+        "total": 3
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 3,
+        "table": "id_schemes",
+        "top_values": [],
+        "total": 3
+      },
+      {
+        "column": "label",
+        "distinct": 3,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 3,
+        "table": "id_schemes",
+        "top_values": [],
+        "total": 3
+      },
+      {
+        "column": "validator",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "id_schemes",
+        "top_values": [],
+        "total": 3
+      },
+      {
+        "column": "completed_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9991,
+        "non_null": 3155,
+        "table": "jobs",
+        "top_values": [],
+        "total": 3158
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 3158,
+        "table": "jobs",
+        "top_values": [],
+        "total": 3158
+      },
+      {
+        "column": "heartbeat_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.5516,
+        "non_null": 1742,
+        "table": "jobs",
+        "top_values": [],
+        "total": 3158
+      },
+      {
+        "column": "job_key",
+        "distinct": 3158,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 3158,
+        "table": "jobs",
+        "top_values": [],
+        "total": 3158
+      },
+      {
+        "column": "actioned",
+        "distinct": 1,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "duration",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9681,
+        "non_null": 17728,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "external_job_id",
+        "distinct": 2734,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9032,
+        "non_null": 16539,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "first_heartbeat",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.2005,
+        "non_null": 3671,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "last_heartbeat",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.2005,
+        "non_null": 3671,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "on_failure",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.246,
+        "non_null": 4504,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "on_success",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.246,
+        "non_null": 4504,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "outcome",
+        "distinct": 3,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "parameters",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9946,
+        "non_null": 18213,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "parent_transform_request_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.1626,
+        "non_null": 2977,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "processed_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "transform_type",
+        "distinct": 11,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 18312,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "worker",
+        "distinct": 1085,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9972,
+        "non_null": 18260,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "worker_notes",
+        "distinct": 5000,
+        "distinct_capped": true,
+        "facet_candidate": false,
+        "fill_rate": 0.7736,
+        "non_null": 14166,
+        "table": "media_transform_requests",
+        "top_values": [],
+        "total": 18312
+      },
+      {
+        "column": "asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "data",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "metadata_type",
+        "distinct": 7,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "updated_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 14602,
+        "table": "metadata",
+        "top_values": [],
+        "total": 14602
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "extras",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "failed_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "processed_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "running_time",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "started_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "success_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "transform_type",
+        "distinct": 6,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "worker_name",
+        "distinct": 1152,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "worker_type",
+        "distinct": 6,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1152,
+        "table": "run_summaries",
+        "top_values": [],
+        "total": 1152
+      },
+      {
+        "column": "runner_key",
+        "distinct": 5,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 5,
+        "table": "runner_state",
+        "top_values": [],
+        "total": 5
+      },
+      {
+        "column": "state",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 5,
+        "table": "runner_state",
+        "top_values": [],
+        "total": 5
+      },
+      {
+        "column": "updated_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 5,
+        "table": "runner_state",
+        "top_values": [],
+        "total": 5
+      },
+      {
+        "column": "api_error_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "dry_run",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "error_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.6468,
+        "non_null": 130,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "excluded_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.1244,
+        "non_null": 25,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "extras",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "folder_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "no_metadata_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "previously_seen_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "processed_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "relative_to_path",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "running_time",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "scan_path",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "started_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "total_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "unsupported_file_count",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "worker_name",
+        "distinct": 29,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "worker_type",
+        "distinct": 8,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 201,
+        "table": "scanner_run_summaries",
+        "top_values": [],
+        "total": 201
+      },
+      {
+        "column": "asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "channels",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.3246,
+        "non_null": 21173,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "codec_name",
+        "distinct": 21,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.9999,
+        "non_null": 65225,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "codec_type",
+        "distinct": 4,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "frame_rate",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.2865,
+        "non_null": 18686,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "height",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.289,
+        "non_null": 18853,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "is_default",
+        "distinct": 1,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "is_forced",
+        "distinct": 1,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "language",
+        "distinct": 60,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.9162,
+        "non_null": 59763,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "sample_rate",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.3246,
+        "non_null": 21173,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "stream_index",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 65230,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "title",
+        "distinct": 12,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 0.2175,
+        "non_null": 14185,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "width",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.289,
+        "non_null": 18853,
+        "table": "streams",
+        "top_values": [],
+        "total": 65230
+      },
+      {
+        "column": "color",
+        "distinct": 4,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "description",
+        "distinct": 6,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "name",
+        "distinct": 51,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "parent_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0784,
+        "non_null": 4,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "updated_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 51,
+        "table": "tags",
+        "top_values": [],
+        "total": 51
+      },
+      {
+        "column": "asset_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.7314,
+        "non_null": 1405,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "child_title_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.2686,
+        "non_null": 516,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1921,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "kind",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1921,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "label",
+        "distinct": 276,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9901,
+        "non_null": 1902,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "membership",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1921,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "parent_title_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1921,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "position",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1921,
+        "table": "title_contents",
+        "top_values": [],
+        "total": 1921
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_references",
+        "top_values": [],
+        "total": 0
+      },
+      {
+        "column": "label",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_references",
+        "top_values": [],
+        "total": 0
+      },
+      {
+        "column": "reference_type",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_references",
+        "top_values": [],
+        "total": 0
+      },
+      {
+        "column": "reference_url",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_references",
+        "top_values": [],
+        "total": 0
+      },
+      {
+        "column": "title_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_references",
+        "top_values": [],
+        "total": 0
+      },
+      {
+        "column": "created_at",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 900,
+        "table": "title_tags",
+        "top_values": [],
+        "total": 900
+      },
+      {
+        "column": "tag_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 900,
+        "table": "title_tags",
+        "top_values": [],
+        "total": 900
+      },
+      {
+        "column": "title_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 900,
+        "table": "title_tags",
+        "top_values": [],
+        "total": 900
+      },
+      {
+        "column": "code",
+        "distinct": 8,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "title_types",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "description",
+        "distinct": 0,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.0,
+        "non_null": 0,
+        "table": "title_types",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "title_types",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "label",
+        "distinct": 8,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 8,
+        "table": "title_types",
+        "top_values": [],
+        "total": 8
+      },
+      {
+        "column": "id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1606,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      },
+      {
+        "column": "library_root",
+        "distinct": 2,
+        "distinct_capped": false,
+        "facet_candidate": true,
+        "fill_rate": 1.0,
+        "non_null": 1606,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      },
+      {
+        "column": "name",
+        "distinct": 1300,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1606,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      },
+      {
+        "column": "release_year",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.5579,
+        "non_null": 896,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      },
+      {
+        "column": "synopsis",
+        "distinct": 1452,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 0.9558,
+        "non_null": 1535,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      },
+      {
+        "column": "title_type_id",
+        "distinct": null,
+        "distinct_capped": false,
+        "facet_candidate": false,
+        "fill_rate": 1.0,
+        "non_null": 1606,
+        "table": "titles",
+        "top_values": [],
+        "total": 1606
+      }
+    ],
+    "coverage": [
+      {
+        "attribute": "resolve a display image (the API's own resolution)",
+        "covered": 957,
+        "note": "the browse grid's central design constraint: every root that does not resolve one needs the typographic treatment, so this is the proportion of the grid that is *not* a poster wall. Measured with the API's own resolution query, so it matches what `resolves_display_image=true` returns rather than approximating it",
+        "population": "Titles with library_root=true",
+        "total": 1137
+      },
+      {
+        "attribute": "have a release_year",
+        "covered": 879,
+        "note": "drives the 'titles with no year' view, and any sort or facet by year",
+        "population": "Titles with library_root=true",
+        "total": 1137
+      },
+      {
+        "attribute": "have at least one tag",
+        "covered": 851,
+        "note": "decides whether tag filter chips are a primary navigation device or a sparse one",
+        "population": "Titles with library_root=true",
+        "total": 1137
+      }
+    ],
+    "row_counts": {
+      "artwork": 1218,
+      "artwork_kinds": 8,
+      "asset_tags": 2880,
+      "assets": 13350,
+      "external_identifiers": 1523,
+      "id_schemes": 3,
+      "jobs": 3158,
+      "media_transform_requests": 18312,
+      "metadata": 14602,
+      "run_summaries": 1152,
+      "runner_state": 5,
+      "scanner_run_summaries": 201,
+      "streams": 65230,
+      "tags": 51,
+      "title_contents": 1921,
+      "title_references": 0,
+      "title_tags": 900,
+      "title_types": 8,
+      "titles": 1606
+    },
+    "server_version": "PostgreSQL 17.9 (Debian 17.9-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "unknowns": []
+  },
   "endpoints": [
     {
       "annotation": {
@@ -460,10 +2372,60 @@
         "service": "ArtworkService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 17398,
+          "endpoint_key": "GET /api/artwork",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "artwork-deep-page",
+          "notes": [
+            "page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork",
+            "deep page reached by following 20 `page.next` cursors; a keyset endpoint offers no way to jump straight to it"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 108.7,
+            "min_ms": 87.1,
+            "p50_ms": 88.7,
+            "p95_ms": 108.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/artwork?after=>i:1000&limit=50"
+        },
+        {
+          "bytes_": 17244,
+          "endpoint_key": "GET /api/artwork",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "artwork-page-1",
+          "notes": [
+            "default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 114.1,
+            "min_ms": 91.4,
+            "p50_ms": 98.9,
+            "p95_ms": 114.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/artwork?limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`created_at`, `entity_id`, `is_primary`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set",
-        "filters that cannot use an index (`entity_id`, `is_primary`); each forces a full scan"
+        "unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,218 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`entity_id`, `is_primary`); each forces a sequential scan, though `artwork` holds only 1,218 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -678,8 +2640,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -934,7 +2896,32 @@
         "service": "ArtworkService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 343,
+          "endpoint_key": "GET /api/artwork/{artwork_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "artwork-one",
+          "notes": [
+            "index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 98.7,
+            "min_ms": 79.8,
+            "p50_ms": 86.1,
+            "p95_ms": 98.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/artwork/1"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -1087,8 +3074,8 @@
           "tests/unit/services/test_artwork_service.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -1603,9 +3590,34 @@
         "service": "ArtworkKindService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 1154,
+          "endpoint_key": "GET /api/artwork_kinds",
+          "http_status": 200,
+          "item_count": 8,
+          "method": "GET",
+          "name": "artwork-kinds",
+          "notes": [
+            "bounded by the seeded kinds, which is small and fixed at six"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 104.8,
+            "min_ms": 81.3,
+            "p50_ms": 87.2,
+            "p95_ms": 104.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/artwork_kinds"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 8 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -1701,8 +3713,8 @@
           "tests/integration/api/test_artwork_api.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -1925,10 +3937,277 @@
         "service": "MediaService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 20216,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-page-1",
+          "notes": [
+            "default first page a browse screen would issue"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 149.5,
+            "min_ms": 131.4,
+            "p50_ms": 141.0,
+            "p95_ms": 149.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?limit=50"
+        },
+        {
+          "bytes_": 20216,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-page-1-with-includes",
+          "notes": [
+            "same page with every optional relation eager-loaded"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 188.9,
+            "min_ms": 170.5,
+            "p50_ms": 179.1,
+            "p95_ms": 188.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?include=tags,master_asset,external_ids&limit=50"
+        },
+        {
+          "bytes_": 20216,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-unplaced-page-1",
+          "notes": [
+            "the drag source -- assets with no intrinsic home, which is the queue the whole placement workflow starts from. Curated listings deliberately do not count as placed, so an asset sitting only in a collection appears here. Pairs with `assets-placed-page-1`; the two should partition `assets`."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 143.3,
+            "min_ms": 133.2,
+            "p50_ms": 139.7,
+            "p95_ms": 143.3,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?has_intrinsic_parent=False&limit=50"
+        },
+        {
+          "bytes_": 19861,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-placed-page-1",
+          "notes": [
+            "the other half of the pair. Both directions are served by `ix_title_contents_asset_membership`, whose leading column is `asset_id` -- nothing indexed that column before #177, and `uq_parent_asset_once` cannot serve it because it leads with `parent_title_id`."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 155.9,
+            "min_ms": 136.2,
+            "p50_ms": 144.1,
+            "p95_ms": 155.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?has_intrinsic_parent=True&limit=50"
+        },
+        {
+          "bytes_": 4091,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 10,
+          "method": "GET",
+          "name": "assets-scaling-10-rows",
+          "notes": [
+            "N+1 scaling, 10 rows"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 129.3,
+            "min_ms": 116.9,
+            "p50_ms": 120.6,
+            "p95_ms": 129.3,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?limit=10"
+        },
+        {
+          "bytes_": 83700,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 200,
+          "method": "GET",
+          "name": "assets-scaling-200-rows",
+          "notes": [
+            "N+1 scaling, 200 rows -- compare against the 10- and 50-row probes"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 173.0,
+            "min_ms": 149.7,
+            "p50_ms": 160.4,
+            "p95_ms": 173.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?limit=200"
+        },
+        {
+          "bytes_": 211400,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 500,
+          "method": "GET",
+          "name": "assets-max-page-unindexed-sort",
+          "notes": [
+            "largest permitted page on an unindexed sort key, N+1 left in place"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 284.4,
+            "min_ms": 211.3,
+            "p50_ms": 229.7,
+            "p95_ms": 284.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?limit=500&sort=size:desc"
+        },
+        {
+          "bytes_": 211400,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 500,
+          "method": "GET",
+          "name": "assets-max-page-unindexed-sort-no-n1",
+          "notes": [
+            "the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 235.0,
+            "min_ms": 195.6,
+            "p50_ms": 223.0,
+            "p95_ms": 235.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?include=external_ids&limit=500&sort=size:desc"
+        },
+        {
+          "bytes_": 209925,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 500,
+          "method": "GET",
+          "name": "assets-indexed-sort-no-n1",
+          "notes": [
+            "control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 234.5,
+            "min_ms": 205.7,
+            "p50_ms": 216.4,
+            "p95_ms": 234.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?include=external_ids&limit=500&sort=id:asc"
+        },
+        {
+          "bytes_": 20216,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-broadest-filter",
+          "notes": [
+            "substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 156.0,
+            "min_ms": 128.4,
+            "p50_ms": 138.9,
+            "p95_ms": 156.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?limit=50&path_part=e"
+        },
+        {
+          "bytes_": 19050,
+          "endpoint_key": "GET /api/assets/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "assets-deep-page",
+          "notes": [
+            "page 41 reached by following cursors; compare against assets-page-1",
+            "deep page reached by following 40 `page.next` cursors; a keyset endpoint offers no way to jump straight to it"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 140.5,
+            "min_ms": 119.8,
+            "p50_ms": 133.2,
+            "p95_ms": 140.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/?after=>i:5756&limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`duration`, `filename`, `size`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set",
-        "filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a full scan",
+        "unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,350 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,350 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost",
+        "measured p95 of 284ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
       "surface": {
@@ -2255,8 +4534,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -2701,7 +4980,32 @@
         "service": "MediaService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 28,
+          "endpoint_key": "GET /api/assets/by-scheme/{scheme_id}/{external_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "asset-by-scheme",
+          "notes": [
+            "measures the lookup, which costs the same whether or not it finds a row"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 97.2,
+            "min_ms": 82.0,
+            "p50_ms": 85.5,
+            "p95_ms": 97.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/by-scheme/2/capinv-probe-no-such-external-id"
+        }
+      ],
       "risks": [
         "unindexed lookup on `assets.external_ids`; the read is a sequential scan"
       ],
@@ -2860,8 +5164,8 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the lookup is not index-covered and measures p95 97ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -3118,7 +5422,30 @@
         "service": "MediaService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 373,
+          "endpoint_key": "GET /api/assets/{asset_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "asset-detail",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 128.6,
+            "min_ms": 101.8,
+            "p50_ms": 118.6,
+            "p95_ms": 128.6,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065"
+        }
+      ],
       "risks": [
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`"
       ],
@@ -3307,8 +5634,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 129ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -3859,7 +6186,30 @@
         "service": "MediaService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 28,
+          "endpoint_key": "GET /api/assets/{asset_id}/accessories",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-accessories",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 116.8,
+            "min_ms": 105.7,
+            "p50_ms": 112.9,
+            "p95_ms": 116.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/accessories"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -3960,8 +6310,8 @@
           "tests/unit/api/assets/test_files.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 117ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -4054,9 +6404,34 @@
         "service": "ArtworkService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/assets/{asset_id}/artwork",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-artwork",
+          "notes": [
+            "uncapped, and returns a bare array rather than a page"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 144.4,
+            "min_ms": 133.8,
+            "p50_ms": 138.8,
+            "p95_ms": 144.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/artwork"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -4219,8 +6594,8 @@
           "tests/unit/api/test_openapi_binary_uploads.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -4854,9 +7229,32 @@
         "service": "MediaService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/assets/{asset_id}/derived_assets",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-derived-assets",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 144.4,
+            "min_ms": 127.6,
+            "p50_ms": 131.6,
+            "p95_ms": 144.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/derived_assets"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -5005,8 +7403,8 @@
           "tests/unit/services/test_media_service.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -5374,10 +7772,33 @@
         "service": "ExternalIdentifierService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/assets/{asset_id}/ids",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-external-ids",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 97.5,
+            "min_ms": 79.0,
+            "p50_ms": 85.2,
+            "p95_ms": 97.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/ids"
+        }
+      ],
       "risks": [
         "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyExternalIdentifierRepository.list_for_entity (comprehension)",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -5495,8 +7916,8 @@
           "tests/integration/api/test_id_schemes_api.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -6380,9 +8801,32 @@
         "service": "MetadataService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 3004,
+          "endpoint_key": "GET /api/assets/{asset_id}/metadata",
+          "http_status": 200,
+          "item_count": 1,
+          "method": "GET",
+          "name": "asset-metadata",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 165.6,
+            "min_ms": 124.7,
+            "p50_ms": 137.6,
+            "p95_ms": 165.6,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/metadata"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -6493,8 +8937,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -7082,8 +9526,35 @@
         "service": "MetadataService",
         "unknowns": []
       },
-      "probes": [],
-      "risks": [],
+      "probes": [
+        {
+          "bytes_": 3002,
+          "endpoint_key": "GET /api/assets/{asset_id}/metadata/{metadata_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "asset-metadata-one",
+          "notes": [
+            "metadata_id is read from this asset's own metadata list"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 372.7,
+            "min_ms": 133.8,
+            "p50_ms": 144.8,
+            "p95_ms": 372.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/metadata/5617"
+        }
+      ],
+      "risks": [
+        "measured p95 of 373ms on `asset-metadata-one` is too slow to drive from a keystroke"
+      ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
         "handler_module": "app.routers.assets.metadata",
@@ -7202,8 +9673,8 @@
           "tests/unit/services/test_metadata_service.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 373ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -7814,9 +10285,32 @@
         "service": "StreamService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 699,
+          "endpoint_key": "GET /api/assets/{asset_id}/streams",
+          "http_status": 200,
+          "item_count": 3,
+          "method": "GET",
+          "name": "asset-streams",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 171.2,
+            "min_ms": 143.5,
+            "p50_ms": 148.4,
+            "p95_ms": 171.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/streams"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 3 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -7975,8 +10469,8 @@
           "tests/unit/api/assets/test_streams.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -8491,10 +10985,33 @@
         "service": "TagService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/assets/{asset_id}/tags",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-tags",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 144.1,
+            "min_ms": 133.9,
+            "p50_ms": 138.1,
+            "p95_ms": 144.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/tags"
+        }
+      ],
       "risks": [
         "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTagRepository.get_asset_tags (comprehension)",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -8612,8 +11129,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -9044,7 +11561,7 @@
       },
       "probes": [],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -9546,9 +12063,32 @@
         "service": "TitleContentService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/assets/{asset_id}/titles",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "asset-titles",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 155.7,
+            "min_ms": 130.4,
+            "p50_ms": 137.4,
+            "p95_ms": 155.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/titles"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -9679,8 +12219,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -9757,10 +12297,33 @@
         "service": "TransformRequestService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 1773,
+          "endpoint_key": "GET /api/assets/{asset_id}/transform_requests",
+          "http_status": 200,
+          "item_count": 4,
+          "method": "GET",
+          "name": "asset-transform-requests",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 152.4,
+            "min_ms": 132.1,
+            "p50_ms": 137.2,
+            "p95_ms": 152.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/assets/1065/transform_requests"
+        }
+      ],
       "risks": [
         "unindexed lookup on `media_transform_requests.asset_id`; the read is a sequential scan",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 4 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -9938,8 +12501,8 @@
           "tests/unit/api/assets/test_transform_requests.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 152ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -10450,7 +13013,32 @@
         "service": "ExternalIdentifierService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 81,
+          "endpoint_key": "GET /api/external-ids/resolve",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "external-id-resolve",
+          "notes": [
+            "the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 85.3,
+            "min_ms": 76.5,
+            "p50_ms": 81.4,
+            "p95_ms": 85.3,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -10556,8 +13144,8 @@
           "tests/integration/api/test_external_identifiers_api.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 85ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -10617,9 +13205,82 @@
         "service": "FileStreamService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/fetch/{asset_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "fetch-asset-stream",
+          "notes": [
+            "time-to-first-byte measured separately from total transfer; a 404 here means no file on this instance, not a broken endpoint -- see the note above",
+            "Accept-Ranges header absent"
+          ],
+          "reason": "expected status [200], got 404",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/fetch/1065"
+        },
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/fetch/{asset_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "fetch-asset-range",
+          "notes": [
+            "first mebibyte only; verifies Content-Range and Accept-Ranges; a 404 means no file on this instance",
+            "Accept-Ranges header absent"
+          ],
+          "reason": "expected status [206], got 404",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/fetch/1065"
+        },
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/fetch/{asset_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "fetch-asset-range-suffix",
+          "notes": [
+            "suffix range, the form a seek-to-end scrub issues; a 404 means no file on this instance",
+            "Accept-Ranges header absent"
+          ],
+          "reason": "expected status [206], got 404",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/fetch/1065"
+        },
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/fetch/{asset_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "fetch-asset-range-unsatisfiable",
+          "notes": [
+            "verifies the unsatisfiable case returns 416 with a Content-Range header; a 404 means no file on this instance",
+            "Accept-Ranges header absent"
+          ],
+          "reason": "expected status [416], got 404",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/fetch/1065"
+        }
+      ],
       "risks": [
-        "the response size is bounded by the file on disk, not by anything the API declares; a client that issues no Range header will be sent the whole asset"
+        "the response size is bounded by the file on disk, not by anything the API declares; a client that issues no Range header will be sent the whole asset",
+        "probe `fetch-asset-stream` failed: expected status [200], got 404",
+        "probe `fetch-asset-range` failed: expected status [206], got 404",
+        "probe `fetch-asset-range-suffix` failed: expected status [206], got 404",
+        "probe `fetch-asset-range-unsatisfiable` failed: expected status [416], got 404"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -10693,7 +13354,7 @@
           "tests/unit/api/test_file_stream_router.py"
         ]
       },
-      "verdict": "streaming behaviour was not measured — no probe reached a file on this instance. Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.",
+      "verdict": "streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404). Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.",
       "verdict_class": "unknown",
       "write_contract": null
     },
@@ -10733,7 +13394,32 @@
         "service": null,
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 210,
+          "endpoint_key": "GET /api/health",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "health",
+          "notes": [
+            "unauthenticated; opens its own database and Elasticsearch connections"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 108.2,
+            "min_ms": 96.2,
+            "p50_ms": 103.9,
+            "p95_ms": 108.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/health"
+        }
+      ],
       "risks": [
         "no authentication is required on this route"
       ],
@@ -10772,8 +13458,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 108ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -10816,9 +13502,32 @@
         "service": "IdSchemeService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 182,
+          "endpoint_key": "GET /api/id_schemes",
+          "http_status": 200,
+          "item_count": 3,
+          "method": "GET",
+          "name": "id-schemes-all",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 91.0,
+            "min_ms": 79.1,
+            "p50_ms": 88.4,
+            "p95_ms": 91.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/id_schemes"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 3 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -10886,8 +13595,8 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 91ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -11197,7 +13906,30 @@
         "service": "IdSchemeService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 62,
+          "endpoint_key": "GET /api/id_schemes/{scheme_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "id-scheme-one",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 105.9,
+            "min_ms": 85.6,
+            "p50_ms": 89.4,
+            "p95_ms": 105.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/id_schemes/2"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -11296,8 +14028,8 @@
           "tests/unit/api/test_id_schemes.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -11794,9 +14526,58 @@
         "service": "InboxService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/inbox",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "inbox-full",
+          "notes": [
+            "the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 3.1,
+            "min_ms": 1.8,
+            "p50_ms": 2.2,
+            "p95_ms": 3.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/inbox"
+        },
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/inbox",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "inbox-top-level",
+          "notes": [
+            "one level only, the cheapest useful request a client can make"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 1.8,
+            "min_ms": 1.6,
+            "p50_ms": 1.7,
+            "p95_ms": 1.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/inbox?depth=1"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -11901,8 +14682,8 @@
           "tests/unit/services/test_inbox_service.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -13002,7 +15783,30 @@
         "service": null,
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 15,
+          "endpoint_key": "GET /api/ping",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "ping",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 1.2,
+            "min_ms": 1.1,
+            "p50_ms": 1.2,
+            "p95_ms": 1.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/ping"
+        }
+      ],
       "risks": [
         "no authentication is required on this route"
       ],
@@ -13041,8 +15845,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 1ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -14607,11 +17411,71 @@
         "service": "TranscriptSearchService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/search/transcripts",
+          "http_status": 503,
+          "item_count": null,
+          "method": "GET",
+          "name": "search-transcripts-page-1",
+          "notes": [],
+          "reason": "expected status [200], got 503",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/search/transcripts?offset=0&q=the&size=25"
+        },
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/search/transcripts",
+          "http_status": 503,
+          "item_count": null,
+          "method": "GET",
+          "name": "search-transcripts-deep-page",
+          "notes": [
+            "last page inside the default 10,000 max_result_window",
+            "offset=9975 requested directly"
+          ],
+          "reason": "expected status [200], got 503",
+          "records_failure_mode": false,
+          "status": "error",
+          "timing": null,
+          "url": "/api/search/transcripts?offset=9975&q=the&size=25"
+        },
+        {
+          "bytes_": 54,
+          "endpoint_key": "GET /api/search/transcripts",
+          "http_status": 503,
+          "item_count": null,
+          "method": "GET",
+          "name": "search-transcripts-past-window",
+          "notes": [
+            "deliberately past max_result_window; records how the failure surfaces",
+            "offset=10000 requested directly",
+            "responded 503; the probe accepted any of [200, 500, 503], so read the status before the timing"
+          ],
+          "reason": null,
+          "records_failure_mode": true,
+          "status": "ok",
+          "timing": {
+            "max_ms": 2.9,
+            "min_ms": 2.4,
+            "p50_ms": 2.4,
+            "p95_ms": 2.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/search/transcripts?offset=10000&q=the&size=25"
+        }
+      ],
       "risks": [
         "filters that cannot use an index (`path_part`, `title_part`); each forces a full scan",
         "deep paging has a hard ceiling: from + size is bounded by the index's max_result_window (10,000 by default); beyond that the query is rejected outright rather than being slow",
-        "ordering is not stable under concurrent writes: Elasticsearch from/size over a relevance sort; a concurrent index write can shift scores and therefore row positions, so a row can be skipped or repeated across pages"
+        "ordering is not stable under concurrent writes: Elasticsearch from/size over a relevance sort; a concurrent index write can shift scores and therefore row positions, so a row can be skipped or repeated across pages",
+        "probe `search-transcripts-page-1` failed: expected status [200], got 503",
+        "probe `search-transcripts-deep-page` failed: expected status [200], got 503"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -14923,9 +17787,82 @@
         "service": "StreamService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 12050,
+          "endpoint_key": "GET /api/streams",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "streams-page-1",
+          "notes": [
+            "default first page a browse screen would issue"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 96.4,
+            "min_ms": 83.1,
+            "p50_ms": 87.6,
+            "p95_ms": 96.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/streams?limit=50"
+        },
+        {
+          "bytes_": 122994,
+          "endpoint_key": "GET /api/streams",
+          "http_status": 200,
+          "item_count": 500,
+          "method": "GET",
+          "name": "streams-max-page",
+          "notes": [
+            "largest permitted page; the old uncapped response was 65,739 rows and 15.15MB"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 125.1,
+            "min_ms": 110.9,
+            "p50_ms": 115.4,
+            "p95_ms": 125.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/streams?limit=500"
+        },
+        {
+          "bytes_": 742,
+          "endpoint_key": "GET /api/streams",
+          "http_status": 200,
+          "item_count": 3,
+          "method": "GET",
+          "name": "streams-by-asset",
+          "notes": [
+            "the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 93.8,
+            "min_ms": 84.8,
+            "p50_ms": 89.6,
+            "p95_ms": 93.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/streams?asset_id=1065&limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`codec_type`, `stream_index`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set"
+        "unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,230 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -15117,8 +18054,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -15161,7 +18098,30 @@
         "service": "StreamService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 231,
+          "endpoint_key": "GET /api/streams/{stream_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "stream-one",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 95.8,
+            "min_ms": 86.0,
+            "p50_ms": 93.4,
+            "p95_ms": 95.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/streams/2117"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -15321,8 +18281,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 96ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -15857,10 +18817,33 @@
         "service": "TagService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 8869,
+          "endpoint_key": "GET /api/tags",
+          "http_status": 200,
+          "item_count": 47,
+          "method": "GET",
+          "name": "tags-page-1",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 113.0,
+            "min_ms": 94.2,
+            "p50_ms": 100.6,
+            "p95_ms": 113.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/tags?limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`color`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set",
-        "filters that cannot use an index (`name`); each forces a full scan"
+        "unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -16020,8 +19003,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -16361,7 +19344,30 @@
         "service": "TagService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 212,
+          "endpoint_key": "GET /api/tags/{tag_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "tag-detail",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 86.5,
+            "min_ms": 75.3,
+            "p50_ms": 81.2,
+            "p95_ms": 86.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/tags/1"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -16479,8 +19485,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 86ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -16890,10 +19896,35 @@
         "service": "TagService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 45,
+          "endpoint_key": "GET /api/tags/{tag_id}/tags",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "child-tags",
+          "notes": [
+            "keyset like the parent listing; first screen of one tag's children"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 120.4,
+            "min_ms": 104.9,
+            "p50_ms": 111.8,
+            "p95_ms": 120.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/tags/1/tags?limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`color`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set",
-        "filters that cannot use an index (`name`); each forces a full scan"
+        "unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -17066,8 +20097,8 @@
           "tests/unit/api/test_tags.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -17420,9 +20451,34 @@
         "service": "TitleTypeService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 497,
+          "endpoint_key": "GET /api/title_types",
+          "http_status": 200,
+          "item_count": 8,
+          "method": "GET",
+          "name": "title-types-all",
+          "notes": [
+            "bounded by the number of title types, which is small and fixed"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 111.7,
+            "min_ms": 79.9,
+            "p50_ms": 90.3,
+            "p95_ms": 111.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/title_types"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 8 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -17487,8 +20543,8 @@
           "tests/integration/api/test_title_types_api.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 112ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -18029,7 +21085,30 @@
         "service": "TitleTypeService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 66,
+          "endpoint_key": "GET /api/title_types/{title_type_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "title-type-one",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 91.7,
+            "min_ms": 82.0,
+            "p50_ms": 85.7,
+            "p95_ms": 91.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/title_types/4"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -18128,8 +21207,8 @@
           "tests/unit/services/test_title_type_service.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 92ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -18660,9 +21739,238 @@
         "service": "TitleService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 42241,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-page-1",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 144.3,
+            "min_ms": 106.1,
+            "p50_ms": 111.4,
+            "p95_ms": 144.3,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50"
+        },
+        {
+          "bytes_": 37909,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-resolving-page-1",
+          "notes": [
+            "the hit path -- 50 rows that each resolve a display image, every one of them borrowed from a contained asset. Pairs with `titles-not-resolving-page-1`, and the gap between them is what the walk costs when it fails."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 152.4,
+            "min_ms": 134.8,
+            "p50_ms": 145.0,
+            "p95_ms": 152.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50&resolves_display_image=True"
+        },
+        {
+          "bytes_": 42241,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-not-resolving-page-1",
+          "notes": [
+            "the miss path -- rows where the walk ascends to its depth cap and finds nothing. 181 of 1,136 library roots are in this state, and every one of them is a hole in the grid that needs the typographic treatment."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 161.4,
+            "min_ms": 138.5,
+            "p50_ms": 144.7,
+            "p95_ms": 161.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50&resolves_display_image=False"
+        },
+        {
+          "bytes_": 45,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "titles-owning-artwork",
+          "notes": [
+            "not a timing measurement -- a recorded fact. This returns an empty page on the whole library: no Title holds artwork of its own, so every image the grid shows is borrowed from an asset through the resolution chain. A design that assumes a title can own its poster has nothing behind it."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 111.2,
+            "min_ms": 89.1,
+            "p50_ms": 96.5,
+            "p95_ms": 111.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?has_artwork=True&limit=50"
+        },
+        {
+          "bytes_": 16602,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-unparented-page-1",
+          "notes": [
+            "titles with no home that are not deliberate entry points either. Rootness is stored rather than derived from having a parent (#91), so this is the conjunction of two filters and not one -- a library root with no parent is not misplaced. Served by `uq_one_intrinsic_parent`, whose partial predicate is exactly this condition."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 120.9,
+            "min_ms": 97.0,
+            "p50_ms": 98.9,
+            "p95_ms": 120.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?has_intrinsic_parent=False&library_root=False&limit=50"
+        },
+        {
+          "bytes_": 19811,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-parented-page-1",
+          "notes": [
+            "the pair's other half, and a cross-check: this returns the same set as `membership=intrinsic`, which is the half the containment filter could already express. A divergence between them is a bug in one of the two."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 109.1,
+            "min_ms": 99.8,
+            "p50_ms": 102.1,
+            "p95_ms": 109.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?has_intrinsic_parent=True&limit=50"
+        },
+        {
+          "bytes_": 142288,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 200,
+          "method": "GET",
+          "name": "titles-poster-scaling-200-rows",
+          "notes": [
+            "poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 143.8,
+            "min_ms": 119.6,
+            "p50_ms": 132.0,
+            "p95_ms": 143.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?include=poster&limit=200"
+        },
+        {
+          "bytes_": 32394,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-newest-page",
+          "notes": [
+            "the newest page, which a \"recently added\" view would issue. Compare against `titles-page-1` for the effect of sort order, and against the `has_artwork` pair above for the cost of resolution itself."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 114.1,
+            "min_ms": 93.3,
+            "p50_ms": 103.9,
+            "p95_ms": 114.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50&sort=id:desc"
+        },
+        {
+          "bytes_": 44116,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "titles-name-substring",
+          "notes": [
+            "leading-wildcard name search, the broadest a UI search box can send"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 124.4,
+            "min_ms": 101.7,
+            "p50_ms": 104.3,
+            "p95_ms": 124.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/?limit=50&name=e"
+        },
+        {
+          "bytes_": null,
+          "endpoint_key": "GET /api/titles/",
+          "http_status": null,
+          "item_count": null,
+          "method": "GET",
+          "name": "titles-deep-page",
+          "notes": [],
+          "reason": "the collection ran out after 33 pages of 50, so there is no page 41 to measure on this instance",
+          "records_failure_mode": false,
+          "status": "unavailable",
+          "timing": null,
+          "url": "/api/titles/?limit=50"
+        }
+      ],
       "risks": [
-        "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
+        "static analysis flags queries inside a loop — **contradicted by measurement** and downgraded: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension). `titles-page-1` returns 50 rows at p50 111ms and `titles-poster-scaling-200-rows` returns 200 at p50 132ms — 21ms for 150 extra rows, against the ~3.8s a genuine query-per-row would cost at the measured 26ms round trip. The queries inside these comprehensions are issued once for the page, not once per row.",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`"
       ],
       "surface": {
@@ -18957,8 +22265,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 161ms. Suitable as the backing query for a virtualised full-library scroll.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -19352,7 +22660,32 @@
         "service": "TitleService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 28,
+          "endpoint_key": "GET /api/titles/by-scheme/{scheme_id}/{external_id}",
+          "http_status": 404,
+          "item_count": null,
+          "method": "GET",
+          "name": "title-by-scheme",
+          "notes": [
+            "measures the lookup, which costs the same whether or not it finds a row"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 108.4,
+            "min_ms": 77.6,
+            "p50_ms": 81.8,
+            "p95_ms": 108.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/by-scheme/2/capinv-probe-no-such-external-id"
+        }
+      ],
       "risks": [
         "unindexed lookup on `titles.external_ids`; the read is a sequential scan"
       ],
@@ -19470,8 +22803,8 @@
         "strength": "weak",
         "test_references": []
       },
-      "verdict": "the read is not index-covered, and it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the lookup is not index-covered and measures p95 108ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -20480,11 +23813,36 @@
         "service": "TitleContentService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 542,
+          "endpoint_key": "GET /api/titles/{parent_title_id}/contents",
+          "http_status": 200,
+          "item_count": 1,
+          "method": "GET",
+          "name": "title-contents",
+          "notes": [
+            "unpaginated child list; size is whatever that title happens to hold"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 184.4,
+            "min_ms": 167.5,
+            "p50_ms": 172.2,
+            "p95_ms": 184.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/contents"
+        }
+      ],
       "risks": [
         "one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`",
         "one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -20626,8 +23984,8 @@
           "tests/unit/api/titles/test_contents.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -23740,9 +27098,57 @@
         "service": "TitleService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 751,
+          "endpoint_key": "GET /api/titles/{title_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "title-detail",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 214.7,
+            "min_ms": 188.9,
+            "p50_ms": 202.0,
+            "p95_ms": 214.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1"
+        },
+        {
+          "bytes_": 751,
+          "endpoint_key": "GET /api/titles/{title_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "title-detail-with-poster",
+          "notes": [
+            "pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 210.8,
+            "min_ms": 187.4,
+            "p50_ms": 193.3,
+            "p95_ms": 210.8,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1?include=poster"
+        }
+      ],
       "risks": [
         "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)",
+        "measured p95 of 215ms on `title-detail` is too slow to drive from a keystroke",
         "fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`"
       ],
       "surface": {
@@ -23921,8 +27327,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 215ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -24383,9 +27789,58 @@
         "service": "ArtworkService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/titles/{title_id}/artwork",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "title-artwork",
+          "notes": [
+            "uncapped, and returns a bare array rather than a page"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 129.5,
+            "min_ms": 111.0,
+            "p50_ms": 118.3,
+            "p95_ms": 129.5,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/artwork"
+        },
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/titles/{title_id}/artwork",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "title-artwork-by-kind",
+          "notes": [
+            "the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 157.2,
+            "min_ms": 137.1,
+            "p50_ms": 145.2,
+            "p95_ms": 157.2,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/artwork?kind=poster"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -24546,8 +28001,8 @@
           "tests/unit/api/test_openapi_artwork_request_fields.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -25161,10 +28616,35 @@
         "service": "ExternalIdentifierService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/titles/{title_id}/ids",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "title-ids",
+          "notes": [
+            "uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 106.0,
+            "min_ms": 80.8,
+            "p50_ms": 90.7,
+            "p95_ms": 106.0,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/ids"
+        }
+      ],
       "risks": [
         "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyExternalIdentifierRepository.list_for_entity (comprehension)",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -25280,8 +28760,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -26170,9 +29650,34 @@
         "service": "TitleContentService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 275,
+          "endpoint_key": "GET /api/titles/{title_id}/parents",
+          "http_status": 200,
+          "item_count": 1,
+          "method": "GET",
+          "name": "title-parents",
+          "notes": [
+            "uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing"
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 170.9,
+            "min_ms": 140.5,
+            "p50_ms": 147.2,
+            "p95_ms": 170.9,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/parents"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -26300,8 +29805,8 @@
           "tests/integration/api/test_title_parents.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -26368,9 +29873,32 @@
         "service": "TitleReferenceService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/titles/{title_id}/references",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "title-references",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 133.7,
+            "min_ms": 112.3,
+            "p50_ms": 117.1,
+            "p95_ms": 133.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/references"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -26476,8 +30004,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -27134,10 +30662,33 @@
         "service": "TagService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/titles/{title_id}/tags",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "title-tags",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 121.1,
+            "min_ms": 106.3,
+            "p50_ms": 110.3,
+            "p95_ms": 121.1,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/titles/1/tags"
+        }
+      ],
       "risks": [
         "queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTagRepository.get_title_tags (comprehension)",
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -27254,8 +30805,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 121ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -27685,7 +31236,7 @@
       },
       "probes": [],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -28237,10 +31788,33 @@
         "service": "TransformRequestService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 46678,
+          "endpoint_key": "GET /api/transform_requests",
+          "http_status": 200,
+          "item_count": 50,
+          "method": "GET",
+          "name": "transform-requests-page-1",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 188.6,
+            "min_ms": 169.9,
+            "p50_ms": 177.7,
+            "p95_ms": 188.6,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/transform_requests?limit=50"
+        }
+      ],
       "risks": [
-        "unindexed sort keys (`created_at`, `processed_at`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set",
-        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a full scan"
+        "unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,312 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows",
+        "filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,312 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -28486,8 +32060,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.",
+      "verdict_class": "caution",
       "write_contract": null
     },
     {
@@ -28903,7 +32477,30 @@
         "service": "TransformRequestService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 568,
+          "endpoint_key": "GET /api/transform_requests/{request_id}",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "transform-request-detail",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 96.6,
+            "min_ms": 83.0,
+            "p50_ms": 86.9,
+            "p95_ms": 96.6,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/transform_requests/21355"
+        }
+      ],
       "risks": [],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -29082,8 +32679,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -30255,9 +33852,34 @@
         "service": "TransformRequestService",
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 2,
+          "endpoint_key": "GET /api/transform_requests/{request_id}/logs",
+          "http_status": 200,
+          "item_count": 0,
+          "method": "GET",
+          "name": "transform-request-logs",
+          "notes": [
+            "an external round-trip to the orchestration backend, not a database read. Capped at the provider's log limit (100 by default), so the worst case is bounded by that rather than by the collection size. An item count of 0 means the backend returned no lines -- the endpoint did its work, but the timing is then the cost of reaching an orchestration backend that had nothing to give, not of rendering a full log."
+          ],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 118.7,
+            "min_ms": 88.5,
+            "p50_ms": 101.8,
+            "p95_ms": 118.7,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/transform_requests/21355/logs"
+        }
+      ],
       "risks": [
-        "no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3"
+        "no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent"
       ],
       "surface": {
         "auth": "bearer, no scope or role enforced at the route",
@@ -30362,8 +33984,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 119ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.",
+      "verdict_class": "safe",
       "write_contract": null
     },
     {
@@ -30712,7 +34334,30 @@
         "service": null,
         "unknowns": []
       },
-      "probes": [],
+      "probes": [
+        {
+          "bytes_": 61,
+          "endpoint_key": "GET /api/version",
+          "http_status": 200,
+          "item_count": null,
+          "method": "GET",
+          "name": "version",
+          "notes": [],
+          "reason": null,
+          "records_failure_mode": false,
+          "status": "ok",
+          "timing": {
+            "max_ms": 8.4,
+            "min_ms": 2.1,
+            "p50_ms": 3.8,
+            "p95_ms": 8.4,
+            "runs": 7,
+            "ttfb_p50_ms": null,
+            "ttfb_p95_ms": null
+          },
+          "url": "/api/version"
+        }
+      ],
       "risks": [
         "no authentication is required on this route"
       ],
@@ -30751,8 +34396,8 @@
           "tests/unit/tools/test_capability_inventory.py"
         ]
       },
-      "verdict": "the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.",
-      "verdict_class": "unknown",
+      "verdict": "p95 8ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.",
+      "verdict_class": "safe",
       "write_contract": null
     }
   ],
@@ -32007,30 +35652,21 @@
     }
   ],
   "notes": [
+    "Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.",
+    "Probed `http://127.0.0.1:8137` with 74 probe(s).",
     "Phase 6 probed `http://127.0.0.1:8077` against a disposable database (fingerprint `644092952611`), verified bound to it by sentinel before any write. 12 of 13 write scenarios executed; 2 idempotent, 6 guarded, 0 duplicating.",
     "No scratch media root was configured, so filesystem-touching write probes were skipped rather than run against a real one."
   ],
   "phases_run": [
     "1 (static surface)",
     "2 (code annotation)",
+    "3 (data shape)",
+    "4 (timed probes)",
     "5 (dead surface)",
     "6 (write semantics)"
   ],
-  "phases_skipped": [
-    "3 (data shape)",
-    "4 (timed probes)"
-  ],
+  "phases_skipped": [],
   "unknowns": [
-    {
-      "question": "row counts, fill rates, cardinality and collection sizes",
-      "resolution": "re-run without --skip-db and with CAPINV_DATABASE_URL set to a read-only connection string",
-      "scope": "Phase 3"
-    },
-    {
-      "question": "latency percentiles, payload sizes and Range handling",
-      "resolution": "re-run without --skip-probes and with CAPINV_BASE_URL pointing at a running instance backed by a realistic library",
-      "scope": "Phase 4"
-    },
     {
       "question": "whether an endpoint has any real caller",
       "resolution": "re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories",

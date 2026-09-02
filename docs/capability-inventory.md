@@ -10,9 +10,14 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 
 - **Source:** media-api @ app.openapi()
 - **App version:** 6.1.0
-- **Phases run:** 1 (static surface), 2 (code annotation), 5 (dead surface), 6 (write semantics)
-- **Phases skipped:** 3 (data shape), 4 (timed probes)
+- **Phases run:** 1 (static surface), 2 (code annotation), 3 (data shape), 4 (timed probes), 5 (dead surface), 6 (write semantics)
+- **Phases skipped:** none
 - **Endpoints:** 108
+- **Database:** read-only Postgres, connection fingerprint 5ee609328cdc (supplied via CAPINV_DATABASE_URL; host, database and credentials not recorded)
+- **Server:** PostgreSQL 17.9 (Debian 17.9-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+- **Baseline database round trip:** 26ms median for `SELECT 1`. This is the unit cost of a query issued once per row, and it is a property of where the harness ran relative to the database rather than of the API. An API co-located with its database would see a far smaller number for the same defect — so read a per-row cost below as evidence of *how many* queries an endpoint issues, and treat the absolute milliseconds as specific to this measurement setup.
+- Example column values were withheld (`--include-example-values` not passed): distinct counts and fill rates are recorded, the underlying rows are not.
+- Probed `http://127.0.0.1:8137` with 74 probe(s).
 - Phase 6 probed `http://127.0.0.1:8077` against a disposable database (fingerprint `644092952611`), verified bound to it by sentinel before any write. 12 of 13 write scenarios executed; 2 idempotent, 6 guarded, 0 duplicating.
 - No scratch media root was configured, so filesystem-touching write probes were skipped rather than run against a real one.
 
@@ -20,82 +25,82 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 
 | Endpoint | Auth | Paging | Measured p95 | Verdict | One-line judgement |
 |---|---|---|---|---|---|
-| `GET /api/artwork` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/artwork` | bearer | keyset | 114ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `DELETE /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/artwork/{artwork_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/artwork/{artwork_id}` | bearer | **none** | 99ms | safe | p95 99ms, index-covered |
 | `PATCH /api/artwork/{artwork_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/artwork_kinds` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
-| `GET /api/assets/` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/artwork_kinds` | bearer | **none** | 105ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly |
+| `GET /api/assets/` | bearer | keyset | 284ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/assets/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is not index-covered, and it was not timed; see Gaps |
+| `GET /api/assets/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 97ms | caution | the lookup is not index-covered and measures p95 97ms, which will grow with the table |
 | `PATCH /api/assets/seen` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/assets/{asset_id}` | bearer | **none** | 129ms | safe | p95 129ms, index-covered |
 | `PATCH /api/assets/{asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
-| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/accessories` | bearer | **none** | 117ms | safe | p95 117ms, index-covered |
+| `GET /api/assets/{asset_id}/artwork` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/derived_assets` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `PUT /api/assets/{asset_id}/derived_assets/{child_asset_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/ids` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/ids` | bearer | **none** | 98ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/assets/{asset_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/metadata` | bearer | **none** | 166ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/metadata` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | **none** | 373ms | caution | p95 373ms — fine for a detail view, too slow to fire on every keystroke |
 | `PATCH /api/assets/{asset_id}/metadata/{metadata_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `DELETE /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/streams` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/streams` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/streams` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/tags` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/tags` | bearer | **none** | 144ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PUT /api/assets/{asset_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/assets/{asset_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/assets/{asset_id}/titles` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
-| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/assets/{asset_id}/titles` | bearer | **none** | 156ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly |
+| `GET /api/assets/{asset_id}/transform_requests` | bearer | **none** | 152ms | safe | the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 152ms, so it is fine to render directly |
 | `POST /api/assets/{asset_id}/transform_requests` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/external-ids/resolve` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
-| `GET /api/fetch/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | streaming behaviour was not measured — no probe reached a file on this instance |
-| `GET /api/health` | **none** | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
-| `GET /api/id_schemes` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/external-ids/resolve` | bearer | **none** | 85ms | safe | p95 85ms, index-covered |
+| `GET /api/fetch/{asset_id}` | bearer | **none** | UNKNOWN | UNKNOWN | streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404) |
+| `GET /api/health` | **none** | **none** | 108ms | safe | p95 108ms, index-covered |
+| `GET /api/id_schemes` | bearer | **none** | 91ms | safe | the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 91ms, so it is fine to render directly |
 | `POST /api/id_schemes` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
-| `GET /api/id_schemes/{scheme_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/id_schemes/{scheme_id}` | bearer | **none** | 106ms | safe | p95 106ms, index-covered |
 | `PATCH /api/id_schemes/{scheme_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `DELETE /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
-| `GET /api/inbox` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/inbox` | bearer | **none** | 3ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly |
 | `POST /api/inbox` | bearer | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
 | `POST /api/jobs` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `PATCH /api/jobs/{job_key}/completed` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `PUT /api/jobs/{job_key}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/log` | **none** | — | UNKNOWN | caution | Usable, with handling — it writes outside the database as well as inside it and can half-succeed, so the interface must re-read rather than trust… |
-| `GET /api/ping` | **none** | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/ping` | **none** | **none** | 1ms | safe | p95 1ms, index-covered |
 | `POST /api/run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/runner_state` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/runner_state/{runner_key}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
 | `PATCH /api/runner_state/{runner_key}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `POST /api/scanner_run_summaries` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `GET /api/search/transcripts` | bearer | offset | UNKNOWN | UNKNOWN | offset paging over Elasticsearch has a hard result-window ceiling, but where it falls on this index was not measured; see Gaps |
-| `GET /api/streams` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
-| `GET /api/streams/{stream_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/streams` | bearer | keyset | 125ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
+| `GET /api/streams/{stream_id}` | bearer | **none** | 96ms | safe | p95 96ms, index-covered |
 | `PATCH /api/streams/{stream_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/tags` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/tags` | bearer | keyset | 113ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
-| `GET /api/tags/{tag_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/tags/{tag_id}` | bearer | **none** | 86ms | safe | p95 86ms, index-covered |
 | `PATCH /api/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/tags/{tag_id}/tags` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/tags/{tag_id}/tags` | bearer | keyset | 120ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/tags/{tag_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/title_types` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/title_types` | bearer | **none** | 112ms | safe | the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 112ms, so it is fine to render directly |
 | `POST /api/title_types` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/title_types/{title_type_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/title_types/{title_type_id}` | bearer | **none** | 92ms | safe | p95 92ms, index-covered |
 | `PATCH /api/title_types/{title_type_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/titles/` | bearer | keyset | 161ms | safe | cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 161ms |
 | `POST /api/titles/` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is not index-covered, and it was not timed; see Gaps |
+| `GET /api/titles/by-scheme/{scheme_id}/{external_id}` | bearer | **none** | 108ms | caution | the lookup is not index-covered and measures p95 108ms, which will grow with the table |
 | `POST /api/titles/{destination_title_id}/contents/batch/move` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `POST /api/titles/{destination_title_id}/contents/{title_contents_id}/move` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
-| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/titles/{parent_title_id}/contents` | bearer | **none** | 184ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly |
 | `POST /api/titles/{parent_title_id}/contents` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `POST /api/titles/{parent_title_id}/contents/batch` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `POST /api/titles/{parent_title_id}/contents/batch/detach` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
@@ -103,31 +108,45 @@ Read the [Summary](#summary) to triage, one section to understand one endpoint, 
 | `DELETE /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `PATCH /api/titles/{parent_title_id}/contents/{title_contents_id}/reorder` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/{title_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/titles/{title_id}` | bearer | **none** | 215ms | caution | p95 215ms — fine for a detail view, too slow to fire on every keystroke |
 | `PATCH /api/titles/{title_id}` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
-| `GET /api/titles/{title_id}/artwork` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/titles/{title_id}/artwork` | bearer | **none** | 157ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/artwork` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/titles/{title_id}/ids` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/titles/{title_id}/ids` | bearer | **none** | 106ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/ids` | bearer | — | UNKNOWN | caution | Usable, with handling — a repeat is refused with a conflict, which a retrying client must treat as success rather than as a new error; some failures… |
 | `DELETE /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{title_id}/ids/{record_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/{title_id}/parents` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
-| `GET /api/titles/{title_id}/references` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/titles/{title_id}/parents` | bearer | **none** | 171ms | safe | the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly |
+| `GET /api/titles/{title_id}/references` | bearer | **none** | 134ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/references` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `PATCH /api/titles/{title_id}/references/{reference_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
-| `GET /api/titles/{title_id}/tags` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/titles/{title_id}/tags` | bearer | **none** | 121ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 121ms, so it is fine to render directly |
 | `POST /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | safe | Nothing a form has to work around: a partial submit is safe, a repeat is harmless, and failures come back legible |
 | `PUT /api/titles/{title_id}/tags` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
 | `DELETE /api/titles/{title_id}/tags/{tag_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/transform_requests` | bearer | keyset | UNKNOWN | UNKNOWN | cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps |
+| `GET /api/transform_requests` | bearer | keyset | 189ms | caution | the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll |
 | `POST /api/transform_requests/claim` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
-| `GET /api/transform_requests/{request_id}` | bearer | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/transform_requests/{request_id}` | bearer | **none** | 97ms | safe | p95 97ms, index-covered |
 | `PATCH /api/transform_requests/{request_id}` | bearer | — | UNKNOWN | caution | Usable, with handling — omitted fields are left unchanged, so a partial form is safe -- but an explicit null is discarded too, so the interface must… |
 | `PATCH /api/transform_requests/{request_id}/heartbeat` | bearer | — | UNKNOWN | caution | Usable, with handling — this is a worker-fleet route rather than a front-end one, and a UI should not be designed against it; no write probe… |
 | `POST /api/transform_requests/{request_id}/link` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | UNKNOWN | UNKNOWN | this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured |
+| `GET /api/transform_requests/{request_id}/logs` | bearer | **none** | 119ms | safe | the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 119ms, so it is fine to render directly |
 | `PATCH /api/transform_requests/{request_id}/retry` | bearer | — | UNKNOWN | caution | Usable, with handling — no write probe exercised it, so repetition is unverified — treat a retry after a dropped connection as unsafe until it is |
-| `GET /api/version` | **none** | **none** | UNKNOWN | UNKNOWN | the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps |
+| `GET /api/version` | **none** | **none** | 8ms | safe | p95 8ms, index-covered |
+
+## Coverage
+
+Measured over the rows a surface actually renders, not over whole tables. The library grid shows `library_root=true` Titles and makes first-class views out of what they are missing, so these are the figures its design depends on.
+
+| Population | Attribute | Covered | Of | Share |
+|---|---|---|---|---|
+| Titles with library_root=true | resolve a display image (the API's own resolution) | 957 | 1,137 | **84%** |
+| Titles with library_root=true | have a release_year | 879 | 1,137 | **77%** |
+| Titles with library_root=true | have at least one tag | 851 | 1,137 | **75%** |
+
+- **resolve a display image (the API's own resolution)** — the browse grid's central design constraint: every root that does not resolve one needs the typographic treatment, so this is the proportion of the grid that is *not* a poster wall. Measured with the API's own resolution query, so it matches what `resolves_display_image=true` returns rather than approximating it.
+- **have a release_year** — drives the 'titles with no year' view, and any sort or facet by year.
+- **have at least one tag** — decides whether tag filter chips are a primary navigation device or a sparse one.
 
 ## Endpoints
 
@@ -135,7 +154,7 @@ All 108 endpoints have a section below, including each of the 63 that write. Wri
 
 ### GET /api/artwork
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -175,16 +194,20 @@ All 108 endpoints have a section below, including each of the 63 that write. Wri
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 50 item(s); the largest was 17.0KB (`artwork-deep-page`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `artwork-deep-page` (`/api/artwork?after=>i:1000&limit=50`): p50 89ms · p95 109ms · 17.0KB · 50 items · n=7 — page 21 by cursor; compare against artwork-page-1. Kept beside the other deep walks rather than in the artwork section, because what it measures is cursor stability at depth rather than anything about artwork
+  - deep page reached by following 20 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
+- `artwork-page-1` (`/api/artwork?limit=50`): p50 99ms · p95 114ms · 16.8KB · 50 items · n=7 — default first page of the collection route. Unlike the nested per-entity artwork reads above this one is capped by `KeysetPagination`, so it is the only artwork listing whose cost does not grow with the entity behind it
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
-- filters that cannot use an index (`entity_id`, `is_primary`); each forces a full scan
+- unindexed sort keys (`created_at`, `entity_id`, `is_primary`); every page sorts the whole filtered set, but `artwork` holds only 1,218 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`entity_id`, `is_primary`); each forces a sequential scan, though `artwork` holds only 1,218 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -216,7 +239,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `artwork`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -267,7 +290,7 @@ None identified by this run.
 
 ### GET /api/artwork/{artwork_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 99ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -295,11 +318,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `artwork-one` (`/api/artwork/1`): p50 86ms · p95 99ms · 343B · n=7 — index-covered detail read. Reports `unavailable` rather than a timing on an instance holding no artwork -- see the note on the `artwork_id` variable
 
 #### Risk
 
@@ -351,7 +374,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -398,7 +421,7 @@ None identified by this run.
 
 ### GET /api/artwork_kinds
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 105ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -420,21 +443,23 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork_kinds`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork_kinds`](#table-artwork_kinds) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 8 item(s); the largest was 1.1KB (`artwork-kinds`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `artwork-kinds` (`/api/artwork_kinds`): p50 87ms · p95 105ms · 1.1KB · 8 items · n=7 — bounded by the seeded kinds, which is small and fixed at six
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 8 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
 ### GET /api/assets/
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -483,21 +508,35 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `asset_tags`, `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`asset_tags`](#table-asset_tags) · [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 **Empty unless requested.** These fields serialise as an empty collection when the caller does not ask for them, which is indistinguishable from genuinely having none:
 
 - `master_asset` — populated only with `include=master_asset`
 - `tags` — populated only with `include=tags`
 
+Own probe responses carried 10 to 500 items; the largest was 206.4KB (`assets-max-page-unindexed-sort`).
+
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `assets-page-1` (`/api/assets/?limit=50`): p50 141ms · p95 150ms · 19.7KB · 50 items · n=7 — default first page a browse screen would issue
+- `assets-page-1-with-includes` (`/api/assets/?include=tags,master_asset,external_ids&limit=50`): p50 179ms · p95 189ms · 19.7KB · 50 items · n=7 — same page with every optional relation eager-loaded
+- `assets-unplaced-page-1` (`/api/assets/?has_intrinsic_parent=False&limit=50`): p50 140ms · p95 143ms · 19.7KB · 50 items · n=7 — the drag source -- assets with no intrinsic home, which is the queue the whole placement workflow starts from. Curated listings deliberately do not count as placed, so an asset sitting only in a collection appears here. Pairs with `assets-placed-page-1`; the two should partition `assets`.
+- `assets-placed-page-1` (`/api/assets/?has_intrinsic_parent=True&limit=50`): p50 144ms · p95 156ms · 19.4KB · 50 items · n=7 — the other half of the pair. Both directions are served by `ix_title_contents_asset_membership`, whose leading column is `asset_id` -- nothing indexed that column before #177, and `uq_parent_asset_once` cannot serve it because it leads with `parent_title_id`.
+- `assets-scaling-10-rows` (`/api/assets/?limit=10`): p50 121ms · p95 129ms · 4.0KB · 10 items · n=7 — N+1 scaling, 10 rows
+- `assets-scaling-200-rows` (`/api/assets/?limit=200`): p50 160ms · p95 173ms · 81.7KB · 200 items · n=7 — N+1 scaling, 200 rows -- compare against the 10- and 50-row probes
+- `assets-max-page-unindexed-sort` (`/api/assets/?limit=500&sort=size:desc`): p50 230ms · p95 284ms · 206.4KB · 500 items · n=7 — largest permitted page on an unindexed sort key, N+1 left in place
+- `assets-max-page-unindexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=size:desc`): p50 223ms · p95 235ms · 206.4KB · 500 items · n=7 — the same worst case with the per-row lazy load eliminated. The gap between this and the probe above is the N+1; what remains is the sort itself
+- `assets-indexed-sort-no-n1` (`/api/assets/?include=external_ids&limit=500&sort=id:asc`): p50 216ms · p95 234ms · 205.0KB · 500 items · n=7 — control for the probe above -- an indexed sort key with the N+1 removed, so the two differ only in whether the sort column is indexed
+- `assets-broadest-filter` (`/api/assets/?limit=50&path_part=e`): p50 139ms · p95 156ms · 19.7KB · 50 items · n=7 — substring filter matching almost everything; sequential scan by construction. One character on purpose, and it is the reason this does not contradict the coverage row above: `ix_assets_path_trgm` serves this filter from three characters up, and a pattern shorter than that contains no whole trigram, so the planner cannot use it. This measures that floor rather than the ordinary case
+- `assets-deep-page` (`/api/assets/?after=>i:5756&limit=50`): p50 133ms · p95 140ms · 18.6KB · 50 items · n=7 — page 41 reached by following cursors; compare against assets-page-1
+  - deep page reached by following 40 `page.next` cursors; a keyset endpoint offers no way to jump straight to it
 
 #### Risk
 
-- unindexed sort keys (`duration`, `filename`, `size`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
-- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a full scan
+- unindexed sort keys (`duration`, `filename`, `size`); every page sorts the whole filtered set, but `assets` holds only 13,350 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`duration_max`, `duration_min`, `size_max`, `size_min`); each forces a sequential scan, though `assets` holds only 13,350 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
+- measured p95 of 284ms on `assets-max-page-unindexed-sort` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `master_asset`, `tags`
 
 ---
@@ -534,7 +573,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -584,7 +623,7 @@ None identified by this run.
 
 ### GET /api/assets/by-scheme/{scheme_id}/{external_id}
 
-> **UNKNOWN** — the read is not index-covered, and it was not timed; see Gaps.
+> **CAUTION** — the lookup is not index-covered and measures p95 97ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -614,11 +653,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-by-scheme` (`/api/assets/by-scheme/2/capinv-probe-no-such-external-id`): p50 86ms · p95 97ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -654,7 +693,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -696,7 +735,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 129ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -725,7 +764,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 **Empty unless requested.** These fields serialise as an empty collection when the caller does not ask for them, which is indistinguishable from genuinely having none:
 
@@ -734,7 +773,7 @@ Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-detail` (`/api/assets/1065`): p50 119ms · p95 129ms · 373B · n=7
 
 #### Risk
 
@@ -782,7 +821,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -839,7 +878,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/accessories
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 117ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -869,11 +908,13 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 28B (`asset-accessories`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-accessories` (`/api/assets/1065/accessories`): p50 113ms · p95 117ms · 28B · 0 items · n=7
 
 #### Risk
 
@@ -883,7 +924,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/artwork
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -915,15 +956,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `assets`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`asset-artwork`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-artwork` (`/api/assets/1065/artwork`): p50 139ms · p95 144ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -973,7 +1016,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `assets`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1024,7 +1067,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/derived_assets
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1055,15 +1098,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`asset-derived-assets`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-derived-assets` (`/api/assets/1065/derived_assets`): p50 132ms · p95 144ms · 2B · 0 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -1102,7 +1147,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1143,7 +1188,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/ids
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 98ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1171,16 +1216,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`, `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) · [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`asset-external-ids`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-external-ids` (`/api/assets/1065/ids`): p50 85ms · p95 98ms · 2B · 0 items · n=7
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyExternalIdentifierRepository.list_for_entity (comprehension)
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -1219,7 +1266,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `external_identifiers`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`external_identifiers`](#table-external_identifiers) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1291,7 +1338,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1375,7 +1422,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1418,7 +1465,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/metadata
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 166ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1448,15 +1495,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `metadata`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 1 item(s); the largest was 2.9KB (`asset-metadata`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-metadata` (`/api/assets/1065/metadata`): p50 138ms · p95 166ms · 2.9KB · 1 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -1494,7 +1543,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `metadata`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1567,7 +1616,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `metadata`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1618,7 +1667,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/metadata/{metadata_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **CAUTION** — p95 373ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
 
 | | |
 |---|---|
@@ -1648,15 +1697,15 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `metadata`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-metadata-one` (`/api/assets/1065/metadata/5617`): p50 145ms · p95 373ms · 2.9KB · n=7 — metadata_id is read from this asset's own metadata list
 
 #### Risk
 
-None identified by this run.
+- measured p95 of 373ms on `asset-metadata-one` is too slow to drive from a keystroke
 
 ---
 
@@ -1696,7 +1745,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `metadata`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`metadata`](#table-metadata) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1767,7 +1816,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1818,7 +1867,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/streams
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1849,15 +1898,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 3 item(s); the largest was 699B (`asset-streams`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-streams` (`/api/assets/1065/streams`): p50 148ms · p95 171ms · 699B · 3 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 3 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -1894,7 +1945,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -1948,7 +1999,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/tags
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 144ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -1978,16 +2029,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `asset_tags`, `assets`, `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`asset_tags`](#table-asset_tags) · [`assets`](#table-assets) · [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`asset-tags`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-tags` (`/api/assets/1065/tags`): p50 138ms · p95 144ms · 2B · 0 items · n=7
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTagRepository.get_asset_tags (comprehension)
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -2031,7 +2084,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2109,7 +2162,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2146,7 +2199,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent
 
 ---
 
@@ -2181,7 +2234,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `asset_tags`, `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`asset_tags`](#table-asset_tags) · [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2230,7 +2283,7 @@ None identified by this run.
 
 ### GET /api/assets/{asset_id}/titles
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 156ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2260,21 +2313,23 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`asset-titles`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-titles` (`/api/assets/1065/titles`): p50 137ms · p95 156ms · 2B · 0 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
 ### GET /api/assets/{asset_id}/transform_requests
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 4 rows (measured directly from a probe response), measured p95 152ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2305,16 +2360,18 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 4 item(s); the largest was 1.7KB (`asset-transform-requests`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `asset-transform-requests` (`/api/assets/1065/transform_requests`): p50 137ms · p95 152ms · 1.7KB · 4 items · n=7
 
 #### Risk
 
 - unindexed lookup on `media_transform_requests.asset_id`; the read is a sequential scan
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 4 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -2351,7 +2408,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2404,7 +2461,7 @@ None identified by this run.
 
 ### GET /api/external-ids/resolve
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 85ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2435,11 +2492,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`, `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) · [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `external-id-resolve` (`/api/external-ids/resolve?external_id=capinv-probe-no-such-external-id&scheme=audible-asin`): p50 81ms · p95 85ms · 81B · n=7 — the join the report judged index coverage for; the composite uq(scheme_id, external_id) serves it because the join pins scheme_id
 
 #### Risk
 
@@ -2449,7 +2506,7 @@ None identified by this run.
 
 ### GET /api/fetch/{asset_id}
 
-> **UNKNOWN** — streaming behaviour was not measured — no probe reached a file on this instance. Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.
+> **UNKNOWN** — streaming behaviour was not measured — no probe reached a file on this instance (expected status [200], got 404). Range support is implemented in the service, but whether it works end to end has not been verified; see Gaps.
 
 | | |
 |---|---|
@@ -2477,21 +2534,32 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `fetch-asset-stream` (`/api/fetch/1065`): ERROR — expected status [200], got 404 — time-to-first-byte measured separately from total transfer; a 404 here means no file on this instance, not a broken endpoint -- see the note above
+  - Accept-Ranges header absent
+- `fetch-asset-range` (`/api/fetch/1065`): ERROR — expected status [206], got 404 — first mebibyte only; verifies Content-Range and Accept-Ranges; a 404 means no file on this instance
+  - Accept-Ranges header absent
+- `fetch-asset-range-suffix` (`/api/fetch/1065`): ERROR — expected status [206], got 404 — suffix range, the form a seek-to-end scrub issues; a 404 means no file on this instance
+  - Accept-Ranges header absent
+- `fetch-asset-range-unsatisfiable` (`/api/fetch/1065`): ERROR — expected status [416], got 404 — verifies the unsatisfiable case returns 416 with a Content-Range header; a 404 means no file on this instance
+  - Accept-Ranges header absent
 
 #### Risk
 
 - the response size is bounded by the file on disk, not by anything the API declares; a client that issues no Range header will be sent the whole asset
+- probe `fetch-asset-stream` failed: expected status [200], got 404
+- probe `fetch-asset-range` failed: expected status [206], got 404
+- probe `fetch-asset-range-suffix` failed: expected status [206], got 404
+- probe `fetch-asset-range-unsatisfiable` failed: expected status [416], got 404
 
 ---
 
 ### GET /api/health
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 108ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2512,7 +2580,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `health` (`/api/health`): p50 104ms · p95 108ms · 210B · n=7 — unauthenticated; opens its own database and Elasticsearch connections
 
 #### Risk
 
@@ -2522,7 +2590,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ### GET /api/id_schemes
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 3 rows (measured directly from a probe response), measured p95 91ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2543,15 +2611,17 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 3 item(s); the largest was 182B (`id-schemes-all`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `id-schemes-all` (`/api/id_schemes`): p50 88ms · p95 91ms · 182B · 3 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 3 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -2587,7 +2657,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2631,7 +2701,7 @@ None identified by this run.
 
 ### GET /api/id_schemes/{scheme_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 106ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -2659,11 +2729,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `id-scheme-one` (`/api/id_schemes/2`): p50 89ms · p95 106ms · 62B · n=7
 
 #### Risk
 
@@ -2704,7 +2774,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2826,7 +2896,7 @@ None identified by this run.
 
 ### GET /api/inbox
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 3ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -2853,13 +2923,16 @@ None identified by this run.
 
 This endpoint reads no database tables.
 
+Own probe responses carried 0 item(s); the largest was 2B (`inbox-full`).
+
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `inbox-full` (`/api/inbox`): p50 2ms · p95 3ms · 2B · 0 items · n=7 — the default walk, bounded by MAX_DEPTH and MAX_ITEMS; size depends on what is sitting in the inbox at the time, so read it as a sample rather than a ceiling
+- `inbox-top-level` (`/api/inbox?depth=1`): p50 2ms · p95 2ms · 2B · 0 items · n=7 — one level only, the cheapest useful request a client can make
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -2899,7 +2972,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -2980,7 +3053,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `jobs`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3050,7 +3123,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `jobs`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3120,7 +3193,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `jobs`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`jobs`](#table-jobs) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3209,7 +3282,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 ### GET /api/ping
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 1ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -3226,7 +3299,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `ping` (`/api/ping`): p50 1ms · p95 1ms · 15B · n=7
 
 #### Risk
 
@@ -3266,7 +3339,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `run_summaries`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`run_summaries`](#table-run_summaries) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3346,7 +3419,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `runner_state`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3416,7 +3489,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `runner_state`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
@@ -3462,7 +3535,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `runner_state`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`runner_state`](#table-runner_state) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3535,7 +3608,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `scanner_run_summaries`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`scanner_run_summaries`](#table-scanner_run_summaries) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3631,19 +3704,26 @@ This endpoint reads no database tables.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `search-transcripts-page-1` (`/api/search/transcripts?offset=0&q=the&size=25`): ERROR — expected status [200], got 503
+- `search-transcripts-deep-page` (`/api/search/transcripts?offset=9975&q=the&size=25`): ERROR — expected status [200], got 503 — last page inside the default 10,000 max_result_window
+  - offset=9975 requested directly
+- `search-transcripts-past-window` (`/api/search/transcripts?offset=10000&q=the&size=25`): p50 2ms · p95 3ms · 54B · n=7 — deliberately past max_result_window; records how the failure surfaces
+  - offset=10000 requested directly
+  - responded 503; the probe accepted any of [200, 500, 503], so read the status before the timing
 
 #### Risk
 
 - filters that cannot use an index (`path_part`, `title_part`); each forces a full scan
 - deep paging has a hard ceiling: from + size is bounded by the index's max_result_window (10,000 by default); beyond that the query is rejected outright rather than being slow
 - ordering is not stable under concurrent writes: Elasticsearch from/size over a relevance sort; a concurrent index write can shift scores and therefore row positions, so a row can be skipped or repeated across pages
+- probe `search-transcripts-page-1` failed: expected status [200], got 503
+- probe `search-transcripts-deep-page` failed: expected status [200], got 503
 
 ---
 
 ### GET /api/streams
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -3679,21 +3759,25 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 3 to 500 items; the largest was 120.1KB (`streams-max-page`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `streams-page-1` (`/api/streams?limit=50`): p50 88ms · p95 96ms · 11.8KB · 50 items · n=7 — default first page a browse screen would issue
+- `streams-max-page` (`/api/streams?limit=500`): p50 115ms · p95 125ms · 120.1KB · 500 items · n=7 — largest permitted page; the old uncapped response was 65,739 rows and 15.15MB
+- `streams-by-asset` (`/api/streams?asset_id=1065&limit=50`): p50 90ms · p95 94ms · 742B · 3 items · n=7 — the filtered read a client actually wants; streams.asset_id is unindexed until #53 lands, so a slow result here is that index, not the paging
 
 #### Risk
 
-- unindexed sort keys (`codec_type`, `stream_index`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
+- unindexed sort keys (`codec_type`, `stream_index`); every page sorts the whole filtered set, but `streams` holds only 65,230 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
 
 ---
 
 ### GET /api/streams/{stream_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 96ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -3721,11 +3805,11 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `stream-one` (`/api/streams/2117`): p50 93ms · p95 96ms · 231B · n=7
 
 #### Risk
 
@@ -3766,7 +3850,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `streams`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`streams`](#table-streams) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3820,7 +3904,7 @@ None identified by this run.
 
 ### GET /api/tags
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -3857,16 +3941,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 47 item(s); the largest was 8.7KB (`tags-page-1`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `tags-page-1` (`/api/tags?limit=50`): p50 101ms · p95 113ms · 8.7KB · 47 items · n=7
 
 #### Risk
 
-- unindexed sort keys (`color`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
-- filters that cannot use an index (`name`); each forces a full scan
+- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -3903,7 +3989,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -3946,7 +4032,7 @@ None identified by this run.
 
 ### GET /api/tags/{tag_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 86ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -3974,11 +4060,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `tag-detail` (`/api/tags/1`): p50 81ms · p95 86ms · 212B · n=7
 
 #### Risk
 
@@ -4020,7 +4106,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4065,7 +4151,7 @@ None identified by this run.
 
 ### GET /api/tags/{tag_id}/tags
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -4103,16 +4189,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 45B (`child-tags`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `child-tags` (`/api/tags/1/tags?limit=50`): p50 112ms · p95 120ms · 45B · 0 items · n=7 — keyset like the parent listing; first screen of one tag's children
 
 #### Risk
 
-- unindexed sort keys (`color`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
-- filters that cannot use an index (`name`); each forces a full scan
+- unindexed sort keys (`color`); every page sorts the whole filtered set, but `tags` holds only 51 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`name`); each forces a sequential scan, though `tags` holds only 51 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -4150,7 +4238,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `tags`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4195,7 +4283,7 @@ None identified by this run.
 
 ### GET /api/title_types
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 8 rows (measured directly from a probe response), measured p95 112ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -4216,15 +4304,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_types`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 8 item(s); the largest was 497B (`title-types-all`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-types-all` (`/api/title_types`): p50 90ms · p95 112ms · 497B · 8 items · n=7 — bounded by the number of title types, which is small and fixed
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 8 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -4260,7 +4350,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_types`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4333,7 +4423,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_types`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4384,7 +4474,7 @@ None identified by this run.
 
 ### GET /api/title_types/{title_type_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 92ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -4412,11 +4502,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_types`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-type-one` (`/api/title_types/4`): p50 86ms · p95 92ms · 66B · n=7
 
 #### Risk
 
@@ -4457,7 +4547,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_types`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4502,7 +4592,7 @@ None identified by this run.
 
 ### GET /api/titles/
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **SAFE** — cursor paging does not degrade with depth, the page size is capped at 500, and worst-case p95 is 161ms. Suitable as the backing query for a virtualised full-library scroll.
 
 | | |
 |---|---|
@@ -4550,20 +4640,31 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `title_contents`, `title_tags`, `title_types`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`title_contents`](#table-title_contents) · [`title_tags`](#table-title_tags) · [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 **Empty unless requested.** These fields serialise as an empty collection when the caller does not ask for them, which is indistinguishable from genuinely having none:
 
 - `tags` — populated only with `include=tags`
 - `references` — populated only with `include=references`
 
+Own probe responses carried 0 to 200 items; the largest was 139.0KB (`titles-poster-scaling-200-rows`).
+
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `titles-page-1` (`/api/titles/?limit=50`): p50 111ms · p95 144ms · 41.3KB · 50 items · n=7
+- `titles-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=True`): p50 145ms · p95 152ms · 37.0KB · 50 items · n=7 — the hit path -- 50 rows that each resolve a display image, every one of them borrowed from a contained asset. Pairs with `titles-not-resolving-page-1`, and the gap between them is what the walk costs when it fails.
+- `titles-not-resolving-page-1` (`/api/titles/?limit=50&resolves_display_image=False`): p50 145ms · p95 161ms · 41.3KB · 50 items · n=7 — the miss path -- rows where the walk ascends to its depth cap and finds nothing. 181 of 1,136 library roots are in this state, and every one of them is a hole in the grid that needs the typographic treatment.
+- `titles-owning-artwork` (`/api/titles/?has_artwork=True&limit=50`): p50 96ms · p95 111ms · 45B · 0 items · n=7 — not a timing measurement -- a recorded fact. This returns an empty page on the whole library: no Title holds artwork of its own, so every image the grid shows is borrowed from an asset through the resolution chain. A design that assumes a title can own its poster has nothing behind it.
+- `titles-unparented-page-1` (`/api/titles/?has_intrinsic_parent=False&library_root=False&limit=50`): p50 99ms · p95 121ms · 16.2KB · 50 items · n=7 — titles with no home that are not deliberate entry points either. Rootness is stored rather than derived from having a parent (#91), so this is the conjunction of two filters and not one -- a library root with no parent is not misplaced. Served by `uq_one_intrinsic_parent`, whose partial predicate is exactly this condition.
+- `titles-parented-page-1` (`/api/titles/?has_intrinsic_parent=True&limit=50`): p50 102ms · p95 109ms · 19.3KB · 50 items · n=7 — the pair's other half, and a cross-check: this returns the same set as `membership=intrinsic`, which is the half the containment filter could already express. A divergence between them is a bug in one of the two.
+- `titles-poster-scaling-200-rows` (`/api/titles/?include=poster&limit=200`): p50 132ms · p95 144ms · 139.0KB · 200 items · n=7 — poster resolution against 200 rows -- compare with the 50-row probe above to tell a per-row walk from a fixed cost
+- `titles-newest-page` (`/api/titles/?limit=50&sort=id:desc`): p50 104ms · p95 114ms · 31.6KB · 50 items · n=7 — the newest page, which a "recently added" view would issue. Compare against `titles-page-1` for the effect of sort order, and against the `has_artwork` pair above for the cost of resolution itself.
+- `titles-name-substring` (`/api/titles/?limit=50&name=e`): p50 104ms · p95 124ms · 43.1KB · 50 items · n=7 — leading-wildcard name search, the broadest a UI search box can send
+- `titles-deep-page` (`/api/titles/?limit=50`): UNAVAILABLE — the collection ran out after 33 pages of 50, so there is no page 41 to measure on this instance
 
 #### Risk
 
-- queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)
+- static analysis flags queries inside a loop — **contradicted by measurement** and downgraded: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension). `titles-page-1` returns 50 rows at p50 111ms and `titles-poster-scaling-200-rows` returns 200 at p50 132ms — 21ms for 150 extra rows, against the ~3.8s a genuine query-per-row would cost at the measured 26ms round trip. The queries inside these comprehensions are issued once for the page, not once per row.
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
 
 ---
@@ -4602,7 +4703,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_types`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4648,7 +4749,7 @@ None identified by this run.
 
 ### GET /api/titles/by-scheme/{scheme_id}/{external_id}
 
-> **UNKNOWN** — the read is not index-covered, and it was not timed; see Gaps.
+> **CAUTION** — the lookup is not index-covered and measures p95 108ms, which will grow with the table. Usable for a deliberate navigation, not for type-ahead.
 
 | | |
 |---|---|
@@ -4678,11 +4779,11 @@ None identified by this run.
 
 #### Data shape
 
-Reads `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-by-scheme` (`/api/titles/by-scheme/2/capinv-probe-no-such-external-id`): p50 82ms · p95 108ms · 28B · n=7 — measures the lookup, which costs the same whether or not it finds a row
 
 #### Risk
 
@@ -4736,7 +4837,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4826,7 +4927,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -4865,7 +4966,7 @@ None identified by this run.
 
 ### GET /api/titles/{parent_title_id}/contents
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 184ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -4896,17 +4997,19 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 1 item(s); the largest was 542B (`title-contents`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-contents` (`/api/titles/1/contents`): p50 172ms · p95 184ms · 542B · 1 items · n=7 — unpaginated child list; size is whatever that title happens to hold
 
 #### Risk
 
 - one extra SELECT per row: TitleContentORM.asset (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `assets`
 - one extra SELECT per row: TitleContentORM.child_title (ORM lazy load) is `lazy='select'` and is serialised into the response, so a page of N rows costs up to N additional queries against `titles`
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -4954,7 +5057,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5047,7 +5150,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `assets`, `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5126,7 +5229,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5214,7 +5317,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5296,7 +5399,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5392,7 +5495,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5479,7 +5582,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5520,7 +5623,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **CAUTION** — p95 215ms — fine for a detail view, too slow to fire on every keystroke. Debounce or prefetch.
 
 | | |
 |---|---|
@@ -5552,7 +5655,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 **Empty unless requested.** These fields serialise as an empty collection when the caller does not ask for them, which is indistinguishable from genuinely having none:
 
@@ -5561,11 +5664,13 @@ Reads `artwork`, `artwork_kinds`, `title_contents`, `titles`. Row counts and fil
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-detail` (`/api/titles/1`): p50 202ms · p95 215ms · 751B · n=7
+- `title-detail-with-poster` (`/api/titles/1?include=poster`): p50 193ms · p95 211ms · 751B · n=7 — pairs with `title-detail` the way the listing pair above does: one title's share of the contents walk, which a detail view pays on its own
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyArtworkKindRepository.list_all (comprehension); SQLAlchemyTitleContentRepository.counts_for_titles (comprehension); SQLAlchemyTitleContentRepository.totals_for_titles (comprehension)
+- measured p95 of 215ms on `title-detail` is too slow to drive from a keystroke
 - fields that are empty unless requested, and indistinguishable from genuinely empty: `references`, `tags`
 
 ---
@@ -5606,7 +5711,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_types`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_types`](#table-title_types) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5651,7 +5756,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/artwork
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 157ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -5683,15 +5788,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `assets`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`title-artwork`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-artwork` (`/api/titles/1/artwork`): p50 118ms · p95 130ms · 2B · 0 items · n=7 — uncapped, and returns a bare array rather than a page
+- `title-artwork-by-kind` (`/api/titles/1/artwork?kind=poster`): p50 145ms · p95 157ms · 2B · 0 items · n=7 — the `kind` filter Phase 2 could not trace statically, because it looks for an `if params.kind` branch and the repository names the parameter `kind_id`. It is applied; this times it
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -5741,7 +5849,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `artwork`, `artwork_kinds`, `assets`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`artwork`](#table-artwork) · [`artwork_kinds`](#table-artwork_kinds) · [`assets`](#table-assets) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5792,7 +5900,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/ids
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 106ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -5820,16 +5928,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`, `id_schemes`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) · [`id_schemes`](#table-id_schemes) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`title-ids`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-ids` (`/api/titles/1/ids`): p50 91ms · p95 106ms · 2B · 0 items · n=7 — uncapped, and each row lazy-loads its scheme; this is the endpoint the report flagged for one extra SELECT per identifier
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyExternalIdentifierRepository.list_for_entity (comprehension)
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -5868,7 +5978,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `assets`, `external_identifiers`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`assets`](#table-assets) · [`external_identifiers`](#table-external_identifiers) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -5939,7 +6049,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6023,7 +6133,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `external_identifiers`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`external_identifiers`](#table-external_identifiers) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6066,7 +6176,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/parents
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 1 rows (measured directly from a probe response), measured p95 171ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6096,21 +6206,23 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_contents`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_contents`](#table-title_contents) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 1 item(s); the largest was 275B (`title-parents`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-parents` (`/api/titles/1/parents`): p50 147ms · p95 171ms · 275B · 1 items · n=7 — uncapped, and the upward counterpart of title-contents. Immediate parents only, so its cost is bounded by how many titles contain this one rather than by the size of any listing
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 1 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
 ### GET /api/titles/{title_id}/references
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 134ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6140,15 +6252,17 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_references`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_references`](#table-title_references) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`title-references`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-references` (`/api/titles/1/references`): p50 117ms · p95 134ms · 2B · 0 items · n=7
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -6185,7 +6299,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `title_references`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_references`](#table-title_references) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6262,7 +6376,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `title_references`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_references`](#table-title_references) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6307,7 +6421,7 @@ None identified by this run.
 
 ### GET /api/titles/{title_id}/tags
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 121ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -6337,16 +6451,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`, `title_tags`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) · [`title_tags`](#table-title_tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`title-tags`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `title-tags` (`/api/titles/1/tags`): p50 110ms · p95 121ms · 2B · 0 items · n=7
 
 #### Risk
 
 - queries issued inside a loop, so cost grows with the size of the request: SQLAlchemyTagRepository.get_title_tags (comprehension)
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -6390,7 +6506,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `tags`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6466,7 +6582,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `tags`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`tags`](#table-tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6503,7 +6619,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 51 rows (at most all 51 rows of `tags`), so the absent cap is currently latent
 
 ---
 
@@ -6538,7 +6654,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `title_tags`, `titles`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`title_tags`](#table-title_tags) · [`titles`](#table-titles) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6587,7 +6703,7 @@ None identified by this run.
 
 ### GET /api/transform_requests
 
-> **UNKNOWN** — cursor pagination means deep pages do not degrade the way offset does, but no timings were taken, so first-screen cost is unmeasured; see Gaps.
+> **CAUTION** — the cursor holds up at depth and the cap is 500, so this is fine for first-screen browse and for virtualised infinite scroll. Caveats: expect the sort control to be the expensive part.
 
 | | |
 |---|---|
@@ -6625,16 +6741,18 @@ None identified by this run.
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 50 item(s); the largest was 45.6KB (`transform-requests-page-1`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `transform-requests-page-1` (`/api/transform_requests?limit=50`): p50 178ms · p95 189ms · 45.6KB · 50 items · n=7
 
 #### Risk
 
-- unindexed sort keys (`created_at`, `processed_at`); the keyset cursor keeps ordering correct but every page still sorts the whole filtered set
-- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a full scan
+- unindexed sort keys (`created_at`, `processed_at`); every page sorts the whole filtered set, but `media_transform_requests` holds only 18,312 rows, so this is latent rather than live -- the measured cost of an unindexed sort is currently indistinguishable from an indexed one. It becomes real as the table grows
+- filters that cannot use an index (`actioned`, `outcome`, `transform_type`, `worker_assigned`); each forces a sequential scan, though `media_transform_requests` holds only 18,312 rows, so the scan is currently cheap. This is a constraint on how large the table can grow before search becomes the bottleneck, not a live cost
 
 ---
 
@@ -6673,7 +6791,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6717,7 +6835,7 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 ### GET /api/transform_requests/{request_id}
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 97ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -6745,11 +6863,11 @@ UNKNOWN — not probed, deliberately. Measuring a mutating endpoint means issuin
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `transform-request-detail` (`/api/transform_requests/21355`): p50 87ms · p95 97ms · 568B · n=7
 
 #### Risk
 
@@ -6791,7 +6909,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6870,7 +6988,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6944,7 +7062,7 @@ None identified by this run.
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -6997,7 +7115,7 @@ None identified by this run.
 
 ### GET /api/transform_requests/{request_id}/logs
 
-> **UNKNOWN** — this endpoint returns an entire collection with no cap, and the largest collection in the data was not measured. Do not build a screen on it until Phase 3 has run; see Gaps.
+> **SAFE** — the collection is bounded in practice at 0 rows (measured directly from a probe response), measured p95 119ms, so it is fine to render directly. The absence of a cap is latent rather than live — worth a page size before the data grows, not before the UI ships.
 
 | | |
 |---|---|
@@ -7025,15 +7143,17 @@ None identified by this run.
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
+
+Own probe responses carried 0 item(s); the largest was 2B (`transform-request-logs`).
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `transform-request-logs` (`/api/transform_requests/21355/logs`): p50 102ms · p95 119ms · 2B · 0 items · n=7 — an external round-trip to the orchestration backend, not a database read. Capped at the provider's log limit (100 by default), so the worst case is bounded by that rather than by the collection size. An item count of 0 means the backend returned no lines -- the endpoint did its work, but the timing is then the cost of reaching an orchestration backend that had nothing to give, not of rendering a full log.
 
 #### Risk
 
-- no pagination and no page-size cap; the largest possible response is UNKNOWN without Phase 3
+- no pagination, but the largest collection measured is only 0 rows (measured directly from a probe response), so the absent cap is currently latent
 
 ---
 
@@ -7070,7 +7190,7 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 #### Data shape
 
-Reads `media_transform_requests`. Row counts and fill rates are UNKNOWN — Phase 3 did not run (`--skip-db`, or no `CAPINV_DATABASE_URL`).
+Reads [`media_transform_requests`](#table-media_transform_requests) — see the [Tables](#tables) appendix for each.
 
 #### Write contract
 
@@ -7111,7 +7231,7 @@ None identified by this run.
 
 ### GET /api/version
 
-> **UNKNOWN** — the read is index-covered, so it is likely fine for a detail view, but it was not timed; see Gaps.
+> **SAFE** — p95 8ms, index-covered. Fine for a detail view and fast enough to prefetch on hover.
 
 | | |
 |---|---|
@@ -7128,7 +7248,7 @@ This endpoint reads no database tables.
 
 #### Measured
 
-UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 was skipped.
+- `version` (`/api/version`): p50 4ms · p95 8ms · 61B · n=7
 
 #### Risk
 
@@ -7138,7 +7258,364 @@ UNKNOWN — no probe covers this endpoint. Add one to `probes.yaml`, or Phase 4 
 
 ## Tables
 
-UNKNOWN — Phase 3 did not run, so no row counts, fill rates, cardinality or collection sizes were measured. Re-run without `--skip-db`.
+Row counts, fill rates, cardinality and collection-size distributions are properties of a table rather than of any endpoint that reads it, so they are recorded once here and linked from each endpoint's **Data shape**.
+
+### Table: artwork
+
+**1,218 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `source_external_id` | 0% | 0 | 0 | — |
+| `source_scheme_id` | 0% | 0 | — | — |
+| `source_url` | 1% | 7 | 5 | yes |
+| `artwork_kind_id` | 100% | 1,218 | — | — |
+| `created_at` | 100% | 1,218 | — | — |
+| `entity_id` | 100% | 1,218 | — | — |
+| `entity_type` | 100% | 1,218 | 1 | yes |
+| `height` | 100% | 1,218 | — | — |
+| `id` | 100% | 1,218 | — | — |
+| `is_primary` | 100% | 1,218 | 1 | yes |
+| `mime` | 100% | 1,218 | 2 | yes |
+| `storage_path` | 100% | 1,218 | 1,167 | — |
+| `width` | 100% | 1,218 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `artwork_kinds` | `artwork_kind_id` | 1 | 7 | 1077 | 1,077 | 4 of 8 |
+
+### Table: artwork_kinds
+
+**8 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `description` | 0% | 0 | 0 | — |
+| `max_width` | 0% | 0 | — | — |
+| `ratio_tolerance` | 50% | 4 | — | — |
+| `target_ratio` | 50% | 4 | — | — |
+| `min_width` | 62% | 5 | — | — |
+| `code` | 100% | 8 | 8 | yes |
+| `id` | 100% | 8 | — | — |
+| `label` | 100% | 8 | 8 | yes |
+
+### Table: asset_tags
+
+**2,880 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `asset_id` | 100% | 2,880 | — | — |
+| `created_at` | 100% | 2,880 | — | — |
+| `tag_id` | 100% | 2,880 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `asset_id` | 1 | 2 | 3 | 4 | 1,388 of 13,350 |
+| `tags` | `tag_id` | 1 | 30 | 510 | 739 | 35 of 51 |
+
+### Table: assets
+
+**13,350 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `master_asset_id` | 0% | 10 | — | — |
+| `edition` | 1% | 146 | 10 | yes |
+| `container_format` | 99% | 13,202 | 4 | yes |
+| `mtime` | 99% | 13,220 | — | — |
+| `last_seen` | 100% | 13,300 | — | — |
+| `bitrate` | 100% | 13,350 | — | — |
+| `created_at` | 100% | 13,350 | — | — |
+| `duration` | 100% | 13,350 | — | — |
+| `filename` | 100% | 13,350 | ≥5,000 | — |
+| `id` | 100% | 13,350 | — | — |
+| `path` | 100% | 13,350 | ≥5,000 | — |
+| `size` | 100% | 13,350 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `master_asset_id` | 1 | 1 | 4 | 4 | 6 of 13,350 |
+
+### Table: external_identifiers
+
+**1,523 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `created_at` | 100% | 1,523 | — | — |
+| `entity_id` | 100% | 1,523 | — | — |
+| `entity_type` | 100% | 1,523 | 2 | yes |
+| `external_id` | 100% | 1,523 | 1,523 | — |
+| `id` | 100% | 1,523 | — | — |
+| `scheme_id` | 100% | 1,523 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `id_schemes` | `scheme_id` | 133 | 671 | 719 | 719 | 3 of 3 |
+
+### Table: id_schemes
+
+**3 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `validator` | 0% | 0 | 0 | — |
+| `code` | 100% | 3 | 3 | yes |
+| `id` | 100% | 3 | — | — |
+| `label` | 100% | 3 | 3 | yes |
+
+### Table: jobs
+
+**3,158 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `heartbeat_at` | 55% | 1,742 | — | — |
+| `completed_at` | 100% | 3,155 | — | — |
+| `created_at` | 100% | 3,158 | — | — |
+| `job_key` | 100% | 3,158 | 3,158 | — |
+
+### Table: media_transform_requests
+
+**18,312 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `parent_transform_request_id` | 16% | 2,977 | — | — |
+| `first_heartbeat` | 20% | 3,671 | — | — |
+| `last_heartbeat` | 20% | 3,671 | — | — |
+| `on_failure` | 25% | 4,504 | — | — |
+| `on_success` | 25% | 4,504 | — | — |
+| `worker_notes` | 77% | 14,166 | ≥5,000 | — |
+| `external_job_id` | 90% | 16,539 | 2,734 | — |
+| `duration` | 97% | 17,728 | — | — |
+| `parameters` | 99% | 18,213 | — | — |
+| `worker` | 100% | 18,260 | 1,085 | — |
+| `actioned` | 100% | 18,312 | 1 | yes |
+| `asset_id` | 100% | 18,312 | — | — |
+| `created_at` | 100% | 18,312 | — | — |
+| `id` | 100% | 18,312 | — | — |
+| `outcome` | 100% | 18,312 | 3 | yes |
+| `processed_at` | 100% | 18,312 | — | — |
+| `transform_type` | 100% | 18,312 | 11 | yes |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `asset_id` | 1 | 1 | 4 | 17 | 13,335 of 13,350 |
+| `media_transform_requests` | `parent_transform_request_id` | 1 | 2 | 3 | 4 | 1,500 of 18,312 |
+
+### Table: metadata
+
+**14,602 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `asset_id` | 100% | 14,602 | — | — |
+| `created_at` | 100% | 14,602 | — | — |
+| `data` | 100% | 14,602 | — | — |
+| `id` | 100% | 14,602 | — | — |
+| `metadata_type` | 100% | 14,602 | 7 | yes |
+| `updated_at` | 100% | 14,602 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `asset_id` | 1 | 1 | 2 | 4 | 13,238 of 13,350 |
+
+### Table: run_summaries
+
+**1,152 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `created_at` | 100% | 1,152 | — | — |
+| `extras` | 100% | 1,152 | — | — |
+| `failed_count` | 100% | 1,152 | — | — |
+| `id` | 100% | 1,152 | — | — |
+| `processed_count` | 100% | 1,152 | — | — |
+| `running_time` | 100% | 1,152 | — | — |
+| `started_at` | 100% | 1,152 | — | — |
+| `success_count` | 100% | 1,152 | — | — |
+| `transform_type` | 100% | 1,152 | 6 | yes |
+| `worker_name` | 100% | 1,152 | 1,152 | — |
+| `worker_type` | 100% | 1,152 | 6 | yes |
+
+### Table: runner_state
+
+**5 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `runner_key` | 100% | 5 | 5 | yes |
+| `state` | 100% | 5 | — | — |
+| `updated_at` | 100% | 5 | — | — |
+
+### Table: scanner_run_summaries
+
+**201 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `api_error_count` | 0% | 0 | — | — |
+| `folder_count` | 0% | 0 | — | — |
+| `no_metadata_count` | 0% | 0 | — | — |
+| `relative_to_path` | 0% | 0 | 0 | — |
+| `scan_path` | 0% | 0 | 0 | — |
+| `total_count` | 0% | 0 | — | — |
+| `unsupported_file_count` | 0% | 0 | — | — |
+| `excluded_count` | 12% | 25 | — | — |
+| `error_count` | 65% | 130 | — | — |
+| `created_at` | 100% | 201 | — | — |
+| `dry_run` | 100% | 201 | 2 | yes |
+| `extras` | 100% | 201 | — | — |
+| `id` | 100% | 201 | — | — |
+| `previously_seen_count` | 100% | 201 | — | — |
+| `processed_count` | 100% | 201 | — | — |
+| `running_time` | 100% | 201 | — | — |
+| `started_at` | 100% | 201 | — | — |
+| `worker_name` | 100% | 201 | 29 | yes |
+| `worker_type` | 100% | 201 | 8 | yes |
+
+### Table: streams
+
+**65,230 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `title` | 22% | 14,185 | 12 | yes |
+| `frame_rate` | 29% | 18,686 | — | — |
+| `height` | 29% | 18,853 | — | — |
+| `width` | 29% | 18,853 | — | — |
+| `channels` | 32% | 21,173 | — | — |
+| `sample_rate` | 32% | 21,173 | — | — |
+| `language` | 92% | 59,763 | 60 | yes |
+| `codec_name` | 100% | 65,225 | 21 | yes |
+| `asset_id` | 100% | 65,230 | — | — |
+| `codec_type` | 100% | 65,230 | 4 | yes |
+| `id` | 100% | 65,230 | — | — |
+| `is_default` | 100% | 65,230 | 1 | yes |
+| `is_forced` | 100% | 65,230 | 1 | yes |
+| `stream_index` | 100% | 65,230 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `asset_id` | 1 | 3 | 20 | 79 | 13,004 of 13,350 |
+
+### Table: tags
+
+**51 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `parent_id` | 8% | 4 | — | — |
+| `color` | 100% | 51 | 4 | yes |
+| `created_at` | 100% | 51 | — | — |
+| `description` | 100% | 51 | 6 | yes |
+| `id` | 100% | 51 | — | — |
+| `name` | 100% | 51 | 51 | yes |
+| `updated_at` | 100% | 51 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `tags` | `parent_id` | 4 | 4 | 4 | 4 | 1 of 51 |
+
+### Table: title_contents
+
+**1,921 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `child_title_id` | 27% | 516 | — | — |
+| `asset_id` | 73% | 1,405 | — | — |
+| `label` | 99% | 1,902 | 276 | — |
+| `id` | 100% | 1,921 | — | — |
+| `kind` | 100% | 1,921 | 2 | yes |
+| `membership` | 100% | 1,921 | 2 | yes |
+| `parent_title_id` | 100% | 1,921 | — | — |
+| `position` | 100% | 1,921 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `assets` | `asset_id` | 1 | 1 | 1 | 1 | 1,405 of 13,350 |
+| `titles` | `child_title_id` | 1 | 1 | 1 | 1 | 516 of 1,606 |
+| `titles` | `parent_title_id` | 1 | 1 | 2 | 35 | 1,593 of 1,606 |
+
+### Table: title_references
+
+**0 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `id` | 0% | 0 | — | — |
+| `label` | 0% | 0 | — | — |
+| `reference_type` | 0% | 0 | — | — |
+| `reference_url` | 0% | 0 | — | — |
+| `title_id` | 0% | 0 | — | — |
+
+### Table: title_tags
+
+**900 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `created_at` | 100% | 900 | — | — |
+| `tag_id` | 100% | 900 | — | — |
+| `title_id` | 100% | 900 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `tags` | `tag_id` | 1 | 3 | 722 | 722 | 15 of 51 |
+| `titles` | `title_id` | 1 | 1 | 1 | 7 | 867 of 1,606 |
+
+### Table: title_types
+
+**8 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `description` | 0% | 0 | 0 | — |
+| `code` | 100% | 8 | 8 | yes |
+| `id` | 100% | 8 | — | — |
+| `label` | 100% | 8 | 8 | yes |
+
+### Table: titles
+
+**1,606 rows.**
+
+| Column | Filled | Non-null | Distinct | Facet |
+|---|---|---|---|---|
+| `release_year` | 56% | 896 | — | — |
+| `synopsis` | 96% | 1,535 | 1,452 | — |
+| `id` | 100% | 1,606 | — | — |
+| `library_root` | 100% | 1,606 | 2 | yes |
+| `name` | 100% | 1,606 | 1,300 | — |
+| `title_type_id` | 100% | 1,606 | — | — |
+
+Children per parent:
+
+| Parent | Via | Min | Median | p95 | Max | Parents with any |
+|---|---|---|---|---|---|---|
+| `title_types` | `title_type_id` | 11 | 109 | 741 | 741 | 6 of 8 |
 
 ## Error taxonomy
 
@@ -7224,13 +7701,11 @@ Nothing has been deleted. This is a list of questions, not actions.
 
 ## Gaps
 
-6 value(s) could not be established. Each is listed with the specific thing that would settle it.
+4 value(s) could not be established. Each is listed with the specific thing that would settle it.
 
 | Scope | Not known | What would settle it |
 |---|---|---|
 | `POST /api/titles/{parent_title_id}/contents/batch` | write probe `contents-batch-attach-twice` could not remove everything it created | inspect the write target and remove the leftovers (DELETE assets.id=2 -> update or delete on table "assets" violates foreign key constraint "title_contents_asset_id_fkey" on table "title_contents" DETAIL:  Key (id)=(2) is still referenced from table "title_contents".; DELETE titles.id=9 -> current transaction is aborted, commands ignored until end of transaction block); the next run's results are otherwise measured against a dirty database |
-| `Phase 3` | row counts, fill rates, cardinality and collection sizes | re-run without --skip-db and with CAPINV_DATABASE_URL set to a read-only connection string |
-| `Phase 4` | latency percentiles, payload sizes and Range handling | re-run without --skip-probes and with CAPINV_BASE_URL pointing at a running instance backed by a realistic library |
 | `Phase 5` | whether an endpoint has any real caller | re-run with --frontend-path pointing at a consumer checkout, or --access-log pointing at a log with real traffic; in-repository evidence alone cannot see callers that live in other repositories |
 | `Phase 6` | what a repeated request does to 55 of 63 write endpoints | declare a `repeat` scenario for them under `write_probes` in probes.yaml. Their contracts are otherwise derived from the code; only repetition is unmeasured, and it cannot be read off the verb — of the routes probed here, one is idempotent and four are guarded, none of which the method predicted |
 | `Phase 6` | what the API returns when 24 of 26 constraints are violated | declare a `violation` scenario naming the constraint. Until then the Constraint map lists them with their definition and no observed response, because assuming one would invent it: `check_processed_at_matches_actioned`, `ck_artwork_source_pair`, `ck_artwork_valid_height`, `ck_artwork_valid_width`, `ck_asset_not_own_master`, `ck_asset_valid_bitrate` and others |
