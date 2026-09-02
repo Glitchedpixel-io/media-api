@@ -39,11 +39,9 @@ metadata, external identifiers and a transform history.
 carries *watchability*: whether a Title is a thing you would consume (Movie, Episode) or a
 thing you navigate through (Season, Collection). Eight types exist; six are in use.
 
-> **Done.** This type was called `TV Show` while denoting a single episode, which would
-> have had the interface saying "12 TV Shows" when it meant "12 episodes". Migration
-> `2d7e94fb015a` renamed the code to `episode` and the label to `Episode`, and both are
-> live. UI copy should take the label from the API rather than hard-coding it, so the next
-> rename does not need a second pass over the front-end.
+> The type currently named `TV Show` denotes a single episode. It must be renamed to
+> `Episode` before any UI copy is written, or the interface will say "12 TV Shows" when it
+> means "12 episodes".
 
 **Containment** — Titles contain Titles and Assets. Both edges are many-to-many, so the
 structure is a directed acyclic graph rather than a tree. Cycles are rejected at write time.
@@ -71,11 +69,11 @@ kind, with a resolution chain so a Title without its own artwork can resolve one
 **Transform request** — an asynchronous job against an Asset, with a status, a log and a
 retry. The application both reports on these and creates them.
 
-## 3. The shape of the actual data
+## 3. The starting state
 
 The schema supports rich structure. The library currently in it is much flatter than the
-schema allows, and the design must be built for what is there rather than for what the model
-permits.
+schema allows. This is the condition the application exists to change, not the condition it
+should be designed around.
 
 | | |
 |---|---|
@@ -92,20 +90,33 @@ permits.
 | `synopsis` filled | 96% |
 | `title_references` | 0 rows — the feature exists and is unused |
 
-Read together: the library is overwhelmingly **one Title, one Asset**. Deep hierarchy is
-rare, multi-parent membership is currently theoretical, and roughly half the metadata a
-poster-wall design would lean on is absent.
+Read together: the library is overwhelmingly **one Title, one Asset**, hierarchy is shallow,
+multi-parent membership is unexercised, and roughly half the metadata a poster-wall design
+would lean on is absent.
+
+None of that is a specification. It is a backlog. The purpose of this application is to turn
+13,321 loose assets into a structured library, so the design must make depth easy to build,
+easy to see and easy to change — and must not treat the current flatness as the shape to
+optimise for.
 
 Design consequences:
 
-- Optimise for the flat case; support hierarchy without making it the organising metaphor.
-  A design that presents itself as a series browser will look broken against this data.
-- Never rely on artwork being present. The grid needs a typographic treatment that is
-  deliberate rather than a fallback, because it will be the common case.
-- Multi-parent membership must be *designed for* even though no data exercises it yet, since
-  curated collections are the feature that will create it.
-- Tag-based filtering is thin today (9 tags in real use, one covering 721 titles). Filter
-  chips with counts would currently show one enormous bucket.
+- **Hierarchy is a first-class interaction, not a fallback.** Depth must be navigable and
+  manipulable at every level. A design that handles two levels gracefully and four levels
+  awkwardly fails at the primary job.
+- **Distinguish flat-because-correct from flat-because-unorganised.** A standalone film with
+  one asset is finished. Thirteen loose episode files are work. The interface must tell them
+  apart, and the API must be able to answer the question (see the gap in §6).
+- **Structure is built by direct manipulation.** Reorganising by opening a form, choosing a
+  parent from a dropdown and saving is too slow for thousands of items. A tree with drag and
+  drop, multi-select and keyboard movement is the working surface.
+- **Never rely on artwork being present.** The grid needs a typographic treatment that is
+  deliberate rather than a fallback, because it is currently the common case — and the
+  absence is itself a work queue.
+- **Design for multi-parent membership now.** No data exercises it yet; curated collections
+  are the feature that will create it.
+- Tag filtering is thin today (9 tags in real use, one covering 721 titles). Filter chips
+  with counts would currently show one enormous bucket.
 
 ## 4. Surfaces
 
@@ -131,7 +142,25 @@ Titles it belongs to, and its transform history. This is where correction work h
 logs. Asynchronous work that the user initiates from an Asset and monitors here. There is no
 push channel, so the front-end polls; the polling contract is an open decision below.
 
-**Curated collections.** Separate from the library grid. Create, add, remove, reorder.
+**Organise.** The surface where structure gets built, and the reason the application exists.
+A tree of intrinsic containment, expandable and navigable to arbitrary depth, alongside a
+working set of unplaced material. Drag and drop to attach and to move, multi-select for bulk
+placement, keyboard movement, reorder within a parent, and detach.
+
+Requirements this surface imposes:
+
+- Depth is unbounded in principle. Expand and collapse state must persist across navigation,
+  and position within a large tree must survive a refresh.
+- A move is one gesture and must read as one action, whatever it costs in requests.
+- Illegal drops are prevented before the drop, not reported after it. Dropping a Title onto
+  its own descendant is rejected by the API; the interface should never offer it.
+- Every destructive gesture distinguishes detach from delete.
+- Bulk placement of a multi-selection needs a progress and partial-failure model, because
+  the API applies these one edge at a time (see §6).
+- Undo, or a recently-changed list precise enough to reverse a mistake by hand.
+
+**Curated collections.** Separate from the library grid. Create, add, remove, reorder. The
+same manipulation vocabulary as Organise, applied to curated rather than intrinsic edges.
 
 ## 5. Principles
 
@@ -148,17 +177,33 @@ push channel, so the front-end polls; the polling contract is an open decision b
 7. **Write failure is a first-class state.** Some writes touch the filesystem as well as the
    database and can half-succeed. The interface must say so rather than showing a spinner
    that resolves into a lie.
+8. **The library's current shape is the workload, not the specification.** Every measurement
+   in §3 describes what needs fixing. Design for the library as it should be, and make the
+   distance between the two visible and shrinkable.
 
-## 6. Open decisions
+## 6. API gaps blocking the Organise surface
+
+Four, all newly identified and none yet raised as issues.
+
+- **No way to ask what is unplaced.** `GET /api/assets/` has no filter for whether an Asset
+  belongs to any Title, and there is no equivalent for Titles with no intrinsic parent that
+  are not library roots. This is the work queue for the entire organising workflow and it
+  cannot currently be requested.
+- **No move operation.** Changing a parent means `DELETE` on the old edge followed by `POST`
+  of the new one: two requests, no transaction, and a failure between them leaves the item
+  attached to nothing. A move is the core gesture of a tree UI and it needs to be one call.
+- **No bulk containment writes.** Every edge is created, moved or removed individually.
+  Dragging forty episodes into a season is forty requests with no atomicity and a partial
+  failure mode the interface has to render.
+- **Reorder is per-edge.** `uq_parent_position` enforces position uniqueness within a parent,
+  and reordering is a single-edge operation. Whether a sibling set can be reordered without
+  transient constraint collisions needs establishing before a drag-to-reorder is designed.
+
+## 7. Open decisions
 
 - **Asset alternatives.** Sibling Assets under one Title cover both encodings of the same
-  content and genuinely different editions. `assets.edition` now exists — migration
-  `6b1f8ac340d9` added it, closing M3, and it is returned on every Asset payload. The
-  decision still stands, for a different reason than before: the field is filled for **146
-  of 13,344 assets (1.1%, 10 distinct values)**, so a null edition does not distinguish
-  "same content, different encoding" from "a different cut" — it means nobody has said
-  yet. The Title screen can read and display an edition where one exists, and cannot use
-  its absence to choose between one action and a picker until the column is backfilled.
+  content and genuinely different editions. Edition is not yet a field (issue M3). Until it
+  is, the Title screen cannot decide between one action and a picker.
 - **Polling contract.** Interval, backoff, and whether the operations surface polls the
   collection or individual requests.
 - **Curated collection entry point.** Its own top-level surface, or a mode within the
@@ -167,7 +212,7 @@ push channel, so the front-end polls; the polling contract is an open decision b
   name filter and adopt the unified endpoint when it lands, rather than waiting.
 - **Empty-state treatment for artwork.** Typographic, generated, or kind-derived.
 
-## 7. Explicitly out of scope
+## 8. Explicitly out of scope
 
 Playback and anything downstream of it: watch state, resume, progress, per-user
 personalisation, recommendations, continue-watching. Multi-user and any authorisation model
