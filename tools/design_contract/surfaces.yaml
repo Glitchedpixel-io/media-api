@@ -1,0 +1,358 @@
+# Surface -> endpoint mapping for the front-end API contract.
+#
+# HAND-MAINTAINED. This file is a design decision, not something derivable from
+# the capability inventory. The generator reads it; the generator never writes it.
+#
+# Surfaces come from section 4 of ../media-manager/design/brief.md.
+#
+# Each surface has two lists:
+#   primary  - endpoints the surface is built on. Rendered in full: filters,
+#              sorts, page size, measured timings, fields with fill rates,
+#              and the write contract.
+#   also     - endpoints the surface calls but that do not need a full spec.
+#              Rendered as one line each.
+#
+# An operation may appear on several surfaces. It is rendered in full at its
+# first primary occurrence (surfaces in the order below) and cross-referenced
+# afterwards, so the document never repeats a spec.
+#
+# Every operation_id in the inventory must appear exactly once across
+# surfaces + do_not_call + unassigned, or the generator fails. That is what
+# stops an endpoint from silently vanishing from the contract.
+
+surfaces:
+  library:
+    title: Library
+    summary: >-
+      The primary surface, and the gap-finding tool. `library_root=true` Titles
+      only, virtualised infinite scroll on a keyset cursor.
+    primary:
+      - list_titles
+    also:
+      - list_title_types
+      - list_tags
+      - list_child_tags
+
+  title:
+    title: Title
+    summary: >-
+      Identity, artwork, synopsis, year, tags, external identifiers, contents
+      by membership kind, and the Assets behind it.
+    primary:
+      - get_title
+      - update_title
+      - set_title_tags
+      - upload_title_artwork
+    also:
+      - create_title
+      - get_title_by_external_id
+      - resolve_external_id
+      - list_title_artwork
+      - list_artwork
+      - get_artwork
+      - update_artwork
+      - delete_artwork
+      - list_artwork_kinds
+      - list_title_tags
+      - add_title_tags_by_name
+      - remove_title_tag
+      - list_title_external_ids
+      - create_title_external_id
+      - update_title_external_id
+      - delete_title_external_id
+      - list_title_parents
+      - list_title_references
+      - create_title_reference
+      - update_title_reference
+
+  asset:
+    title: Asset
+    summary: >-
+      A full destination. Path, technical metadata, streams, external
+      identifiers, derived assets, artwork, owning Titles, transform history.
+      This is where correction work happens.
+    primary:
+      - list_assets
+      - get_asset
+      - update_asset
+    also:
+      - get_asset_by_external_id
+      - get_asset_titles
+      - list_asset_artwork
+      - upload_asset_artwork
+      - list_asset_accessories
+      - list_derived_assets
+      - add_derived_asset
+      - list_asset_external_ids
+      - create_asset_external_id
+      - update_asset_external_id
+      - delete_asset_external_id
+      - list_asset_metadata
+      - get_asset_metadata_item
+      - create_asset_metadata_item
+      - update_asset_metadata_item
+      - delete_asset_metadata_item
+      - list_asset_streams
+      - create_asset_stream
+      - delete_asset_streams
+      - list_streams
+      - get_stream
+      - update_stream
+      - list_asset_tags
+      - add_asset_tags_by_name
+      - set_asset_tags
+      - remove_asset_tag
+
+  operations:
+    title: Operations
+    summary: >-
+      Transform requests across the library: queue state, failures, retries,
+      logs. There is no push channel, so this surface polls.
+    primary:
+      - list_transform_requests
+      - create_asset_transform_request
+      - retry_transform_request
+    also:
+      - get_transform_request
+      - get_transform_request_logs
+      - update_transform_request
+      - create_linked_transform_request
+      - list_asset_transform_requests
+
+  organise:
+    title: Organise
+    summary: >-
+      Where structure gets built. A tree of intrinsic containment alongside a
+      working set of unplaced material. Attach, move, detach, reorder.
+    primary:
+      - list_title_contents
+      - attach_title_contents_batch
+      - move_title_content
+      - move_title_contents_batch
+      - detach_title_contents_batch
+      - reorder_title_content
+    also:
+      - create_title_content
+      - create_title_content_positioned
+      - update_title_content
+      - delete_title_content
+      - list_inbox
+      - import_from_inbox
+      - delete_from_inbox
+
+  curated:
+    title: Curated collections
+    summary: >-
+      Separate from the library grid. The same manipulation vocabulary as
+      Organise, applied to curated rather than intrinsic edges.
+    primary: []
+    also:
+      - create_title
+      - list_title_contents
+      - create_title_content_positioned
+      - attach_title_contents_batch
+      - detach_title_contents_batch
+      - reorder_title_content
+      - update_title_content
+      - delete_title_content
+      - list_title_parents
+
+# Response model -> database table, so a field can be given its fill rate from
+# the inventory's Tables appendix. A model with no entry here renders no fill
+# rates at all: a wrong rate is worse than an absent one, because the whole
+# point of the column is "56% needs designing for absence".
+models:
+  AssetRead: assets
+  AssetReadExtended: assets
+  TitleReadExtended: titles
+  TitleContentRead: title_contents
+  TitleContentReadExtended: title_contents
+  TitleContentReadParent: title_contents
+  ArtworkRead: artwork
+  ArtworkKindRead: artwork_kinds
+  TagRead: tags
+  TitleTypeRead: title_types
+  StreamRead: streams
+  MetadataRead: metadata
+  ExternalIdentifierReadExtended: external_identifiers
+  IdSchemeRead: id_schemes
+  TitleReferenceRead: title_references
+  TransformRequestRead: media_transform_requests
+  TransformRequestReadExpanded: media_transform_requests
+  # No table backs these: they are computed, filesystem-derived or search hits.
+  # Listed explicitly so an unmapped model is a deliberate choice, not an omission.
+  AccessoryFile: null
+  InboxItem: null
+  TranscriptSearchHit: null
+  TransformRequestLogEntry: null
+
+# First path segment -> the table it addresses, so a nested collection can be
+# costed by its fan-out per parent rather than by the child table's total size.
+# An Asset's stream list is bounded by streams *per asset*, not by all 65,230
+# streams in the library.
+path_roots:
+  assets: assets
+  titles: titles
+  tags: tags
+  artwork: artwork
+  artwork_kinds: artwork_kinds
+  title_types: title_types
+  id_schemes: id_schemes
+  transform_requests: media_transform_requests
+  streams: streams
+
+# Routes whose collection is reached through a join table, so the response model
+# does not name the table that actually bounds the list. Without these, a tag
+# list looks unmeasured when its real fan-out is known and small.
+fan_out:
+  list_asset_tags: [assets, asset_tags]
+  list_title_tags: [titles, title_tags]
+  list_title_contents: [titles, title_contents]
+  get_asset_titles: [assets, title_contents]
+  list_title_parents: [titles, title_contents]
+
+# Worker and machine-audience routes. A designer must never build against these.
+# Seeded from write_contract.audience == "worker fleet" in the inventory, plus
+# read routes that serve the same fleet.
+do_not_call:
+  - operation: create_job
+    reason: Fleet registers a job it started.
+  - operation: mark_job_completed
+    reason: Fleet reports completion.
+  - operation: update_job_heartbeat
+    reason: Fleet liveness ping.
+  - operation: claim_transform_request
+    reason: Fleet takes work off the queue. Claiming from a UI would race it.
+  - operation: transform_request_heartbeat
+    reason: Fleet liveness ping on a claimed request.
+  - operation: create_run_summary
+    reason: Fleet writes a run record.
+  - operation: create_scanner_run_summary
+    reason: Scanner writes a run record.
+  - operation: create_runner_state
+    reason: Runner registers itself.
+  - operation: update_runner_state
+    reason: Runner reports its own state.
+  - operation: get_runner_state
+    reason: >-
+      Keyed by a runner key the runner already knows. There is no list route by
+      design, so there is no fleet view to build.
+  - operation: ingest_client_traces
+    reason: Telemetry sink. Not a data route.
+  - operation: get_health
+    reason: Infrastructure probe.
+  - operation: ping
+    reason: Infrastructure probe.
+  - operation: get_version
+    reason: Infrastructure probe.
+
+# Endpoints deliberately not placed on a surface, with why. These are the ones
+# to review: each is a judgement call rather than a mechanical assignment.
+unassigned:
+  - operation: search_transcripts
+    reason: >-
+      Searches transcript text, which is a different capability from the name
+      search the brief describes. Unmeasured in the inventory (verdict
+      "unknown"). Needs a product decision before it gets a surface.
+  - operation: stream_asset
+    reason: >-
+      Byte serving. Deliberately deferred (issue #85), so no surface should
+      depend on it for thumbnails or preview.
+  - operation: mark_assets_seen
+    reason: >-
+      Bulk "still on disk" stamp. Reads as scanner bookkeeping, but its declared
+      audience is the front end. Unclear whether a person ever triggers it.
+  - operation: create_asset
+    reason: >-
+      Assets originate from scanning the filesystem. Creating one by hand may be
+      an import-only path; if so it belongs to Organise's inbox, not a form.
+  - operation: list_id_schemes
+    reason: Configuration of identifier namespaces, not a browse or edit surface.
+  - operation: get_id_scheme
+    reason: Configuration of identifier namespaces.
+  - operation: create_id_scheme
+    reason: Configuration of identifier namespaces.
+  - operation: update_id_scheme
+    reason: Configuration of identifier namespaces.
+  - operation: get_title_type
+    reason: Type vocabulary administration, not a library surface.
+  - operation: create_title_type
+    reason: >-
+      Type vocabulary administration. Also currently broken in production: a new
+      sequence inherits no grants.
+  - operation: update_title_type
+    reason: >-
+      Type vocabulary administration. Renaming `TV Show` to `Episode` runs
+      through here, but that is a one-off migration, not a surface.
+  - operation: delete_title_type
+    reason: Type vocabulary administration.
+  - operation: create_tag
+    reason: >-
+      Tag vocabulary administration. Whether a designer gets a tag-creation
+      affordance inline on Title, or a separate vocabulary surface, is undecided.
+  - operation: get_tag
+    reason: Tag vocabulary administration.
+  - operation: update_tag
+    reason: Tag vocabulary administration.
+  - operation: create_child_tag
+    reason: Tag vocabulary administration; builds the tag hierarchy.
+
+# Capabilities the front-end will want that the API cannot serve.
+#
+# Each entry is checked against the inventory when the document is generated.
+# `absent_*` assertions fail the build if the thing actually exists, so this
+# list can never drift back into claiming a gap that has since been closed.
+not_available:
+  - capability: Unified search across Titles and Assets
+    issue: "#97 (design paused), #78 (search cluster)"
+    absent_op: unified_search
+    detail: >-
+      The only search route is transcript search. Title lookup is a substring
+      match on `name` that needs three characters before its trigram index
+      engages, so the search box must not fire before then. Build against the
+      name filter; do not design a single ranked cross-entity result list.
+  - capability: Optimistic concurrency on any edit
+    issue: none raised
+    absent_field: get_title.updated_at
+    detail: >-
+      No ETag, no `If-Match`, no version field. Every form is last-write-wins:
+      two people editing one Title silently overwrite each other. Design saves
+      as immediate and non-negotiable, not as a mergeable draft.
+  - capability: Sort a listing by tag, year or artwork presence
+    issue: none raised
+    detail: >-
+      Titles sort by `id`, `name` or `title_type` only. Anything else the grid
+      offers has to be a filter, not a sort.
+  - capability: A count of matching rows on a listing
+    issue: none raised
+    detail: >-
+      Keyset pagination returns a cursor, not a total. "1,204 titles" cannot be
+      shown above a filtered grid, and no pagination control can show "page 3
+      of 40". Design for "load more", not for numbered pages.
+
+# Gaps the brief states as open that the API has since closed. The brief is the
+# document the designer has already read, so leaving these unstated would leave
+# a stale constraint standing. `present_*` assertions fail the build if the
+# capability disappears again.
+resolved_since_brief:
+  - brief: "S6: no way to ask what is unplaced"
+    now: >-
+      `has_intrinsic_parent=false` on both `GET /api/assets/` and
+      `GET /api/titles/`. The organising work queue is directly requestable.
+    present_param: list_assets.has_intrinsic_parent
+  - brief: "S6: no move operation"
+    now: >-
+      `POST /api/titles/{destination}/contents/{edge}/move` moves one edge in
+      one transaction, and `.../contents/batch/move` moves many. A move is one
+      call; it cannot leave an item attached to nothing.
+    present_op: move_title_content
+  - brief: "S6: no bulk containment writes"
+    now: >-
+      `contents/batch`, `contents/batch/move` and `contents/batch/detach` each
+      apply the whole set in one transaction.
+    present_op: attach_title_contents_batch
+  - brief: "S7: edition is not yet a field"
+    now: >-
+      `edition` is present on Asset and is editable. The Title screen can tell a
+      re-encoding from a different cut, so the picker question is answerable.
+    present_field: get_asset.edition

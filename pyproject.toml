@@ -54,6 +54,10 @@ capability-inventory = "tools.capability_inventory.cli:main"
 # The artwork backfill (tools/artwork_backfill). Registers the cover files that
 # predate the artwork table. One-shot, dry-run by default; see its module docstring.
 artwork-backfill = "tools.artwork_backfill.cli:main"
+# The front-end API contract generator (tools/design_contract). Turns the
+# capability inventory into the surface-organised contract the design repository
+# reads. Regenerate rather than editing its output.
+design-contract = "tools.design_contract.cli:main"
 # The artwork dimensions pass (tools/artwork_dimensions). Fills in width/height on
 # rows registered before anything measured them -- rows that predate #140, when the
 # API began measuring every upload itself. Also re-measures after a bad pass.
