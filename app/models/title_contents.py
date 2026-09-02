@@ -86,6 +86,21 @@ class TitleContentORM(Base):
         # Checking per-statement would reject the shuffle itself; checking at commit
         # asks the question that actually matters -- is the list well-formed now.
         #
+        # **Do not "tidy" this into a plain UniqueConstraint.** Measured in #180 by
+        # replacing it with `UNIQUE (parent_title_id, position)` and re-running the same
+        # requests: every reorder shape then fails with a 409 -- first-to-end,
+        # last-to-start and mid-to-mid alike. Not some edge case; reordering stops
+        # working entirely, because the mover's own row still occupies the position the
+        # first shifted row is being written into.
+        #
+        # Nothing in CI would catch that. `alembic check` compares models to database
+        # and does **not** report deferrability, so the swap above passed it with "No new
+        # upgrade operations detected" (verified in #180 against a freshly migrated
+        # database). The test suite builds its schema from this model rather than from
+        # the migrations, so a migration that dropped deferrability without touching this
+        # line would ship green and break reordering in production. `test_uq_parent_
+        # position_is_deferrable` pins the model side; the migration side is unguarded.
+        #
         # Deferred, not dropped. The guard has to hold against a writer that never goes
         # near the service layer, which this table demonstrably has (#125).
         UniqueConstraint(
@@ -168,5 +183,56 @@ class TitleContentORM(Base):
             unique=True,
             postgresql_where=(child_title_id.isnot(None))
             & (membership == MembershipKind.intrinsic),
+        ),
+        # Containment asked from the *asset's* side: "does this asset have a home?",
+        # which is `GET /api/assets/?has_intrinsic_parent=` and the unplaced queue the
+        # placement workflow starts from (#177).
+        #
+        # Nothing indexed `asset_id` before this. `uq_parent_asset_once` is keyed on
+        # (parent_title_id, asset_id), so it answers "what is under this parent" and can
+        # never serve a lookup that pins only the asset -- the same leading-column trap
+        # that left the curated half of the child-side question uncovered until
+        # `ix_title_contents_child_membership` was added.
+        #
+        # Not the mirror of `uq_one_intrinsic_parent`, deliberately: an asset may have
+        # several intrinsic parents (the same file under two cuts), so this cannot be
+        # unique and cannot be partial on `intrinsic` without losing the `true`
+        # direction's other half. A plain composite keyed on (asset_id, membership)
+        # serves both directions of the filter and the membership-agnostic lookup that
+        # `GET /api/assets/{id}/titles` issues.
+        Index(
+            "ix_title_contents_asset_membership",
+            "asset_id",
+            "membership",
+        ),
+        # Membership asked *without* a child to pin it -- `GET /api/titles/?membership=`
+        # on its own, where the semi-join has to find every edge of a kind rather than
+        # check one child's edges (#182).
+        #
+        # Leading with `membership` is the whole point, and is what makes this not a
+        # duplicate of `ix_title_contents_child_membership` above despite holding the
+        # same two columns: that one leads with `child_title_id` and answers "what kind
+        # of edge does this child have", this one answers "which children have an edge
+        # of this kind". Neither can serve the other's question, and #59 and #171 are
+        # the reminder to say so explicitly rather than leave the pair looking redundant.
+        #
+        # `child_title_id` is carried as the second column so the scan is index-only:
+        # the semi-join wants exactly that column and nothing else. Measured at the
+        # production shape (1,917 edges, 119 of them curated), on
+        # `?membership=curated`:
+        #
+        #   sequential scan                        cost 38.96
+        #   index scan, membership alone           cost 10.36
+        #   index-only scan, (membership, child)   cost  6.36
+        #
+        # The intrinsic half is untouched by this and stays on
+        # `uq_one_intrinsic_parent`, which is smaller and already exact -- 94% of edges
+        # are intrinsic, so an index leading on `membership` has nothing to narrow
+        # there. This index earns its place on the rare value, which is the one a
+        # curated-collections screen filters by.
+        Index(
+            "ix_title_contents_membership_child",
+            "membership",
+            "child_title_id",
         ),
     )
