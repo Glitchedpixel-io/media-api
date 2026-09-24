@@ -35,7 +35,7 @@ jobs:
       tag: ${{ steps.check.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
@@ -64,12 +64,12 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - name: Install dependencies
         run: uv sync --frozen
@@ -95,7 +95,7 @@ jobs:
           fi
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -104,7 +104,7 @@ jobs:
       # The core image depends on no orchestration framework. That is the point
       # of the pluggable provider registry, and it is why EXTRAS defaults empty.
       - name: Build and push (core)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -118,7 +118,7 @@ jobs:
       # A separate artifact, not a different default. Environments that enable
       # the prefect provider deploy this tag; everything else stays lean.
       - name: Build and push (prefect flavour)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true

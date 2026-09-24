@@ -51,11 +51,11 @@ jobs:
 
       - name: Check out main at this commit
         if: steps.find_run.outputs.run_id != ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Download that run's coverage reports
         if: steps.find_run.outputs.run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-reports
           run-id: ${{ steps.find_run.outputs.run_id }}
