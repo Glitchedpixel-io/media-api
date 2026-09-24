@@ -1,0 +1,20 @@
+# Canonical Dependabot config. Keeps workflow `uses:` refs off retired action runtimes.
+# Standard: Glitchedpixel-io/claude-code docs/standards/actions-dependencies.md. Canonical
+# copy: claude-code .claude/skills/new-repo/assets/dependabot.yml — copy it, do not re-type it.
+#
+# Scope is deliberately github-actions only. Language dependencies are pinned by uv.lock /
+# package-lock.json and moved on purpose; action majors retire underneath us on GitHub's
+# schedule (Node 20 was removed from runners 2026-09-23) whether we move or not.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # One PR per repo per run. Every merge to main cuts a patch tag and, in most repos,
+    # auto-deploys — ungrouped, a single run could ship five releases of unchanged code.
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"

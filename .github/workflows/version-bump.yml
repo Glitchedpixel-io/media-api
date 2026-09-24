@@ -29,7 +29,7 @@ jobs:
       contents: write
       pull-requests: read      # needed to look up the source PR's actual title
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0       # REQUIRED — a shallow clone has no tags, and every run
                                # would then compute v0.0.1
