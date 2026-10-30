@@ -22,6 +22,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.utils.session_timezone import pinned_conninfo
+
 from .models import Unknown
 from .probes import _pick
 from .write_semantics import WriteTarget, psycopg_dsn
@@ -202,7 +204,9 @@ class WriteProbeRunner:
 
         ok = True
         try:
-            with psycopg.connect(psycopg_dsn(self.target.database_url), connect_timeout=10) as conn:
+            with psycopg.connect(
+                pinned_conninfo(psycopg_dsn(self.target.database_url)), connect_timeout=10
+            ) as conn:
                 for table, column, value in reversed(ledger.sql_entries):
                     if table not in _CLEANABLE_TABLES:  # pragma: no cover - checked earlier
                         continue

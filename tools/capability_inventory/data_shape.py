@@ -31,6 +31,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from app.utils.session_timezone import pinned_conninfo
+
 from .models import CollectionStats, ColumnStats, CoverageMetric, DataShape, Unknown
 
 ENV_VAR = "CAPINV_DATABASE_URL"
@@ -166,7 +168,7 @@ class ReadOnlySession:
             raise RuntimeError(f"psycopg is required for Phase 3: {exc}") from exc
 
         try:
-            self._conn = psycopg.connect(dsn, connect_timeout=10)
+            self._conn = psycopg.connect(pinned_conninfo(dsn), connect_timeout=10)
         except Exception as exc:
             raise RuntimeError(
                 f"Could not connect to the database at {redact(dsn)}: {exc}"

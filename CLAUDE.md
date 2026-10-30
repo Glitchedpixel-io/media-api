@@ -16,6 +16,17 @@
 
 ## Known gotchas
 - The test suite requires a running Postgres instance. Use TEST_DATABASE_URL environment variable to locate a suitable instance.
+  It is shared with other agents: never alter it. `tests/integration/test_session_timezone.py`
+  needs a database defaulting to London, so it creates a throwaway `tz_london_<random>`
+  database and drops it.
+- **Every database session is pinned to UTC.** Each connect path -- the app engine, the
+  Alembic engine, the `tools/` CLIs and `scripts/` -- takes its libpq `options` from
+  `app/utils/session_timezone.py` (`-c TimeZone=UTC`, after any `options` its URL already
+  carries). Core's servers default a session to `Europe/London` and psycopg returns
+  `timestamptz` in the session's zone; in the hour repeated when the clocks go back a London
+  datetime is never `==` to the same instant in another zone (PEP 495). The test databases
+  default to UTC, which hid it (sentinel-core#525, D-239). A new engine or
+  `psycopg.connect` must use `engine_connect_args` / `pinned_conninfo` too.
 
 ## Database Migrations
 

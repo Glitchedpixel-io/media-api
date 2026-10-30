@@ -34,6 +34,8 @@ import uuid
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from app.utils.session_timezone import pinned_conninfo
+
 from .models import Unknown
 
 BASE_URL_ENV = "CAPINV_WRITE_BASE_URL"
@@ -144,7 +146,7 @@ def cluster_fingerprint(dsn: str) -> str:
     import psycopg  # noqa: PLC0415 -- optional at import time; only Phase 6 needs it.
 
     try:
-        with psycopg.connect(psycopg_dsn(dsn), connect_timeout=10) as conn:
+        with psycopg.connect(pinned_conninfo(psycopg_dsn(dsn)), connect_timeout=10) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT system_identifier::text, current_database() FROM pg_control_system()"
@@ -263,7 +265,7 @@ def bind_check(target: WriteTarget) -> None:
     # fails with a type error that reads as a binding failure -- aborting the run
     # while pointing the operator at entirely the wrong problem.
     sentinel = f"capinv-sentinel-{uuid.uuid4().hex[:16]}"
-    dsn = psycopg_dsn(target.database_url)
+    dsn = pinned_conninfo(psycopg_dsn(target.database_url))
     tag_id: int | None = None
     try:
         try:

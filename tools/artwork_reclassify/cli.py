@@ -25,6 +25,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import get_config
+from app.utils.session_timezone import engine_connect_args
 
 from .reclassify import SOURCE_KIND, Summary, distribution, run
 
@@ -88,7 +89,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     config = get_config()
-    engine = create_engine(config.database.url, future=True)
+    engine = create_engine(
+        config.database.url,
+        future=True,
+        connect_args=engine_connect_args(config.database.url),
+    )
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     session = session_factory()
     try:

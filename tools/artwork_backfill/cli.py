@@ -23,6 +23,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import get_config
+from app.utils.session_timezone import engine_connect_args
 from app.repositories.artwork_repository import SQLAlchemyArtworkKindRepository
 from app.services.artwork_storage import ArtworkStore
 
@@ -122,7 +123,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    engine = create_engine(config.database.url, future=True)
+    engine = create_engine(
+        config.database.url,
+        future=True,
+        connect_args=engine_connect_args(config.database.url),
+    )
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     session = session_factory()
     try:
