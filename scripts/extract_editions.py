@@ -47,6 +47,7 @@ import sqlalchemy as sa
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.utils.editions import CANONICAL_EDITIONS, parse_edition  # noqa: E402
+from app.utils.session_timezone import engine_connect_args  # noqa: E402
 
 _FIELDS = ("asset_id", "filename", "edition", "raw_marker", "source", "canonical")
 
@@ -181,7 +182,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    engine = sa.create_engine(_database_url())
+    url = _database_url()
+    engine = sa.create_engine(url, connect_args=engine_connect_args(url))
     if args.apply:
         if not args.from_file.exists():
             raise SystemExit(f"No such file: {args.from_file}. Run without --apply first.")

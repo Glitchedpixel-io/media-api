@@ -5,6 +5,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
+from app.utils.session_timezone import engine_connect_args
 
 # A valid unquoted-or-simple SQL identifier for a role name.
 _ROLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -118,11 +119,14 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section, {})
     # Inject the URL directly rather than via set_main_option so passwords
     # containing '%' are not mangled by ConfigParser interpolation.
-    configuration["sqlalchemy.url"] = _database_url()
+    url = _database_url()
+    configuration["sqlalchemy.url"] = url
+    # Sessions pinned to UTC, like the app's own (app/utils/session_timezone.py).
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=engine_connect_args(url),
     )
 
     with connectable.connect() as connection:

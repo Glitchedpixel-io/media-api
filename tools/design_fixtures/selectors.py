@@ -18,6 +18,8 @@ from typing import Any, Sequence
 
 from sqlalchemy import Engine, create_engine, text
 
+from app.utils.session_timezone import engine_connect_args
+
 
 @dataclass(frozen=True)
 class Measured:
@@ -40,7 +42,9 @@ class Selectors:
     """
 
     def __init__(self, database_url: str) -> None:
-        self._engine: Engine = create_engine(database_url)
+        self._engine: Engine = create_engine(
+            database_url, connect_args=engine_connect_args(database_url)
+        )
 
     def dispose(self) -> None:
         """Close the connection pool."""

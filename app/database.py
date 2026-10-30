@@ -8,6 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DatabaseConfig
 from app.repositories.errors import DatabaseLocked
+from app.utils.session_timezone import engine_connect_args
 
 
 class Base(DeclarativeBase):
@@ -56,9 +57,14 @@ def _attach_error_handler(engine: Engine) -> None:
 
 
 def _create_engine_from_config(config: DatabaseConfig) -> Engine:
-    """Create a new SQLAlchemy Engine from the given config."""
+    """Create a new SQLAlchemy Engine from the given config.
+
+    Every session it opens is pinned to UTC (`app.utils.session_timezone`): Core's
+    servers default a session to Europe/London, which psycopg would otherwise hand back.
+    """
     engine = create_engine(
         config.url,
+        connect_args=engine_connect_args(config.url),
         pool_size=config.pool_size,
         max_overflow=10,
         pool_timeout=30,
@@ -112,6 +118,18 @@ def _normalize_tz(value: str | None) -> str | None:
 
 
 def assert_database_timezone_utc(db_engine: Engine) -> None:
+    """Check that the engine's sessions run in UTC.
+
+    The engine pins each session to UTC itself (`engine_connect_args`), whatever the
+    server's default -- Core's servers default to Europe/London -- so on PostgreSQL this
+    now proves the pin took effect rather than how the server is configured.
+
+    Args:
+        db_engine (Engine): The engine to check.
+
+    Raises:
+        RuntimeError: If a session reports a zone other than UTC.
+    """
     with logfire.span("assert_database_timezone_utc") as span:
         dialect = db_engine.dialect.name.lower()
         try:
@@ -121,8 +139,9 @@ def assert_database_timezone_utc(db_engine: Engine) -> None:
                     tz_norm = _normalize_tz(tz)
                     if not tz_norm or "UTC" not in tz_norm.upper():
                         raise RuntimeError(
-                            f"Database timezone must be UTC; current PostgreSQL setting is '{tz_norm}'. "
-                            "Set 'timezone = 'UTC'' in postgresql.conf or run ALTER DATABASE ... SET timezone TO 'UTC';"
+                            f"Database sessions must run in UTC; this one reports '{tz_norm}'. "
+                            "The engine's connect_args should pin it (-c TimeZone=UTC, "
+                            "app/utils/session_timezone.py); check they reached the connection."
                         )
                     logfire.info(f"PostgreSQL timezone check passed: {tz_norm}")
                     return
