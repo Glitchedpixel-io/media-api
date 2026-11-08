@@ -312,12 +312,10 @@ def _conditional_fields(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
 def _streaming_returns(api: Any) -> set[tuple[str, str]]:
     """Identify routes whose handler returns a streamed response."""
-    from fastapi.routing import APIRoute  # noqa: PLC0415 -- deferred with the app import.
+    from app.utils.routes import api_routes  # noqa: PLC0415 -- deferred with the app import.
 
     streaming: set[tuple[str, str]] = set()
-    for route in api.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for route in api_routes(api):
         annotation = getattr(route.endpoint, "__annotations__", {}).get("return")
         name = getattr(annotation, "__name__", str(annotation))
         if "Streaming" in name or "FileResponse" in name:
@@ -341,12 +339,10 @@ def _normalise_path(path: str) -> str:
 
 def _handlers(api: Any) -> dict[tuple[str, str], tuple[str, str]]:
     """Map (method, path) to the handler's (module, function name)."""
-    from fastapi.routing import APIRoute  # noqa: PLC0415 -- deferred with the app import.
+    from app.utils.routes import api_routes  # noqa: PLC0415 -- deferred with the app import.
 
     out: dict[tuple[str, str], tuple[str, str]] = {}
-    for route in api.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for route in api_routes(api):
         for method in route.methods:
             out[(method.upper(), _normalise_path(route.path))] = (
                 route.endpoint.__module__,
@@ -363,12 +359,11 @@ def _served_paths(api: Any) -> set[tuple[str, str]]:
     collections -- is served but not published, so judging "is a trailing slash
     required?" from the document alone reports a redirect that cannot happen.
     """
-    from fastapi.routing import APIRoute  # noqa: PLC0415 -- deferred with the app import.
+    from app.utils.routes import api_routes  # noqa: PLC0415 -- deferred with the app import.
 
     return {
         (method.upper(), _normalise_path(route.path))
-        for route in api.routes
-        if isinstance(route, APIRoute)
+        for route in api_routes(api)
         for method in route.methods
     }
 

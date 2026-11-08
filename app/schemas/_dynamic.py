@@ -20,7 +20,7 @@ def make_partial_model(model: type[T], *, name: str | None = None) -> type[T]:
         ann = f.annotation
         # If not already Optional, wrap it
         if type(None) not in get_args(ann):
-            ann = Optional[ann]  # type: ignore # type: ignore[index]
+            ann = Optional[ann]  # type: ignore[assignment]
         new_field = copy.deepcopy(f)
         new_field.annotation = ann
         new_field.default = None
@@ -28,4 +28,4 @@ def make_partial_model(model: type[T], *, name: str | None = None) -> type[T]:
         new_fields[fname] = (ann, new_field)
     # inherit from the original model to keep validators/config;
     # overriding fields with optional versions
-    return create_model(name, __base__=model, **new_fields)  # type: ignore # type: ignore[return-value]
+    return create_model(name, __base__=model, **new_fields)  # type: ignore[call-overload,no-any-return]
