@@ -9,10 +9,14 @@ dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "fastapi>=0.121.2",
-    "uvicorn[standard]>=0.38.0",
+    "fastapi>=0.162.2",
+    "uvicorn[standard]>=0.54.0",
     "psycopg[binary]>=3.2.12,<4.0.0",
-    "sqlalchemy>=2.0.44,<3.0.0",
+    # Held below 2.1: 2.1 deprecates the `noload` loader strategy, which the asset
+    # and title relationships use so collections serialise empty unless `include=`
+    # eager-loads them. Replacing it changes how responses are built; do that on its
+    # own, then lift this.
+    "sqlalchemy>=2.0.44,<2.1",
     # Not just a dev tool for authoring migrations: the deploy pipeline runs
     # `alembic upgrade head` inside this same production image at deploy time.
     "alembic>=1.17.0",
@@ -23,9 +27,8 @@ dependencies = [
     "elasticsearch>=9.2.0,<10.0.0",
     "sqlakeyset>2.0.1746777265,<3.0.0",
     "pydantic-settings>=2.12.0,<3.0.0",
-    "logfire[fastapi,sqlalchemy]>=4.14.2,<5.0.0",
-    "opentelemetry-instrumentation-elasticsearch>=0.59b0,<0.60",
-    "ecdsa==0.19.1",
+    "logfire[fastapi,sqlalchemy]>=5.5.0,<6.0.0",
+    "ecdsa==0.19.2",
     "python-multipart>=0.0.32",
     # The API measures every uploaded image and refuses what it cannot read, so an
     # image library is now core rather than an optional maintenance extra (#140).
@@ -117,6 +120,7 @@ minversion = "8.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 xfail_strict = true
 
 addopts = """

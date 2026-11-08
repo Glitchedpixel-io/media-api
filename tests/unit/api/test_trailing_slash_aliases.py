@@ -15,8 +15,10 @@ from http import HTTPStatus
 
 import pytest
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
+from fastapi.routing import RouteContext
 from fastapi.testclient import TestClient
+
+from app.utils.routes import api_routes
 
 pytestmark = [pytest.mark.unit, pytest.mark.api]
 
@@ -73,11 +75,13 @@ def test_the_alias_matches_the_canonical_route(api_app: FastAPI, path: str) -> N
         assert alias.endpoint is canonical.endpoint
         assert alias.response_model == canonical.response_model
         assert alias.status_code == canonical.status_code
-        assert type(alias) is type(canonical), "the alias must keep the route class"
+        assert type(alias.original_route) is type(
+            canonical.original_route
+        ), "the alias must keep the route class"
 
 
-def _route(api_app: FastAPI, path: str, method: str) -> APIRoute | None:
-    for route in api_app.routes:
-        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
+def _route(api_app: FastAPI, path: str, method: str) -> RouteContext | None:
+    for route in api_routes(api_app):
+        if route.path == path and method in route.methods:
             return route
     return None

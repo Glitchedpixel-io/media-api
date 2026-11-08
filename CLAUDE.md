@@ -27,6 +27,13 @@
   datetime is never `==` to the same instant in another zone (PEP 495). The test databases
   default to UTC, which hid it (sentinel-core#525, D-239). A new engine or
   `psycopg.connect` must use `engine_connect_args` / `pinned_conninfo` too.
+- **Never filter `app.routes` for `APIRoute`; use `app.utils.routes.api_routes(app)`.**
+  From FastAPI 0.137 `app.routes` is a tree in which an included router is a single
+  node, so the filter silently finds none of its routes. It took out the trailing-slash
+  aliases (`/api/assets` answered with a redirect again) and the capability inventory's
+  route scan without raising anything. `api_routes` wraps FastAPI's
+  `iter_route_contexts`, which reports each route's effective path and its
+  router-level dependencies.
 
 ## Database Migrations
 

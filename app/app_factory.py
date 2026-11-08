@@ -3,10 +3,11 @@ from __future__ import annotations
 import logfire
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, Callable
+from typing import Any, AsyncContextManager, Callable, cast
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from sqlalchemy import text
 
 from app.auth.jwt import get_current_user
@@ -34,6 +35,7 @@ from app.routers.tags import router as tags_router
 from app.routers.title_types import router as title_types_router
 from app.routers.titles import router as titles_router
 from app.routers.transform_requests import router as transform_requests_router
+from app.utils.routes import api_routes
 
 
 def get_lifespan(config: AppConfig | None = None) -> Callable[[FastAPI], AsyncContextManager[None]]:
@@ -218,34 +220,39 @@ def _alias_unslashed_paths(api: FastAPI) -> None:
     Each alias is *copied* from its canonical route rather than declared by hand:
     response model, status code, dependencies and declared responses all come from
     it, so the pair cannot drift. The dependencies matter most -- router-level
-    ``Depends(get_current_user)`` lands on ``route.dependencies``, and an alias that
-    dropped it would be an unauthenticated copy of an authenticated endpoint.
+    ``Depends(get_current_user)`` lands on the route's effective ``dependencies``,
+    and an alias that dropped it would be an unauthenticated copy of an
+    authenticated endpoint.
 
     Args:
         api: The application, with its routers already included.
     """
-    from fastapi.routing import APIRoute  # noqa: PLC0415 -- avoids a circular import
-
-    routes = [route for route in api.routes if isinstance(route, APIRoute)]
-    existing = {(route.path, frozenset(route.methods)) for route in routes}
+    # `api_routes`, not `api.routes`: an included router is one node in that tree,
+    # so filtering it for APIRoute finds none of the collection routes. Each context
+    # carries the effective path and the router-level dependencies merged in.
+    routes = list(api_routes(api))
+    existing = {(route.path, frozenset(route.methods or ())) for route in routes}
 
     for route in routes:
-        if not route.path.endswith("/") or route.path == "/":
+        path, methods, endpoint = route.path, route.methods, route.endpoint
+        if path is None or methods is None or endpoint is None:  # pragma: no cover
+            continue  # never for an APIRoute; RouteContext types them as optional
+        if not path.endswith("/") or path == "/":
             continue
-        unslashed = route.path.rstrip("/")
-        if (unslashed, frozenset(route.methods)) in existing:
+        unslashed = path.rstrip("/")
+        if (unslashed, frozenset(methods)) in existing:
             continue
         api.router.add_api_route(
             unslashed,
-            route.endpoint,
-            methods=sorted(route.methods),
+            endpoint,
+            methods=sorted(methods),
             response_model=route.response_model,
             status_code=route.status_code,
             dependencies=route.dependencies,
             responses=route.responses,
             name=f"{route.name}_unslashed",
             include_in_schema=False,
-            route_class_override=type(route),
+            route_class_override=cast(type[APIRoute], type(route.original_route)),
         )
 
 
