@@ -322,7 +322,7 @@ Two things worth knowing when reading it:
   the flag on each row records which kind of evidence produced it.
 - **Fill rate is not reported for `include=`-gated fields.** `AssetORM.tags`,
   `AssetORM.master_asset`, `TitleORM.tags` and `TitleORM.references` are mapped
-  `lazy="noload"`: without `?include=`, they serialise as `[]`, which is
+  `lazy="raise"`: without `?include=`, they serialise as `[]`, which is
   indistinguishable from genuinely having none. A database-derived percentage
   would describe something the front end never sees, so those fields carry the
   caveat instead of a number.

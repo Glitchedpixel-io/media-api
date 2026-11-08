@@ -421,7 +421,7 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
             for query in annotation.queries
             for table in query.tables
         }
-        noload = {
+        gated = {
             (table, field.name)
             for route in routes
             for response in route.responses
@@ -431,7 +431,7 @@ def _run(args: argparse.Namespace, root: Path) -> Inventory:
         }
         shape = data_shape.collect(
             tables=tables,
-            noload_columns=noload,
+            gated_columns=gated,
             cardinality_scan_limit=args.cardinality_scan_limit,
             include_example_values=args.include_example_values,
         )
