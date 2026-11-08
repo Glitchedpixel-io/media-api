@@ -134,12 +134,15 @@ class AssetORM(Base):
         foreign_keys=[master_asset_id],
         primaryjoin="AssetORM.master_asset_id==AssetORM.id",
         uselist=False,
-        lazy="noload",
+        lazy="raise",
     )
 
-    # Tags
+    # Tags. Like master_asset, loaded only when the list's include= asks for it, and
+    # lazy="raise" so nothing else can load it by accident: AssetReadExtended reads it
+    # as empty when unloaded (app/schemas/_orm.py). passive_deletes leaves the
+    # asset_tags rows to the database's ON DELETE CASCADE rather than loading them.
     tags: Mapped[list[TagORM]] = relationship(
-        secondary="asset_tags", back_populates="assets", lazy="noload"
+        secondary="asset_tags", back_populates="assets", lazy="raise", passive_deletes=True
     )
 
     # Eager by default: AssetReadExtended serialises external_ids unconditionally, so a

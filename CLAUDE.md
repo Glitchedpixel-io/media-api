@@ -34,6 +34,12 @@
   route scan without raising anything. `api_routes` wraps FastAPI's
   `iter_route_contexts`, which reports each route's effective path and its
   router-level dependencies.
+- **An `include=`-gated relationship is `lazy="raise"`, and its read schema must
+  inherit `UnloadedRelationshipsAsEmpty` (`app/schemas/_orm.py`).** The repository
+  eager-loads it only when `include=` names it; unrequested, the schema serialises it
+  as `[]` or `null` with no query. It replaced `lazy="noload"`, which SQLAlchemy 2.1
+  deprecates. Without the mixin, validating the ORM row raises on the unloaded field.
+  `tests/integration/api/test_unrequested_relationships.py` pins each endpoint's output.
 
 ## Database Migrations
 

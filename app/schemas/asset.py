@@ -9,6 +9,7 @@ from app.utils.paths import to_linux_path
 
 
 from ._dynamic import make_partial_model
+from ._orm import UnloadedRelationshipsAsEmpty
 from .mixins import IDMixin
 from .tag import TagRead
 from .id_scheme import ExternalIdentifierRead
@@ -85,7 +86,7 @@ class AssetRead(AssetCreateInternal, IDMixin):
     created_at: Timestamp = Field(..., description="When the record was created")
 
 
-class AssetReadExtended(AssetRead):
+class AssetReadExtended(AssetRead, UnloadedRelationshipsAsEmpty):
     master_asset: AssetRead | None = Field(
         None,
         title="Master Asset",

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from sqlakeyset import select_page
 from sqlalchemy import Integer, case, func, literal, select
 from sqlalchemy.sql import ColumnElement, Select
-from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.dialects.postgresql import array, distinct_on
 
 from app.models import ArtworkKindORM, ArtworkORM, TitleContentORM, TitleORM
 from app.models.sort_configs import ARTWORK_SORT
@@ -529,7 +529,7 @@ class SQLAlchemyArtworkRepository(SQLAlchemyBaseRepository, ArtworkRepository):
         # kind beating depth. Swapping them changes which image a title shows.
         nearest = (
             select(matches.c.root_id, matches.c.artwork_id)
-            .distinct(matches.c.root_id)
+            .ext(distinct_on(matches.c.root_id))
             .order_by(
                 matches.c.root_id,
                 matches.c.kind_rank,

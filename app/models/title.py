@@ -63,14 +63,16 @@ class TitleORM(Base):
     # the request's session has closed.
     type: Mapped[TitleTypeORM] = relationship(lazy="joined")
 
-    # Relationship to title references
+    # References and tags are loaded only when the list's include= asks for them, and
+    # lazy="raise" so nothing else can load them by accident: TitleReadExtended reads
+    # them as empty when unloaded (app/schemas/_orm.py). passive_deletes leaves their
+    # rows to the database's ON DELETE CASCADE rather than loading them.
     references: Mapped[list[TitleReferenceORM]] = relationship(
-        "TitleReferenceORM", cascade="all, delete-orphan", lazy="noload"
+        "TitleReferenceORM", cascade="all, delete-orphan", lazy="raise", passive_deletes=True
     )
 
-    # Tags
     tags: Mapped[list[TagORM]] = relationship(
-        secondary="title_tags", back_populates="titles", lazy="noload"
+        secondary="title_tags", back_populates="titles", lazy="raise", passive_deletes=True
     )
 
     __table_args__ = (

@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ._dynamic import make_partial_model
+from ._orm import UnloadedRelationshipsAsEmpty
 from .artwork import ArtworkRead
 from .mixins import IDMixin
 from .tag import TagRead
@@ -83,7 +84,7 @@ class TitleRead(TitleAttrs, IDMixin):
     pass
 
 
-class TitleReadExtended(TitleRead):
+class TitleReadExtended(TitleRead, UnloadedRelationshipsAsEmpty):
     display_image: ArtworkRead | None = Field(
         None,
         title="Display Image",

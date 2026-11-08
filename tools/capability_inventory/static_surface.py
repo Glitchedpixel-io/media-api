@@ -9,7 +9,7 @@ recovered here by inspecting the live route table and the SQLAlchemy mappers:
 
 * whether a response is streamed rather than serialised, and
 * which response fields are *conditionally* populated -- relationship fields
-  configured ``lazy="noload"`` serialise as ``[]`` unless the caller passes
+  configured ``lazy="raise"`` serialise as ``[]`` unless the caller passes
   ``include=``, which reads identically to "this thing has no tags".
 
 That second one is the difference between a designer trusting a field and being
@@ -265,10 +265,10 @@ def _responses(
 def _conditional_fields(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     """Find response fields that are only populated on request.
 
-    A relationship mapped ``lazy="noload"`` yields an empty collection unless
-    the query explicitly eager-loads it, and the list repositories only do that
-    when ``include=`` names it. The serialised response is then ``[]``, which is
-    indistinguishable from genuinely having none.
+    A relationship mapped ``lazy="raise"`` is never loaded unless the query
+    explicitly eager-loads it, and the list repositories only do that when
+    ``include=`` names it. Otherwise the read schema serialises it as ``[]``
+    (``app/schemas/_orm.py``), which is indistinguishable from genuinely having none.
 
     Returns:
         Schema name -> field name -> the parameter that populates it. Empty if
@@ -281,18 +281,18 @@ def _conditional_fields(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     except Exception:  # pragma: no cover - defensive
         return {}
 
-    noload: dict[str, set[str]] = {}
+    gated: dict[str, set[str]] = {}
     for name in dir(app_models):
         obj = getattr(app_models, name)
         if not (isinstance(obj, type) and name.endswith("ORM")):
             continue
         try:
             mapper = sa_inspect(obj)
-            lazy_none = {rel.key for rel in mapper.relationships if rel.lazy == "noload"}
+            on_request = {rel.key for rel in mapper.relationships if rel.lazy == "raise"}
         except Exception:  # pragma: no cover - not a mapped class
             continue
-        if lazy_none:
-            noload[name.removesuffix("ORM")] = lazy_none
+        if on_request:
+            gated[name.removesuffix("ORM")] = on_request
 
     out: dict[str, dict[str, str]] = {}
     for schema_name in spec.get("components", {}).get("schemas", {}):
@@ -303,7 +303,7 @@ def _conditional_fields(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
                 break
         else:
             continue
-        for rel in noload.get(entity, set()):
+        for rel in gated.get(entity, set()):
             props = spec["components"]["schemas"][schema_name].get("properties", {})
             if rel in props:
                 out.setdefault(schema_name, {})[rel] = f"include={rel}"

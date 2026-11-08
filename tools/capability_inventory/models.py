@@ -52,7 +52,7 @@ class FieldInfo:
         type_: Rendered type.
         nullable: Whether the schema permits null.
         conditional_on: Populated only when the named request parameter asks for
-            it. Set for relationship fields loaded with ``lazy="noload"``, which
+            it. Set for relationship fields mapped ``lazy="raise"``, which
             serialise as an empty collection rather than being absent when not
             requested. A database fill rate is meaningless for these, so
             :mod:`.data_shape` skips them and the renderer says why.

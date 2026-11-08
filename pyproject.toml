@@ -12,11 +12,7 @@ dependencies = [
     "fastapi>=0.162.2",
     "uvicorn[standard]>=0.54.0",
     "psycopg[binary]>=3.2.12,<4.0.0",
-    # Held below 2.1: 2.1 deprecates the `noload` loader strategy, which the asset
-    # and title relationships use so collections serialise empty unless `include=`
-    # eager-loads them. Replacing it changes how responses are built; do that on its
-    # own, then lift this.
-    "sqlalchemy>=2.0.44,<2.1",
+    "sqlalchemy>=2.1.8,<2.2",
     # Not just a dev tool for authoring migrations: the deploy pipeline runs
     # `alembic upgrade head` inside this same production image at deploy time.
     "alembic>=1.17.0",
@@ -160,7 +156,6 @@ omit = [
 [tool.mypy]
 python_version = "3.13"
 plugins = [
-  "sqlalchemy.ext.mypy.plugin",
   "pydantic.mypy"
 ]
 files = ["app"]
@@ -194,6 +189,14 @@ module = [
   "python_telegram_bot.*",
 ]
 ignore_missing_imports = true
+
+# sqlakeyset's hints predate SQLAlchemy 2.1, which re-typed `Select` with a TypeVarTuple:
+# `select_page` still bounds its selectable to `Select[tuple[...]]`, so every call with a
+# 2.1 `Select[AssetORM]` fails type-checking although it runs correctly. Read it as
+# untyped until it catches up.
+[[tool.mypy.overrides]]
+module = ["sqlakeyset", "sqlakeyset.*"]
+follow_imports = "skip"
 
 [tool.black]
 line-length = 100

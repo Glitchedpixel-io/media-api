@@ -15,7 +15,7 @@ Three questions are answered per column, and they are different questions:
 * **Collection size distribution** -- min/median/p95/max children per parent, so
   a design accounts for the 3-item case and the 4000-item case at once.
 
-Columns backing a relationship mapped ``lazy="noload"`` are deliberately *not*
+Columns backing a relationship mapped ``lazy="raise"`` are deliberately *not*
 given a fill rate. The API returns ``[]`` for those unless the caller opts in
 with ``include=``, so a database-derived percentage would describe something the
 front-end never sees.
@@ -570,7 +570,7 @@ def _library_root_coverage(
 
 def collect(
     tables: set[str],
-    noload_columns: set[tuple[str, str]],
+    gated_columns: set[tuple[str, str]],
     cardinality_scan_limit: int = 5000,
     include_example_values: bool = False,
 ) -> DataShape:
@@ -578,7 +578,7 @@ def collect(
 
     Args:
         tables: Tables to profile, derived from the endpoints being reported on.
-        noload_columns: (table, column) pairs to exclude from fill-rate
+        gated_columns: (table, column) pairs to exclude from fill-rate
             reporting because the API does not populate them by default.
         cardinality_scan_limit: Distinct-value scan cap per column.
         include_example_values: Whether to record the most common values of
@@ -624,7 +624,7 @@ def collect(
 
         columns: list[ColumnStats] = []
         for table, cols in sorted(by_table.items()):
-            reportable = [c for c in cols if (table, c.name) not in noload_columns]
+            reportable = [c for c in cols if (table, c.name) not in gated_columns]
             stats = _fill_rates(session, table, reportable, row_counts.get(table, 0))
             index = {c.name: c for c in reportable}
             for stat in stats:
