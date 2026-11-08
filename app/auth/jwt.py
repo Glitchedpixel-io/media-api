@@ -1,7 +1,6 @@
 # app/auth/jwt.py
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass
 from functools import lru_cache
@@ -11,8 +10,8 @@ import logfire
 import requests
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt
-from jose.utils import base64url_decode
+import jwt
+from jwt import PyJWK
 
 from app.config import get_auth_config
 
@@ -76,22 +75,24 @@ def _find_key_for_kid(jwks: dict[str, Any], kid: str) -> dict[str, Any] | None: 
 def verify_jwt(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
     # Decode header to select JWK by kid
     try:
-        header_segment = token.split(".")[0]
-        header_bytes = base64url_decode(header_segment.encode())
-        header = json.loads(header_bytes.decode("utf-8"))
+        header = jwt.get_unverified_header(token)
         kid = header.get("kid")
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid token header") from e
 
     jwks = get_cached_jwks()
-    key = _find_key_for_kid(jwks, kid) if kid else None
-    if not key:
+    jwk = _find_key_for_kid(jwks, kid) if kid else None
+    if not jwk:
         # Refresh cache once and retry
         get_cached_jwks.cache_clear()
         jwks = get_cached_jwks()
-        key = _find_key_for_kid(jwks, kid) if kid else None
-        if not key:
+        jwk = _find_key_for_kid(jwks, kid) if kid else None
+        if not jwk:
             raise HTTPException(status_code=401, detail="Signing key not found")
+    try:
+        key = PyJWK(jwk).key
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Signing key not usable") from e
 
     issuer = _issuer()
     audience = _audience()
@@ -195,7 +196,7 @@ def get_current_user(
 
     _header, payload = verify_jwt(token)
 
-    # Basic time validation (jose already checks exp/nbf)
+    # Basic time validation (jwt.decode already checks exp/nbf)
     now = int(time.time())
     if int(payload.get("exp", now)) < now:
         raise HTTPException(status_code=401, detail="Token expired")
