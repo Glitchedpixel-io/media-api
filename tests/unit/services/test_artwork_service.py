@@ -187,7 +187,7 @@ class TestKindResolution:
 
     def test_an_unknown_kind_is_422_not_500(self, service, kinds, repo, store):
         """A caller's bad kind code is a client error. Collapsing it into something
-        that maps to 500 is what CLAUDE.md warns QuietClientErrorRoute cannot undo."""
+        that maps to 500 is what CLAUDE.md warns quiet_client_errors cannot undo."""
         kinds.get_by_code.return_value = None
         with pytest.raises(HTTPException) as exc:
             service.register_upload(EntityTypeEnum.title, 42, _upload(), io.BytesIO(b"x"))

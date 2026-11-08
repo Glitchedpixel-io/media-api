@@ -3,11 +3,10 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_WRITE_RESPONSES
 from app.dependencies import get_scanner_run_summary_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import ScannerRunSummaryCreatePublic, ScannerRunSummaryRead
 from app.services import ScannerRunSummaryService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.post(

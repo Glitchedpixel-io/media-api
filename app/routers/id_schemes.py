@@ -5,11 +5,10 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_id_scheme_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import IdSchemeRead, IdSchemeCreatePublic, IdSchemePatchPublic
 from app.services import IdSchemeService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

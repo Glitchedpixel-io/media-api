@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_external_identifier_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     ExternalIdentifierCreatePublic,
     ExternalIdentifierPatchPublic,
@@ -15,7 +14,7 @@ from app.schemas import (
 from app.schemas.enums import EntityTypeEnum
 from app.services import ExternalIdentifierService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

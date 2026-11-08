@@ -6,12 +6,11 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from app.api_responses import COMMON_READ_RESPONSES
 from app.dependencies import get_artwork_service
 from app.routers.artwork import ARTWORK_UPLOAD_RESPONSES, artwork_upload_form
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import ArtworkRead, ArtworkUploadForm
 from app.schemas.enums import EntityTypeEnum
 from app.services import ArtworkService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

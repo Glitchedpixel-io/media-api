@@ -122,7 +122,7 @@ class TestFormatSniffing:
 
     def test_an_empty_file_is_400_not_415(self, store):
         """A distinct cause deserves a distinct status -- see the CLAUDE.md note on
-        QuietClientErrorRoute needing the right code to begin with."""
+        quiet_client_errors needing the right code to begin with."""
         with pytest.raises(HTTPException) as exc:
             store.store(io.BytesIO(b""))
         assert exc.value.status_code == 400

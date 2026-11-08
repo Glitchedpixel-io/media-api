@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_media_service, get_title_content_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     AssetCreatePublic,
     AssetListParams,
@@ -18,7 +17,7 @@ from app.schemas import (
 )
 from app.services import MediaService, TitleContentService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.post(

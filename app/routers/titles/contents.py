@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_title_content_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     TitleContentBatchIds,
     TitleContentBatchInsert,
@@ -16,7 +15,7 @@ from app.schemas import (
 )
 from app.services import TitleContentService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

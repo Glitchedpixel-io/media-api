@@ -7,14 +7,13 @@ from app.api_responses import COMMON_WRITE_RESPONSES
 from app.dependencies import (
     get_inbox_service,
 )
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     AssetRead,
 )
 from app.schemas.inbox import InboxDeleteRequest, InboxImportRequest, InboxItem
 from app.services.inbox_service import InboxService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

@@ -311,12 +311,7 @@ def _conditional_fields(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
 
 def _streaming_returns(api: Any) -> set[tuple[str, str]]:
-    """Identify routes whose handler returns a streamed response.
-
-    ``QuietClientErrorRoute`` replaces the endpoint callable, but it does so
-    through ``functools.wraps``, so the original annotations survive on the
-    wrapper and can be read directly.
-    """
+    """Identify routes whose handler returns a streamed response."""
     from fastapi.routing import APIRoute  # noqa: PLC0415 -- deferred with the app import.
 
     streaming: set[tuple[str, str]] = set()

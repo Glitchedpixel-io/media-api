@@ -6,11 +6,10 @@ from fastapi import APIRouter, Depends, Response
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_tag_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import TaggingReport, TagNameSet, TagRead, TagSet
 from app.services import TagService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

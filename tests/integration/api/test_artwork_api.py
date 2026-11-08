@@ -350,7 +350,7 @@ class TestUploadFormValidation:
 
     A pydantic ValidationError raised inside a dependency escapes as a 500 unless it
     is translated, and a 500 is what Logfire pages on -- the failure CLAUDE.md warns
-    QuietClientErrorRoute cannot undo, because by then the status is already wrong.
+    `quiet_client_errors` cannot undo, because by then the status is already wrong.
     """
 
     def test_half_a_provenance_pair_is_422_not_500(self, client, title_id):

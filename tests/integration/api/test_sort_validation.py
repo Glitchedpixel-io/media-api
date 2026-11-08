@@ -2,9 +2,9 @@
 
 `normalize_sort` raises `EnumViolation` for a field an endpoint does not allow. None
 of the paginated list services translated it, so it escaped as a 500: a caller
-asking for a sort that does not exist was told the server had failed, and the route
-class could not help -- `QuietClientErrorRoute` only converts an `HTTPException`
-that already carries the right status.
+asking for a sort that does not exist was told the server had failed, and the Logfire
+exception callback could not help -- `quiet_client_errors` only quiets an
+`HTTPException` that already carries the right status.
 
 Found while removing `mtime` from the asset sort keys (#62), which turned a
 previously-valid sort into an invalid one and so made the 500 reachable by a client

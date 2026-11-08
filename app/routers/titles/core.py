@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_title_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     PaginatedResponse,
     TitleCreatePublic,
@@ -14,7 +13,7 @@ from app.schemas import (
 )
 from app.services import TitleService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

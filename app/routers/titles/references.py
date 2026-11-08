@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_title_reference_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     TitleReferenceCreatePublic,
     TitleReferencePatchPublic,
@@ -11,7 +10,7 @@ from app.schemas import (
 )
 from app.services import TitleReferenceService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

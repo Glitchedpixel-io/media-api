@@ -9,12 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api_responses import COMMON_READ_RESPONSES
 from app.config import MediaConfig, get_media_config
 from app.dependencies import get_media_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import AccessoryFilePage
 from app.services import MediaService
 from app.utils.paths import accessory_relative_path, resolve_under_root
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(
