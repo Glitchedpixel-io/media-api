@@ -73,7 +73,7 @@ def test_the_alias_matches_the_canonical_route(api_app: FastAPI, path: str) -> N
         assert alias.endpoint is canonical.endpoint
         assert alias.response_model == canonical.response_model
         assert alias.status_code == canonical.status_code
-        assert type(alias) is type(canonical), "the alias must keep QuietClientErrorRoute"
+        assert type(alias) is type(canonical), "the alias must keep the route class"
 
 
 def _route(api_app: FastAPI, path: str, method: str) -> APIRoute | None:

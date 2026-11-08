@@ -3,11 +3,10 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_runner_state_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import RunnerStateCreatePublic, RunnerStatePatchPublic, RunnerStateRead
 from app.services import RunnerStateService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

@@ -153,8 +153,8 @@ class SQLAlchemyMediaRepository(SQLAlchemyBaseRepository, MediaRepository):
             #
             # Unguarded, `int()` raised ValueError straight out of the repository and
             # `?tag_ids=abc` was served as a 500 -- and, being a 500, was recorded as a
-            # Logfire issue that `QuietClientErrorRoute` had nothing to work with, since
-            # it only converts a status that is already correct (#132). The identical
+            # Logfire issue that `quiet_client_errors` had nothing to work with, since
+            # it only quiets a status that is already correct (#132). The identical
             # parse on GET /api/titles/ was guarded this way in #131.
             try:
                 tags = {

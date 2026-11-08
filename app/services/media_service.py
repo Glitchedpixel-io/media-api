@@ -87,8 +87,8 @@ class MediaService:
             HTTPException: 422 if `sort` names a field the endpoint does not
                 support. `normalize_sort` raises `EnumViolation` for that, and
                 without translation it escaped as a 500 -- so a caller asking for an
-                unsupported sort was told the server had failed. The route class
-                cannot help: it only converts an `HTTPException` that already
+                unsupported sort was told the server had failed. `quiet_client_errors`
+                cannot help: it only quiets an `HTTPException` that already
                 carries the right status.
         """
         try:

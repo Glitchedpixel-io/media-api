@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_file_stream_service
-from app.routers.base import QuietClientErrorRoute
 from app.services import FileStreamService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get("/{asset_id}", operation_id="stream_asset")

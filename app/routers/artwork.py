@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_artwork_kind_service, get_artwork_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     ArtworkKindRead,
     ArtworkListParams,
@@ -17,14 +16,14 @@ from app.schemas import (
 )
 from app.services import ArtworkKindService, ArtworkService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 #: The refusals an artwork upload can produce, each from a distinct cause.
 #:
-#: Kept distinct on purpose. `QuietClientErrorRoute` only silences a client error if
-#: the status reaching the route is already right (see CLAUDE.md), so collapsing "not
-#: an image", "too large" and "unknown kind" into one 500-shaped exception would page
-#: on every caller mistake and the route class could do nothing about it.
+#: Kept distinct on purpose. A client error is only kept out of Logfire if its status
+#: is already right (see CLAUDE.md), so collapsing "not an image", "too large" and
+#: "unknown kind" into one 500-shaped exception would page on every caller mistake
+#: and `quiet_client_errors` could do nothing about it.
 ARTWORK_UPLOAD_RESPONSES: dict[int | str, dict] = {
     **COMMON_READ_RESPONSES,
     **COMMON_WRITE_RESPONSES,
@@ -66,7 +65,7 @@ def artwork_upload_form(
         )
     except ValidationError as e:
         # Without this the ValidationError escapes as a 500 and Logfire pages on a
-        # caller mistake -- the failure mode CLAUDE.md warns QuietClientErrorRoute
+        # caller mistake -- the failure mode CLAUDE.md warns `quiet_client_errors`
         # cannot undo, because by then the status is already wrong.
         #
         # All three flags are load-bearing. `ctx` carries the original ValueError
@@ -160,7 +159,7 @@ def delete_artwork(artwork_id: int, service: ArtworkService = Depends(get_artwor
     service.delete_artwork(artwork_id)
 
 
-kinds_router = APIRouter(route_class=QuietClientErrorRoute)
+kinds_router = APIRouter()
 
 
 @kinds_router.get(

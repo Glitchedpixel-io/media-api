@@ -5,11 +5,10 @@ from fastapi import APIRouter, Depends, Response
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_title_type_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import TitleTypeCreatePublic, TitleTypePatchPublic, TitleTypeRead
 from app.services import TitleTypeService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

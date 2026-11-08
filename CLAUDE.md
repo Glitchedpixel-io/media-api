@@ -52,33 +52,26 @@ the same models, and CI's `alembic check` fails if the two ever drift.)
 
 ## Quiet Client Errors
 
-Routers use `QuietClientErrorRoute` (`app/routers/base.py`) via
-`APIRouter(route_class=QuietClientErrorRoute)`. Logfire's FastAPI instrumentation
-records every exception that escapes an endpoint as a Logfire issue — *before* any
-`app.exception_handler` runs, so a handler cannot suppress it. `QuietClientErrorRoute`
-converts `HTTPException`s with `status_code < 500` into the equivalent `JSONResponse`
-and returns it instead of raising, which avoids the record; `>= 500` is re-raised
-unchanged so real faults still page. Keep using plain `raise HTTPException(...)` in
-endpoint code — the route class does the conversion, nothing else needs to change.
+Logfire's FastAPI instrumentation records every exception that leaves an endpoint or a
+dependency on the request span — including an `HTTPException` that FastAPI turns into
+an ordinary 4xx — and a recorded exception opens a Logfire issue. `setup_logging`
+(`app/utils/logs.py`) therefore configures Logfire with an exception callback,
+`quiet_client_errors`, which skips recording any Starlette/FastAPI `HTTPException` with
+`status_code < 500`. `>= 500` and every other exception are recorded as before, so real
+faults still page. Keep using plain `raise HTTPException(...)` in endpoints and
+dependencies; nothing else needs to change.
 
-**This only quiets the log if the status code reaching the route is already correct.**
-If a service/repository layer collapses distinct failure causes into one exception type
-that always maps to 500, the route has nothing to work with — fix the status code at
-its source, not by adding more route-class magic.
+**This only quiets the log if the status code is already correct.** If a
+service/repository layer collapses distinct failure causes into one exception type that
+always maps to 500, the callback has nothing to work with — fix the status code at its
+source.
 
-**Most endpoints in this codebase are sync `def`, not `async def`.** The route class
-must preserve the original callable's sync/async-ness in its wrapper — FastAPI decides
-once, at route construction, whether to await the endpoint or run it in a threadpool,
-based on the callable in place *before* the route class swaps it out. A wrapper that's
-unconditionally `async def` breaks every sync endpoint silently (the response becomes
-an unawaited coroutine object, not the actual data) — see the regression tests in
-`tests/unit/api/test_base_router.py` for both variants.
-
-This pattern was hardened against real incidents where Logfire's FastAPI
-instrumentation paged on ordinary client errors that a lower layer had
-miscategorized. If porting this to another FastAPI+Logfire repo, replicate
-`QuietClientErrorRoute` and the regression tests above — the same
-sync/async-preservation caveat applies there too.
+This replaced a custom `APIRoute` subclass that wrapped each endpoint. That approach
+depended on FastAPI internals (it broke silently in FastAPI 0.137, when included routes
+began to be served from their original endpoint), and never covered exceptions raised
+in dependencies. Logfire marks the callback API as experimental, so
+`tests/unit/utils/test_quiet_client_errors.py` checks the behaviour end to end, through
+the real instrumentation, rather than just the function.
 
 ## Versioning & Releases
 
@@ -320,7 +313,7 @@ workarounds at once (issue #32).
 ## Database Sessions
 
 One session per request, provided via a generator. This project's endpoints are
-mostly sync `def` (see `QuietClientErrorRoute` below), so the session is a plain
+mostly sync `def`, so the session is a plain
 SQLAlchemy `Session`, not `AsyncSession` — match whichever your repo actually uses:
 
 ```python

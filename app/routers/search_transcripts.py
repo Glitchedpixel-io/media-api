@@ -2,7 +2,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_transcript_search_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import (
     TranscriptSearchHit,
     TranscriptSearchQuery,
@@ -10,7 +9,7 @@ from app.schemas import (
 )
 from app.services import TranscriptSearchService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

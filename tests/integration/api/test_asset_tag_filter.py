@@ -1,8 +1,8 @@
 """Integration tests for the tag_ids filter on GET /api/assets/ (issue #132).
 
 `?tag_ids=abc` reached `int()` unguarded in the repository and was served as a 500 --
-a caller-caused condition arriving as a server fault, which `QuietClientErrorRoute`
-cannot quiet because it only converts a status that is already correct. So the wrong
+a caller-caused condition arriving as a server fault, which `quiet_client_errors`
+cannot quiet because it only acts on a status that is already correct. So the wrong
 status was not only wrong for the caller, it also opened a Logfire issue for every
 malformed request.
 

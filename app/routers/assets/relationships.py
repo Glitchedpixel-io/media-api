@@ -5,11 +5,10 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_READ_RESPONSES, COMMON_WRITE_RESPONSES
 from app.dependencies import get_media_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import AssetRead
 from app.services import MediaService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.get(

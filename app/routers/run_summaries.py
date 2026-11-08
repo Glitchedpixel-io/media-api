@@ -3,11 +3,10 @@ from fastapi import APIRouter, Depends
 
 from app.api_responses import COMMON_WRITE_RESPONSES
 from app.dependencies import get_run_summary_service
-from app.routers.base import QuietClientErrorRoute
 from app.schemas import RunSummaryCreatePublic, RunSummaryRead
 from app.services import RunSummaryService
 
-router = APIRouter(route_class=QuietClientErrorRoute)
+router = APIRouter()
 
 
 @router.post(
