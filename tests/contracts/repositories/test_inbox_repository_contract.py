@@ -225,3 +225,34 @@ def test_an_unreadable_directory_does_not_fail_the_request(
     locked_item = next(item for item in items if item.name == "locked")
     assert locked_item.children == []
     assert locked_item.children_truncated is True
+
+
+# --- Paths that name a root (CodeQL py/path-injection review) -----------------
+
+
+@pytest.mark.contract
+@pytest.mark.parametrize("source", [".", "/", "sub/.."])
+def test_the_inbox_root_itself_cannot_be_deleted(bundle, source: str) -> None:
+    """A path naming the inbox root used to reach shutil.move and fail as a 500."""
+    with pytest.raises(ForbiddenError):
+        bundle.inbox.delete(InboxDeleteRequest(source=source))
+
+
+@pytest.mark.contract
+@pytest.mark.parametrize("source", [".trash", ".trash/clip.avi", "sub/../.trash"])
+def test_the_trash_cannot_be_deleted_from(test_settings, bundle, source: str) -> None:
+    """Deleting the trash, or something in it, would move it into itself."""
+    trash = Path(test_settings.media.inbox_root).resolve() / ".trash"
+    (trash / "clip.avi").write_bytes(b"x")
+
+    with pytest.raises(ForbiddenError):
+        bundle.inbox.delete(InboxDeleteRequest(source=source))
+    assert (trash / "clip.avi").exists()
+
+
+@pytest.mark.contract
+def test_a_move_cannot_name_either_root(bundle) -> None:
+    with pytest.raises(ForbiddenError):
+        bundle.inbox.move(InboxImportRequest(source=".", target="any/file.txt"))
+    with pytest.raises(ForbiddenError):
+        bundle.inbox.move(InboxImportRequest(source="bad/clip101.avi", target="."))

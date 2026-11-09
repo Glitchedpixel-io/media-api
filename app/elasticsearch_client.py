@@ -160,7 +160,9 @@ class ElasticsearchClientManager:
             return {
                 "status": "error",
                 "healthy": False,
-                "message": str(e),
+                # The detail goes to the log above, not to callers: this dict is
+                # served by the unauthenticated /api/health.
+                "message": "Elasticsearch health check failed",
             }
 
 
