@@ -52,7 +52,7 @@ class InboxService:
             raise HTTPException(status_code=403, detail="Forbidden") from fe
         except Exception as e:
             logfire.exception(f"Unexpected error deleting inbox item {item.source}, with {e}")
-            raise HTTPException(status_code=500, detail=str(e)) from e
+            raise HTTPException(status_code=500, detail="Internal server error") from e
 
     def import_file(self, item: InboxImportRequest) -> AssetRead:
         try:
@@ -109,4 +109,4 @@ class InboxService:
             logfire.exception(
                 f"Unexpected error importing inbox file: {item.model_dump()}",
             )
-            raise HTTPException(status_code=500, detail=str(e)) from e
+            raise HTTPException(status_code=500, detail="Internal server error") from e

@@ -9,6 +9,11 @@ on:
     workflows: ["Version Bump"]
     types: [completed]
 
+# Read-only by default. `build` raises its own scope for releases and GHCR;
+# `dispatch` drops to none.
+permissions:
+  contents: read
+
 concurrency:
   group: publish
   cancel-in-progress: false

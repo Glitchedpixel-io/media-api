@@ -354,12 +354,12 @@ def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) ->
                 "status": "healthy",
                 "type": get_engine().dialect.name,
             }
-        except Exception as e:
+        except Exception:
+            # Logged, never returned: this endpoint is unauthenticated and a
+            # driver error can name the host, database and login.
+            logfire.exception("Health check: database unreachable")
             health_status["status"] = "degraded"
-            health_status["services"]["database"] = {
-                "status": "unhealthy",
-                "error": str(e),
-            }
+            health_status["services"]["database"] = {"status": "unhealthy"}
 
         # Check Elasticsearch connectivity
         try:
@@ -368,11 +368,11 @@ def create_app(config: AppConfig, allow_origins: Sequence[str] | None = None) ->
             health_status["services"]["elasticsearch"] = es_health
             if not es_health.get("healthy", False):
                 health_status["status"] = "degraded"
-        except Exception as e:
+        except Exception:
+            logfire.exception("Health check: Elasticsearch check raised")
             health_status["services"]["elasticsearch"] = {
                 "status": "unavailable",
                 "healthy": False,
-                "error": str(e),
             }
 
         return health_status

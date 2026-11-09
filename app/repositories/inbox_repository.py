@@ -62,6 +62,10 @@ class FileInboxRepository(InboxRepository):
 
     def delete(self, file: InboxDeleteRequest) -> None:
         src = self._safe_relative_path(self.inbox_root, file.source)
+        # Trash lives inside the inbox. Deleting it, or anything already in it,
+        # would move it into itself.
+        if src.is_relative_to(self.trash_root):
+            raise ForbiddenError("Cannot delete from the trash")
         if not src.exists():
             raise NotFoundError("Source not found in inbox")
 
@@ -158,9 +162,25 @@ class FileInboxRepository(InboxRepository):
 
     @staticmethod
     def _safe_relative_path(base: Path, rel: str) -> Path:
-        # Normalize separators and remove leading slashes
+        """Resolve ``rel`` under ``base``, refusing anything that is not inside it.
+
+        The path is resolved first, so ``..`` segments and symlinks that lead out of
+        ``base`` are caught. ``base`` itself is refused too: an empty or ``.`` path
+        named the whole inbox, and deleting it tried to move the inbox into its own
+        trash, which failed as a 500.
+
+        Args:
+            base: The resolved root the path must stay within.
+            rel: A caller-supplied path relative to ``base``.
+
+        Returns:
+            Path: The resolved path, strictly inside ``base``.
+
+        Raises:
+            ForbiddenError: If the path resolves to ``base`` or outside it.
+        """
         rel_norm = rel.replace("\\", "/").lstrip("/")
         candidate = (base / rel_norm).resolve()
-        if base not in candidate.parents and candidate != base:
-            raise ForbiddenError("Path traversal detected")
+        if candidate == base or not candidate.is_relative_to(base):
+            raise ForbiddenError("Path must be inside the root")
         return candidate
